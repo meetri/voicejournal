@@ -26,7 +26,9 @@ struct RecordingView: View {
     
     init(context: NSManagedObjectContext? = nil) {
         let ctx = context ?? PersistenceController.shared.container.viewContext
-        _viewModel = StateObject(wrappedValue: AudioRecordingViewModel(context: ctx))
+        // Create the AudioRecordingService on the main actor
+        let recordingService = AudioRecordingService()
+        _viewModel = StateObject(wrappedValue: AudioRecordingViewModel(context: ctx, recordingService: recordingService))
     }
     
     // MARK: - Body
@@ -141,9 +143,13 @@ struct RecordingView: View {
             if viewModel.isRecording {
                 Button(action: {
                     if viewModel.isPaused {
-                        viewModel.resumeRecording()
+                        Task {
+                            await viewModel.resumeRecording()
+                        }
                     } else {
-                        viewModel.pauseRecording()
+                        Task {
+                            await viewModel.pauseRecording()
+                        }
                     }
                 }) {
                     Image(systemName: viewModel.isPaused ? "play.circle.fill" : "pause.circle.fill")

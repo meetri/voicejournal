@@ -60,14 +60,15 @@ class AudioRecordingViewModel: ObservableObject {
     
     // MARK: - Private Properties
     
-    private let recordingService = AudioRecordingService()
+    private let recordingService: AudioRecordingService
     private var cancellables = Set<AnyCancellable>()
     private var managedObjectContext: NSManagedObjectContext
     
     // MARK: - Initialization
     
-    init(context: NSManagedObjectContext) {
+    init(context: NSManagedObjectContext, recordingService: AudioRecordingService) {
         self.managedObjectContext = context
+        self.recordingService = recordingService
         
         // Set up publishers
         setupPublishers()
@@ -114,9 +115,9 @@ class AudioRecordingViewModel: ObservableObject {
     }
     
     /// Pause recording
-    func pauseRecording() {
+    func pauseRecording() async {
         do {
-            try recordingService.pauseRecording()
+            try await recordingService.pauseRecording()
             isPaused = true
         } catch {
             handleError(error)
@@ -124,9 +125,9 @@ class AudioRecordingViewModel: ObservableObject {
     }
     
     /// Resume recording
-    func resumeRecording() {
+    func resumeRecording() async {
         do {
-            try recordingService.resumeRecording()
+            try await recordingService.resumeRecording()
             isPaused = false
         } catch {
             handleError(error)
@@ -136,7 +137,7 @@ class AudioRecordingViewModel: ObservableObject {
     /// Stop recording
     func stopRecording() async {
         do {
-            if let recordingURL = try recordingService.stopRecording() {
+            if let recordingURL = try await recordingService.stopRecording() {
                 isRecording = false
                 isPaused = false
                 
@@ -151,8 +152,8 @@ class AudioRecordingViewModel: ObservableObject {
     /// Cancel recording
     func cancelRecording() async {
         do {
-            _ = try recordingService.stopRecording()
-            recordingService.deleteRecording()
+            _ = try await recordingService.stopRecording()
+            await recordingService.deleteRecording()
             
             isRecording = false
             isPaused = false

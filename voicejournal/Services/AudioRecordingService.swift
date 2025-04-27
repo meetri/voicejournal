@@ -32,6 +32,13 @@ extension RecordingState: Equatable {
     }
 }
 
+/// Enum representing recording permission states
+enum RecordingPermission {
+    case granted
+    case denied
+    case undetermined
+}
+
 /// Enum representing errors that can occur during audio recording
 enum AudioRecordingError: Error {
     case audioSessionSetupFailed
@@ -58,6 +65,25 @@ enum AudioRecordingError: Error {
             return "Microphone permission denied"
         case .unknown(let error):
             return "Unknown error: \(error.localizedDescription)"
+        }
+    }
+}
+
+// Add Equatable conformance to AudioRecordingError
+extension AudioRecordingError: Equatable {
+    static func == (lhs: AudioRecordingError, rhs: AudioRecordingError) -> Bool {
+        switch (lhs, rhs) {
+        case (.audioSessionSetupFailed, .audioSessionSetupFailed),
+             (.audioEngineSetupFailed, .audioEngineSetupFailed),
+             (.recordingInProgress, .recordingInProgress),
+             (.noRecordingInProgress, .noRecordingInProgress),
+             (.fileCreationFailed, .fileCreationFailed),
+             (.permissionDenied, .permissionDenied):
+            return true
+        case (.unknown(let lhsError), .unknown(let rhsError)):
+            return lhsError.localizedDescription == rhsError.localizedDescription
+        default:
+            return false
         }
     }
 }
@@ -94,7 +120,8 @@ class AudioRecordingService: ObservableObject {
     private let audioSession = AVAudioSession.sharedInstance()
     private let processingQueue = DispatchQueue(label: "com.voicejournal.audioprocessing", qos: .userInitiated)
     
-    private var recordingsDirectory: URL {
+    // Changed from private to internal for testing purposes
+    internal var recordingsDirectory: URL {
         let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
         return paths[0].appendingPathComponent("Recordings", isDirectory: true)
     }
@@ -117,9 +144,33 @@ class AudioRecordingService: ObservableObject {
     }
     
     /// Check if microphone permission is granted
-    func checkPermission() async -> AVAudioSession.RecordPermission {
+    func checkPermission() async -> RecordingPermission {
         return await withCheckedContinuation { continuation in
-            continuation.resume(returning: AVAudioSession.sharedInstance().recordPermission)
+            if #available(iOS 17.0, *) {
+                // For iOS 17+, map from AVAudioApplication's permission
+                switch AVAudioApplication.shared.recordPermission {
+                case .granted:
+                    continuation.resume(returning: .granted)
+                case .denied:
+                    continuation.resume(returning: .denied)
+                case .undetermined:
+                    continuation.resume(returning: .undetermined)
+                @unknown default:
+                    continuation.resume(returning: .undetermined)
+                }
+            } else {
+                // For iOS versions before 17.0, map from AVAudioSession's permission
+                switch AVAudioSession.sharedInstance().recordPermission {
+                case .granted:
+                    continuation.resume(returning: .granted)
+                case .denied:
+                    continuation.resume(returning: .denied)
+                case .undetermined:
+                    continuation.resume(returning: .undetermined)
+                @unknown default:
+                    continuation.resume(returning: .undetermined)
+                }
+            }
         }
     }
     
@@ -215,7 +266,7 @@ class AudioRecordingService: ObservableObject {
     }
     
     /// Pause the current recording
-    func pauseRecording() throws {
+    func pauseRecording() async throws {
         guard state == .recording, let audioEngine = audioEngine else {
             throw AudioRecordingError.noRecordingInProgress
         }
@@ -235,7 +286,7 @@ class AudioRecordingService: ObservableObject {
     }
     
     /// Resume a paused recording
-    func resumeRecording() throws {
+    func resumeRecording() async throws {
         guard state == .paused, let audioEngine = audioEngine else {
             throw AudioRecordingError.noRecordingInProgress
         }
@@ -257,7 +308,7 @@ class AudioRecordingService: ObservableObject {
     }
     
     /// Stop and finalize the current recording
-    func stopRecording() throws -> URL? {
+    func stopRecording() async throws -> URL? {
         guard state == .recording || state == .paused, let audioEngine = audioEngine else {
             throw AudioRecordingError.noRecordingInProgress
         }
@@ -296,7 +347,7 @@ class AudioRecordingService: ObservableObject {
     }
     
     /// Delete the current recording file
-    func deleteRecording() {
+    func deleteRecording() async {
         guard let url = recordingURL else { return }
         
         do {
@@ -382,6 +433,35 @@ class AudioRecordingService: ObservableObject {
         await MainActor.run {
             self.audioLevel = normalizedLevel
         }
+    }
+}
+
+// MARK: - Testing Support
+    
+// These methods are for testing purposes only
+extension AudioRecordingService {
+    /// Internal method to set state (for testing)
+    @MainActor
+    internal func setStateForTesting(_ newState: RecordingState) {
+        state = newState
+    }
+    
+    /// Internal method to set recordingURL (for testing)
+    @MainActor
+    internal func setRecordingURLForTesting(_ url: URL?) {
+        recordingURL = url
+    }
+    
+    /// Internal method to set audioLevel (for testing)
+    @MainActor
+    internal func setAudioLevelForTesting(_ level: Float) {
+        audioLevel = level
+    }
+    
+    /// Internal method to set duration (for testing)
+    @MainActor
+    internal func setDurationForTesting(_ newDuration: TimeInterval) {
+        duration = newDuration
     }
 }
 

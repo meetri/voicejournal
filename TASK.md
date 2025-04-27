@@ -54,6 +54,32 @@
 - [ ] Create editing interface for transcription corrections
 - [ ] Add support for punctuation and formatting in transcripts
 
+### Playback of Journal Recordings
+
+#### Basic Playback Infrastructure
+- [ ] Set up AVAudioPlayer for playback capabilities
+- [ ] Create audio playback service class with error handling
+- [ ] Implement core playback controls (play, pause, resume, stop)
+- [ ] Add proper audio session handling for playback
+
+#### Playback Interface & Controls
+- [ ] Design playback interface with intuitive controls
+- [ ] Implement playback progress tracking with time display
+- [ ] Add playback rate control (0.5x, 1x, 1.5x, 2x speeds)
+- [ ] Implement playback position seeking (scrubbing) functionality
+
+#### Visual Feedback & Enhanced Features
+- [ ] Design and implement interactive waveform display for playback visualization
+- [ ] Add audio bookmarking system for marking important moments
+- [ ] Create highlighting of transcribed text as audio plays
+- [ ] Implement audio level visualization during playback
+
+#### System Integration
+- [ ] Create a mini-player for continued playback while navigating the app
+- [ ] Implement background audio playback capabilities
+- [ ] Add lock screen and Control Center media controls
+- [ ] Implement AirPlay and external device playback support
+
 ## Phase 3: Journal Interface & Organization
 
 ### Entry Management UI
