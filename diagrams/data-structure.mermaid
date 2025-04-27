@@ -1,0 +1,17 @@
+erDiagram
+    JournalEntry {
+        UUID id
+        Date createdAt
+        Date modifiedAt
+        String title
+        String transcription
+        String audioFilePath
+        Float duration
+        Bool isLocked
+    }
+    Tag {
+        UUID id
+        String name
+        String colorHex
+    }
+    JournalEntry }o--o{ Tag : has

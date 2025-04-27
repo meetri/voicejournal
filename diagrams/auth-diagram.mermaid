@@ -1,0 +1,8 @@
+graph TD
+    A[App Launch] --> B{Authentication Required?}
+    B -->|Yes| C[Face ID/Touch ID Prompt]
+    C -->|Success| D[Access App]
+    C -->|Failure| E[Fallback PIN Entry]
+    E -->|Success| D
+    E -->|Failure| F[Access Denied]
+    B -->|No| D
