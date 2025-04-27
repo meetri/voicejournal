@@ -71,6 +71,11 @@ struct WaveformView: View {
         
         // Draw each bar
         for i in 0..<barCount {
+            
+            if levelHistory.count <= i {
+                continue
+            }
+            
             let level = levelHistory[i]
             
             // Calculate bar height based on level (minimum 2 pixels)
@@ -129,7 +134,9 @@ struct WaveformView: View {
         }
         
         // Remove last element to maintain fixed size
-        newHistory.removeLast()
+        if !newHistory.isEmpty {
+            newHistory.removeLast()
+        }
         
         // Update state
         levelHistory = newHistory
