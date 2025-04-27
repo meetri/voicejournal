@@ -21,6 +21,10 @@ class MockAudioRecordingService: AudioRecordingService {
     var mockRecordingURL: URL?
     var mockFileSize: Int64 = 0
     
+    // Publishers to simulate @Published properties
+    private let audioLevelSubject = CurrentValueSubject<Float, Never>(0.0)
+    private let durationSubject = CurrentValueSubject<TimeInterval, Never>(0.0)
+    
     var startRecordingCalled = false
     var pauseRecordingCalled = false
     var resumeRecordingCalled = false
@@ -40,14 +44,22 @@ class MockAudioRecordingService: AudioRecordingService {
         set { }
     }
     
+    // Override audioLevel to properly publish changes
     override var audioLevel: Float {
         get { return mockAudioLevel }
-        set { }
+        set {
+            // This setter is needed to properly override the property
+            // but we'll control the value through simulateAudioLevelChange
+        }
     }
     
+    // Override duration to properly publish changes
     override var duration: TimeInterval {
         get { return mockDuration }
-        set { }
+        set {
+            // This setter is needed to properly override the property
+            // but we'll control the value through simulateDurationChange
+        }
     }
     
     override var recordingURL: URL? {
@@ -111,11 +123,25 @@ class MockAudioRecordingService: AudioRecordingService {
     
     // Helper methods for testing
     func simulateAudioLevelChange(to level: Float) {
+        // Update the mock value
         mockAudioLevel = level
+        
+        // Use the testing helper method instead of direct access
+        super.setAudioLevelForTesting(level)
+        
+        // Also trigger the objectWillChange notification for ObservableObject
+        self.objectWillChange.send()
     }
     
     func simulateDurationChange(to duration: TimeInterval) {
+        // Update the mock value
         mockDuration = duration
+        
+        // Use the testing helper method instead of direct access
+        super.setDurationForTesting(duration)
+        
+        // Also trigger the objectWillChange notification for ObservableObject
+        self.objectWillChange.send()
     }
 }
 
