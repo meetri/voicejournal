@@ -55,7 +55,7 @@ struct JournalEntriesView: View {
             List {
                 ForEach(entries) { entry in
                     NavigationLink {
-                        JournalEntryDetailView(entry: entry)
+                        JournalEntryView(journalEntry: entry)
                     } label: {
                         JournalEntryRow(entry: entry)
                     }

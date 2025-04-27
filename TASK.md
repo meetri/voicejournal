@@ -20,7 +20,7 @@
 - [x] Create unit tests for authentication and Core Data models (Completed: 4/27/2025)
 - [x] Begin implementing audio recording functionality (Phase 2) (Completed: 4/27/2025)
 - [ ] Implement Speech-to-Text functionality for transcription
-- [ ] Enhance journal entry UI with audio playback capabilities
+- [x] Enhance journal entry UI with audio playback capabilities (Completed: 4/27/2025)
 
 ### Core Data Model
 - [x] Design and implement Core Data model for journal entries (Completed: 4/27/2025)
@@ -57,22 +57,22 @@
 ### Playback of Journal Recordings
 
 #### Basic Playback Infrastructure
-- [ ] Set up AVAudioPlayer for playback capabilities
-- [ ] Create audio playback service class with error handling
-- [ ] Implement core playback controls (play, pause, resume, stop)
-- [ ] Add proper audio session handling for playback
+- [x] Set up AVAudioPlayer for playback capabilities (Completed: 4/27/2025)
+- [x] Create audio playback service class with error handling (Completed: 4/27/2025)
+- [x] Implement core playback controls (play, pause, resume, stop) (Completed: 4/27/2025)
+- [x] Add proper audio session handling for playback (Completed: 4/27/2025)
 
 #### Playback Interface & Controls
-- [ ] Design playback interface with intuitive controls
-- [ ] Implement playback progress tracking with time display
-- [ ] Add playback rate control (0.5x, 1x, 1.5x, 2x speeds)
-- [ ] Implement playback position seeking (scrubbing) functionality
+- [x] Design playback interface with intuitive controls (Completed: 4/27/2025)
+- [x] Implement playback progress tracking with time display (Completed: 4/27/2025)
+- [x] Add playback rate control (0.5x, 1x, 1.5x, 2x speeds) (Completed: 4/27/2025)
+- [x] Implement playback position seeking (scrubbing) functionality (Completed: 4/27/2025)
 
 #### Visual Feedback & Enhanced Features
-- [ ] Design and implement interactive waveform display for playback visualization
+- [x] Design and implement interactive waveform display for playback visualization (Completed: 4/27/2025)
 - [ ] Add audio bookmarking system for marking important moments
 - [ ] Create highlighting of transcribed text as audio plays
-- [ ] Implement audio level visualization during playback
+- [x] Implement audio level visualization during playback (Completed: 4/27/2025)
 
 #### System Integration
 - [ ] Create a mini-player for continued playback while navigating the app
@@ -84,7 +84,7 @@
 
 ### Entry Management UI
 - [ ] Design and implement journal entry list view
-- [ ] Create detailed entry view with audio playback
+- [x] Create detailed entry view with audio playback (Completed: 4/27/2025)
 - [ ] Build entry creation flow
 - [ ] Implement entry editing and deletion
 
@@ -135,7 +135,7 @@
 - [ ] Design empty states and helpful prompts
 
 ### Testing
-- [ ] Conduct unit testing for core functionality
+- [x] Conduct unit testing for core functionality (Completed: 4/27/2025)
 - [ ] Perform UI testing for major user flows
 - [ ] Complete integration testing for API connections
 - [ ] Conduct beta testing with sample users
