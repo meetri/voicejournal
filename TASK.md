@@ -18,7 +18,9 @@
 - [x] Begin implementing Core Data Model for journal entries (Completed: 4/27/2025)
 - [x] Start work on authentication system using LocalAuthentication framework (Completed: 4/27/2025)
 - [x] Create unit tests for authentication and Core Data models (Completed: 4/27/2025)
-- [ ] Begin implementing audio recording functionality (Phase 2)
+- [x] Begin implementing audio recording functionality (Phase 2) (Completed: 4/27/2025)
+- [ ] Implement Speech-to-Text functionality for transcription
+- [ ] Enhance journal entry UI with audio playback capabilities
 
 ### Core Data Model
 - [x] Design and implement Core Data model for journal entries (Completed: 4/27/2025)
@@ -35,16 +37,16 @@
 ## Phase 2: Voice Recording & Transcription
 
 ### Audio Recording
-- [ ] Set up AVAudioSession for recording capabilities
-- [ ] Implement recording controls (start, pause, resume, stop)
-- [ ] Add audio level metering for input validation
-- [ ] Create audio recording service class
+- [x] Set up AVAudioSession for recording capabilities (Completed: 4/27/2025)
+- [x] Implement recording controls (start, pause, resume, stop) (Completed: 4/27/2025)
+- [x] Add audio level metering for input validation (Completed: 4/27/2025)
+- [x] Create audio recording service class (Completed: 4/27/2025)
 
 ### Waveform Visualization
-- [ ] Research and select waveform visualization approach (custom or library)
-- [ ] Implement real-time amplitude visualization during recording
-- [ ] Optimize rendering for performance
-- [ ] Add visual styling options for waveform display
+- [x] Research and select waveform visualization approach (custom or library) (Completed: 4/27/2025)
+- [x] Implement real-time amplitude visualization during recording (Completed: 4/27/2025)
+- [x] Optimize rendering for performance (Completed: 4/27/2025)
+- [x] Add visual styling options for waveform display (Completed: 4/27/2025)
 
 ### Speech-to-Text
 - [ ] Integrate Speech framework for transcription
@@ -123,13 +125,13 @@
 1. ✅ Set up basic Xcode project with the correct configurations
 2. ✅ Implement the authentication system using LocalAuthentication
 3. ✅ Create the Core Data model for storing journal entries
-4. Build a simple recording interface with basic waveform visualization
+4. ✅ Build a simple recording interface with basic waveform visualization
 5. Implement the Speech framework integration for initial transcription testing
 
 ## Technical Research Tasks
 
-1. Evaluate waveform visualization libraries (DSWaveformImage, FDWaveformView) vs. custom implementation
-2. ✅ Research best practices for Core Data encryption with biometric authentication
+1. ✅ Evaluate waveform visualization libraries (DSWaveformImage, FDWaveformView) vs. custom implementation (Completed: 4/27/2025)
+2. ✅ Research best practices for Core Data encryption with biometric authentication (Completed: 4/27/2025)
 3. Investigate iOS 18's speech recognition limits and optimization strategies
-4. Explore efficient methods for audio buffer processing for visualization
+4. ✅ Explore efficient methods for audio buffer processing for visualization (Completed: 4/27/2025)
 5. Research ChatGPT API integration patterns for iOS applications

@@ -1,0 +1,8 @@
+i am planning a project to create an iOS voice journal application. I need your help with the high level direction and initial tasks. I want the app to be able to record daily journal entries. Each journal entry can be tagged with custom generated tags. Also the app needs to be password protected using standard ios techniques ( face id / pin ). Also eventually i'd like to connect the app to an external chatgpt api to analyze the journal entry and apply metrics to it such as. mood, subject and others. Also i'd like for all voice journal entries to be converted to text. Also, i would like the app to have the ability to show the wave-form of the spoken words as it's getting recorded. Use the brave api to query apple for details on ios version 18 to figure out how best to implement this idea. Next create a PLANNING.md and TASK.md file.
+
+PLANNING.md - high level direction, scope, tech, etc.
+TASK.md - initial tasks to complete the project
+
+
+Documentation Links:
+
