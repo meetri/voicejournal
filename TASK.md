@@ -47,6 +47,7 @@
 - [x] Implement real-time amplitude visualization during recording (Completed: 4/27/2025)
 - [x] Optimize rendering for performance (Completed: 4/27/2025)
 - [x] Add visual styling options for waveform display (Completed: 4/27/2025)
+- [x] Fix waveform not showing on first recording (Completed: 4/27/2025)
 
 ### Speech-to-Text
 - [ ] Integrate Speech framework for transcription

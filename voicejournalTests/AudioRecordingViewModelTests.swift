@@ -236,6 +236,32 @@ final class AudioRecordingViewModelTests: XCTestCase {
     }
     
     @MainActor
+    func testStartRecordingInitialAudioLevel() async {
+        // Set initial audio level to 0
+        mockService.mockAudioLevel = 0.0
+        mockService.simulateAudioLevelChange(to: 0.0)
+        
+        // Wait for the binding to update
+        let expectation1 = XCTestExpectation(description: "Initial audio level should be set to 0")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            XCTAssertEqual(self.viewModel.audioLevel, 0.0, "Initial audio level should be 0")
+            expectation1.fulfill()
+        }
+        wait(for: [expectation1], timeout: 0.2)
+        
+        // Start recording
+        await viewModel.startRecording()
+        
+        // Check that audio level was initialized to a minimum value
+        let expectation2 = XCTestExpectation(description: "Audio level should be initialized to minimum value")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            XCTAssertGreaterThanOrEqual(self.viewModel.audioLevel, 0.05, "Audio level should be initialized to at least 0.05")
+            expectation2.fulfill()
+        }
+        wait(for: [expectation2], timeout: 0.2)
+    }
+    
+    @MainActor
     func testStartRecordingWithPermissionDenied() async {
         // Set up permission denied
         mockService.permissionToReturn = RecordingPermission.denied

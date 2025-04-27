@@ -104,6 +104,12 @@ class AudioRecordingViewModel: ObservableObject {
             // Start recording
             try await recordingService.startRecording()
             
+            // Set initial audio level to ensure waveform is visible immediately
+            // This helps especially on the first recording
+            if audioLevel <= 0.01 {
+                audioLevel = 0.05
+            }
+            
             isRecording = true
             isPaused = false
             hasRecordingSaved = false

@@ -140,6 +140,47 @@ final class WaveformViewTests: XCTestCase {
         
         XCTAssertNil(testWaveformView.timer, "Timer should be nil after changing to inactive state")
     }
+    
+    // Test that the waveform shows on first activation
+    func testWaveformShowsOnFirstActivation() {
+        let testWaveformView = TestableWaveformView(audioLevel: 0.0, isActive: false)
+        testWaveformView.isFirstActivation = true
+        
+        // Initialize level history
+        testWaveformView.levelHistory = Array(repeating: 0.0, count: testWaveformView.barCount)
+        
+        // Simulate first activation
+        testWaveformView.isActive = true
+        testWaveformView.handleFirstActivation(oldValue: false, newValue: true)
+        
+        // Wait a short time for the delayed timer start
+        let expectation = XCTestExpectation(description: "Timer should start after delay")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            // Verify timer was started
+            XCTAssertNotNil(testWaveformView.timer, "Timer should be started after first activation")
+            
+            // Verify isFirstActivation was set to false
+            XCTAssertFalse(testWaveformView.isFirstActivation, "isFirstActivation should be set to false")
+            
+            expectation.fulfill()
+        }
+        
+        wait(for: [expectation], timeout: 0.3)
+    }
+    
+    // Test that minimum visible level is applied
+    func testMinimumVisibleLevelIsApplied() {
+        let testWaveformView = TestableWaveformView(audioLevel: 0.01, isActive: true)
+        
+        // Initialize level history
+        testWaveformView.levelHistory = Array(repeating: 0.0, count: testWaveformView.barCount)
+        
+        // Simulate timer firing
+        testWaveformView.updateLevelHistoryWithMinLevel()
+        
+        // First element should be at least the minimum visible level
+        XCTAssertGreaterThanOrEqual(testWaveformView.levelHistory[0], 0.05, "First element should be at least the minimum visible level")
+    }
 }
 
 // A wrapper class for WaveformView that allows testing private properties and methods
@@ -147,6 +188,7 @@ class TestableWaveformView {
     var waveformView: WaveformView
     var timer: Timer?
     var levelHistory: [CGFloat] = []
+    var isFirstActivation: Bool = true
     
     // Forward properties from WaveformView
     var audioLevel: CGFloat {
@@ -204,10 +246,61 @@ class TestableWaveformView {
         levelHistory = newHistory
     }
     
+    func updateLevelHistoryWithMinLevel() {
+        // Simulate the updated updateLevelHistory method with minimum level
+        var newHistory = levelHistory
+        
+        if isActive {
+            // When active, use the current audio level with some randomization for visual interest
+            let randomFactor = CGFloat.random(in: 0.8...1.2)
+            
+            // Ensure we have a visible level even if audioLevel is very low
+            let minVisibleLevel: CGFloat = 0.05
+            let adjustedLevel = max(minVisibleLevel, audioLevel)
+            
+            let newLevel = min(1.0, adjustedLevel * randomFactor)
+            newHistory.insert(newLevel, at: 0)
+        } else {
+            // When inactive, gradually reduce levels
+            newHistory.insert(0, at: 0)
+        }
+        
+        // Remove last element to maintain fixed size
+        if !newHistory.isEmpty && newHistory.count > barCount {
+            newHistory.removeLast()
+        }
+        
+        // Update state
+        levelHistory = newHistory
+    }
+    
     func handleIsActiveChange(oldValue: Bool, newValue: Bool) {
         // Simulate the onChange handler
         if newValue {
             startTimer()
+        } else {
+            stopTimer()
+        }
+    }
+    
+    func handleFirstActivation(oldValue: Bool, newValue: Bool) {
+        // Simulate the onChange handler with first activation logic
+        if newValue {
+            // Ensure level history is initialized
+            if levelHistory.isEmpty || levelHistory.count != barCount {
+                levelHistory = Array(repeating: 0, count: barCount)
+            }
+            
+            // Handle first activation specially
+            if isFirstActivation {
+                // Insert a small delay to ensure audio engine is fully set up
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                    self?.startTimer()
+                    self?.isFirstActivation = false
+                }
+            } else {
+                startTimer()
+            }
         } else {
             stopTimer()
         }

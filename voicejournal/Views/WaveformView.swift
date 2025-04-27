@@ -35,6 +35,9 @@ struct WaveformView: View {
     /// Timer for updating the waveform
     @State private var timer: Timer? = nil
     
+    /// Flag to track if this is the first activation
+    @State private var isFirstActivation = true
+    
     // MARK: - Body
     
     var body: some View {
@@ -46,8 +49,10 @@ struct WaveformView: View {
             // Initialize level history
             levelHistory = Array(repeating: 0, count: barCount)
             
-            // Start timer for animation
-            startTimer()
+            // Don't start timer yet if not active
+            if isActive {
+                startTimer()
+            }
         }
         .onDisappear {
             // Stop timer
@@ -55,7 +60,21 @@ struct WaveformView: View {
         }
         .onChange(of: isActive) { oldValue, newValue in
             if newValue {
-                startTimer()
+                // Ensure level history is initialized when becoming active
+                if levelHistory.isEmpty || levelHistory.count != barCount {
+                    levelHistory = Array(repeating: 0, count: barCount)
+                }
+                
+                // Handle first activation specially
+                if isFirstActivation {
+                    // Insert a small delay to ensure audio engine is fully set up
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        startTimer()
+                        isFirstActivation = false
+                    }
+                } else {
+                    startTimer()
+                }
             } else {
                 stopTimer()
             }
@@ -126,7 +145,13 @@ struct WaveformView: View {
         if isActive {
             // When active, use the current audio level with some randomization for visual interest
             let randomFactor = CGFloat.random(in: 0.8...1.2)
-            let newLevel = min(1.0, audioLevel * randomFactor)
+            
+            // Ensure we have a visible level even if audioLevel is very low
+            // This helps especially during the first recording
+            let minVisibleLevel: CGFloat = 0.05
+            let adjustedLevel = max(minVisibleLevel, audioLevel)
+            
+            let newLevel = min(1.0, adjustedLevel * randomFactor)
             newHistory.insert(newLevel, at: 0)
         } else {
             // When inactive, gradually reduce levels

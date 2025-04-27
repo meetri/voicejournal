@@ -396,6 +396,22 @@ final class AudioRecordingServiceTests: XCTestCase {
     }
     
     @MainActor
+    func testInitialAudioLevelOnStartRecording() async throws {
+        // Set up permission
+        recordingService.mockAudioApplication.recordPermission = .granted
+        
+        // Set initial audio level to 0
+        recordingService.setAudioLevelForTesting(0.0)
+        XCTAssertEqual(recordingService.audioLevel, 0.0, "Initial audio level should be 0")
+        
+        // Start recording
+        try await recordingService.startRecording()
+        
+        // Verify that audio level is initialized to a minimum value
+        XCTAssertGreaterThanOrEqual(recordingService.audioLevel, 0.05, "Audio level should be initialized to at least 0.05")
+    }
+    
+    @MainActor
     func testStartRecordingWithPermissionDenied() async {
         // Set up denied permission
         recordingService.mockAudioApplication.recordPermission = .denied

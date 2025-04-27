@@ -260,6 +260,9 @@ class AudioRecordingService: ObservableObject {
         recordingStartTime = Date()
         recordingPausedTime = 0
         
+        // Set an initial audio level to ensure waveform is visible immediately
+        audioLevel = 0.05
+        
         startTimers()
         
         state = .recording
