@@ -38,6 +38,24 @@ enum AuthenticationError: Error {
     }
 }
 
+extension AuthenticationError: Equatable {
+    static func == (lhs: AuthenticationError, rhs: AuthenticationError) -> Bool {
+        switch (lhs, rhs) {
+        case (.biometricsFailed, .biometricsFailed),
+             (.pinMismatch, .pinMismatch),
+             (.pinTooShort, .pinTooShort),
+             (.noFallbackAvailable, .noFallbackAvailable),
+             (.biometricsNotAvailable, .biometricsNotAvailable),
+             (.biometricsNotEnrolled, .biometricsNotEnrolled):
+            return true
+        case (.unknown(let lhsError), .unknown(let rhsError)):
+            return lhsError.localizedDescription == rhsError.localizedDescription
+        default:
+            return false
+        }
+    }
+}
+
 class AuthenticationService: ObservableObject {
     private let context = LAContext()
     private let keychainService = "com.voicejournal.pin"

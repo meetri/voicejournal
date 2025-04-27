@@ -18,6 +18,8 @@ struct PersistenceController {
         for _ in 0..<10 {
             let newItem = JournalEntry(context: viewContext)
             newItem.createdAt = Date()
+            newItem.modifiedAt = Date()
+            newItem.title = "Sample Journal Entry \(Int.random(in: 1...100))"
         }
         do {
             try viewContext.save()
