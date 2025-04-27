@@ -1,9 +1,37 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="1" systemVersion="11A491" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithCloudKit="false" userDefinedModelVersionIdentifier="">
-    <entity name="Item" representedClassName="Item" syncable="YES" codeGenerationType="class">
-        <attribute name="timestamp" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+    <entity name="JournalEntry" representedClassName="JournalEntry" syncable="YES" codeGenerationType="class">
+        <attribute name="createdAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="isLocked" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="modifiedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="title" optional="YES" attributeType="String"/>
+        <relationship name="audioRecording" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="AudioRecording" inverseName="journalEntry" inverseEntity="AudioRecording"/>
+        <relationship name="tags" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Tag" inverseName="entries" inverseEntity="Tag"/>
+        <relationship name="transcription" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="Transcription" inverseName="journalEntry" inverseEntity="Transcription"/>
+    </entity>
+    <entity name="AudioRecording" representedClassName="AudioRecording" syncable="YES" codeGenerationType="class">
+        <attribute name="duration" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="filePath" optional="NO" attributeType="String"/>
+        <attribute name="fileSize" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="recordedAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="journalEntry" optional="NO" maxCount="1" deletionRule="Nullify" destinationEntity="JournalEntry" inverseName="audioRecording" inverseEntity="JournalEntry"/>
+    </entity>
+    <entity name="Tag" representedClassName="Tag" syncable="YES" codeGenerationType="class">
+        <attribute name="color" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="name" optional="NO" attributeType="String"/>
+        <relationship name="entries" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="JournalEntry" inverseName="tags" inverseEntity="JournalEntry"/>
+    </entity>
+    <entity name="Transcription" representedClassName="Transcription" syncable="YES" codeGenerationType="class">
+        <attribute name="createdAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="modifiedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="text" optional="YES" attributeType="String"/>
+        <relationship name="journalEntry" optional="NO" maxCount="1" deletionRule="Nullify" destinationEntity="JournalEntry" inverseName="transcription" inverseEntity="JournalEntry"/>
     </entity>
     <elements>
-        <element name="Item" positionX="-63" positionY="-18" width="128" height="44"/>
+        <element name="JournalEntry" positionX="-63" positionY="-18" width="128" height="134"/>
+        <element name="AudioRecording" positionX="-54" positionY="18" width="128" height="104"/>
+        <element name="Transcription" positionX="-36" positionY="45" width="128" height="89"/>
+        <element name="Tag" positionX="-18" positionY="63" width="128" height="89"/>
     </elements>
 </model>
