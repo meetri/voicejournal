@@ -9,6 +9,7 @@ import Foundation
 import SwiftUI
 import Combine
 import AVFoundation
+import CoreData
 
 /// ViewModel for handling audio playback functionality
 @MainActor
@@ -70,11 +71,15 @@ class AudioPlaybackViewModel: ObservableObject {
     
     /// Load an audio file for playback
     func loadAudio(from url: URL) async {
+        print("DEBUG: AudioPlaybackViewModel - Loading audio from URL: \(url.path)")
+        
         do {
             try await playbackService.loadAudio(from: url)
             audioFileURL = url
             isAudioLoaded = true
+            print("DEBUG: AudioPlaybackViewModel - Successfully loaded audio from URL")
         } catch {
+            print("ERROR: AudioPlaybackViewModel - Failed to load audio: \(error.localizedDescription)")
             handleError(error)
             isAudioLoaded = false
         }
@@ -83,11 +88,27 @@ class AudioPlaybackViewModel: ObservableObject {
     /// Load an audio file from an AudioRecording entity
     func loadAudio(from recording: AudioRecording) async {
         guard let filePath = recording.filePath else {
+            print("ERROR: AudioPlaybackViewModel - Recording filePath is nil")
             handleError(AudioPlaybackError.fileNotFound)
             return
         }
         
-        let url = URL(fileURLWithPath: filePath)
+        print("DEBUG: AudioPlaybackViewModel - Loading audio from recording with filePath: \(filePath)")
+        
+        // Convert relative path to absolute path
+        let url = FilePathUtility.toAbsolutePath(from: filePath)
+        print("DEBUG: AudioPlaybackViewModel - Converted to absolute URL: \(url.path)")
+        
+        // Check if file exists before attempting to load
+        let fileExists = FileManager.default.fileExists(atPath: url.path)
+        print("DEBUG: AudioPlaybackViewModel - File exists at path: \(fileExists ? "YES" : "NO")")
+        
+        if !fileExists {
+            print("ERROR: AudioPlaybackViewModel - Audio file not found at path: \(url.path)")
+            handleError(AudioPlaybackError.fileNotFound)
+            return
+        }
+        
         await loadAudio(from: url)
     }
     

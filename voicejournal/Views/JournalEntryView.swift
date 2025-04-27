@@ -225,11 +225,16 @@ struct JournalEntryView: View {
     private func loadAudio() {
         guard let recording = journalEntry.audioRecording,
               let filePath = recording.filePath else {
+            print("DEBUG: JournalEntryView - No audio recording or filePath is nil")
             return
         }
         
+        print("DEBUG: JournalEntryView - Loading audio from filePath: \(filePath)")
+        
+        // Use the AudioPlaybackViewModel's method which properly handles path conversion
         Task {
-            await playbackViewModel.loadAudio(from: URL(fileURLWithPath: filePath))
+            await playbackViewModel.loadAudio(from: recording)
+            print("DEBUG: JournalEntryView - Audio loading completed, isAudioLoaded: \(playbackViewModel.isAudioLoaded)")
         }
     }
     

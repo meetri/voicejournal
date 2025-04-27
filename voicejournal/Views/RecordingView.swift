@@ -44,12 +44,17 @@ struct RecordingView: View {
             Spacer()
             
             // Waveform visualization
+            let level = viewModel.visualizationLevel
+            // 'buildExpression' is unavailable: this expression does not conform to 'View' - print("DEBUG: RecordingView passing audio level to WaveformView: \(level)")
+            
+            // Use a stable WaveformView without forcing recreation
             WaveformView(
-                audioLevel: viewModel.visualizationLevel,
+                audioLevel: level,
                 color: recordingColor,
                 isActive: viewModel.isRecording && !viewModel.isPaused
             )
-            .frame(height: 100)
+            // Removed .id(level) to prevent excessive view recreation
+            .frame(height: 120)
             .padding()
             .background(Color(.systemGray6))
             .cornerRadius(16)

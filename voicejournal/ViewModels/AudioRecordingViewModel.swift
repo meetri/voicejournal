@@ -9,6 +9,7 @@ import Foundation
 import SwiftUI
 import CoreData
 import Combine
+import AVFoundation
 
 /// ViewModel for handling audio recording functionality
 @MainActor
@@ -104,11 +105,9 @@ class AudioRecordingViewModel: ObservableObject {
             // Start recording
             try await recordingService.startRecording()
             
-            // Set initial audio level to ensure waveform is visible immediately
-            // This helps especially on the first recording
-            if audioLevel <= 0.01 {
-                audioLevel = 0.05
-            }
+            // We no longer need to set an initial audio level as we've improved the waveform visualization
+            // to properly handle low audio levels
+            print("DEBUG: ViewModel - Recording started")
             
             isRecording = true
             isPaused = false
@@ -192,6 +191,7 @@ class AudioRecordingViewModel: ObservableObject {
             .receive(on: RunLoop.main)
             .sink { [weak self] level in
                 self?.audioLevel = level
+                print("DEBUG: ViewModel received audio level: \(level)")
             }
             .store(in: &cancellables)
         
@@ -232,8 +232,11 @@ class AudioRecordingViewModel: ObservableObject {
         let entry = JournalEntry.create(in: managedObjectContext)
         entry.title = "Voice Journal - \(Date().formatted(date: .abbreviated, time: .shortened))"
         
-        // Create audio recording
-        let recording = entry.createAudioRecording(filePath: recordingURL.path)
+        // Convert absolute path to relative path before storing
+        let relativePath = FilePathUtility.toRelativePath(from: recordingURL.path)
+        
+        // Create audio recording with relative path
+        let recording = entry.createAudioRecording(filePath: relativePath)
         recording.duration = duration
         recording.fileSize = recordingService.fileSize ?? 0
         
@@ -253,7 +256,9 @@ class AudioRecordingViewModel: ObservableObject {
 extension AudioRecordingViewModel {
     /// Get audio level for visualization (0.0 to 1.0)
     var visualizationLevel: CGFloat {
-        return CGFloat(audioLevel)
+        let level = CGFloat(audioLevel)
+        print("DEBUG: ViewModel providing visualization level: \(level)")
+        return level
     }
     
     /// Get recording duration in seconds

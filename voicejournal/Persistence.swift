@@ -7,8 +7,9 @@
 
 import CoreData
 import CoreTransferable
+import Foundation
 
-struct PersistenceController {
+class PersistenceController {
     static let shared = PersistenceController()
 
     @MainActor
@@ -54,7 +55,24 @@ struct PersistenceController {
                  */
                 fatalError("Unresolved error \(error), \(error.userInfo)")
             }
+            
+            // Perform data migrations after successful store load
+            self.performDataMigrations()
         })
         container.viewContext.automaticallyMergesChangesFromParent = true
+    }
+    
+    /// Perform any necessary data migrations
+    private func performDataMigrations() {
+        // Create recordings directory if needed
+        FilePathUtility.createRecordingsDirectoryIfNeeded()
+        
+        // Migrate audio file paths from absolute to relative paths
+        Task {
+            let migratedCount = MigrationUtility.migrateAudioFilePaths(in: container.viewContext)
+            if migratedCount > 0 {
+                print("Successfully migrated \(migratedCount) audio file paths")
+            }
+        }
     }
 }

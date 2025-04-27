@@ -120,10 +120,9 @@ class AudioRecordingService: ObservableObject {
     private let audioSession = AVAudioSession.sharedInstance()
     private let processingQueue = DispatchQueue(label: "com.voicejournal.audioprocessing", qos: .userInitiated)
     
-    // Changed from private to internal for testing purposes
+    // Use the shared recordings directory from FilePathUtility
     internal var recordingsDirectory: URL {
-        let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
-        return paths[0].appendingPathComponent("Recordings", isDirectory: true)
+        return FilePathUtility.recordingsDirectory
     }
     
     // MARK: - Initialization
@@ -260,8 +259,8 @@ class AudioRecordingService: ObservableObject {
         recordingStartTime = Date()
         recordingPausedTime = 0
         
-        // Set an initial audio level to ensure waveform is visible immediately
-        audioLevel = 0.05
+        // We no longer need to set an initial audio level as we've improved the waveform visualization
+        print("DEBUG: AudioRecordingService - Recording started")
         
         startTimers()
         
@@ -364,11 +363,7 @@ class AudioRecordingService: ObservableObject {
     // MARK: - Private Methods
     
     private func createRecordingsDirectoryIfNeeded() {
-        do {
-            try FileManager.default.createDirectory(at: recordingsDirectory, withIntermediateDirectories: true)
-        } catch {
-            print("Error creating recordings directory: \(error.localizedDescription)")
-        }
+        FilePathUtility.createRecordingsDirectoryIfNeeded()
     }
     
     private func startTimers() {
@@ -386,7 +381,9 @@ class AudioRecordingService: ObservableObject {
                 guard let self = self else { return }
                 if self.audioLevel > 0 {
                     // Gradually decrease audio level if no new audio is detected
-                    self.audioLevel = max(0, self.audioLevel - 0.05)
+                    // Use a smaller decrement to make the decay more gradual
+                    self.audioLevel = max(0, self.audioLevel - 0.02)
+                    print("DEBUG: Timer decreasing audio level to: \(self.audioLevel)")
                 }
             }
         }
@@ -402,10 +399,15 @@ class AudioRecordingService: ObservableObject {
     
     // Make this function properly handle actor isolation
     private func calculateAudioLevel(buffer: AVAudioPCMBuffer) async {
-        guard let channelData = buffer.floatChannelData else { return }
+        guard let channelData = buffer.floatChannelData else { 
+            print("DEBUG: Audio buffer has no channel data")
+            return 
+        }
         
         let channelCount = Int(buffer.format.channelCount)
         let frameLength = Int(buffer.frameLength)
+        
+        print("DEBUG: Processing audio buffer - Channels: \(channelCount), Frames: \(frameLength)")
         
         // Calculate RMS (root mean square) for audio level
         var rms: Float = 0.0
@@ -420,6 +422,7 @@ class AudioRecordingService: ObservableObject {
         }
         
         rms = sqrt(rms / Float(frameLength * channelCount))
+        print("DEBUG: Raw RMS value: \(rms)")
         
         // Convert to decibels and normalize to 0-1 range
         var decibels: Float = 0.0
@@ -428,13 +431,28 @@ class AudioRecordingService: ObservableObject {
         } else {
             decibels = -160 // Silence
         }
+        print("DEBUG: Decibels: \(decibels) dB")
         
-        // Normalize to 0-1 range (assuming typical values between -60dB and 0dB)
-        let normalizedLevel = max(0, min(1, (decibels + 60) / 60))
+        // Normalize to 0-1 range with enhanced scaling for better visibility
+        // Using -70dB to 0dB range instead of -50dB for better sensitivity to quiet sounds
+        let decibelRange: Float = 50.0 // Increased from 50 to 70 to capture quieter sounds
+        let normalizedLevel = max(0, min(1, (decibels + decibelRange) / decibelRange))
+        
+        // Apply a moderate scaling factor to make the waveform responsive without maxing out
+        let scalingFactor: Float = 0.5 // Reduced from 2.0 to 1.5 for better balance
+        let scaledLevel = min(1.0, normalizedLevel * scalingFactor)
+        
+        print("DEBUG: Normalized level: \(normalizedLevel), Scaled level: \(scaledLevel)")
         
         // Update audio level on main thread
         await MainActor.run {
-            self.audioLevel = normalizedLevel
+            // Check if the current level is suspiciously close to 0.95
+            if abs(self.audioLevel - 0.95) < 0.01 {
+                print("DEBUG: WARNING - Audio level is suspiciously close to 0.95: \(self.audioLevel)")
+            }
+            
+            self.audioLevel = scaledLevel
+            print("DEBUG: Updated audio level to: \(self.audioLevel), normalized: \(normalizedLevel)")
         }
     }
 }

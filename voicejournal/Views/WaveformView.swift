@@ -18,25 +18,35 @@ struct WaveformView: View {
     var color: Color = .blue
     
     /// The number of bars to display in the waveform
-    var barCount: Int = 30
+    var barCount: Int = 20
     
     /// The spacing between bars
     var spacing: CGFloat = 3
     
     /// The corner radius of the bars
-    var cornerRadius: CGFloat = 3
+    var cornerRadius: CGFloat = 4
     
     /// Whether the waveform is active (recording)
     var isActive: Bool = true
     
-    /// The history of audio levels for animation
-    @State private var levelHistory: [CGFloat] = []
+    // MARK: - View Model
     
-    /// Timer for updating the waveform
-    @State private var timer: Timer? = nil
+    /// The view model for managing waveform state
+    @StateObject private var viewModel: WaveformViewModel
     
-    /// Flag to track if this is the first activation
-    @State private var isFirstActivation = true
+    // MARK: - Initialization
+    
+    init(audioLevel: CGFloat, color: Color = .blue, barCount: Int = 30, spacing: CGFloat = 4, cornerRadius: CGFloat = 4, isActive: Bool = true) {
+        self.audioLevel = audioLevel
+        self.color = color
+        self.barCount = barCount
+        self.spacing = spacing
+        self.cornerRadius = cornerRadius
+        self.isActive = isActive
+        
+        // Initialize the view model
+        _viewModel = StateObject(wrappedValue: WaveformViewModel(barCount: barCount))
+    }
     
     // MARK: - Body
     
@@ -46,37 +56,28 @@ struct WaveformView: View {
             drawWaveform(context: context, size: size)
         }
         .onAppear {
-            // Initialize level history
-            levelHistory = Array(repeating: 0, count: barCount)
+            print("DEBUG: WaveformView appeared with audioLevel: \(audioLevel), isActive: \(isActive)")
             
-            // Don't start timer yet if not active
-            if isActive {
-                startTimer()
-            }
+            // Update the view model with the current audio level and active state
+            viewModel.update(audioLevel: audioLevel, isActive: isActive)
         }
-        .onDisappear {
-            // Stop timer
-            stopTimer()
+        .onChange(of: audioLevel) { oldValue, newValue in
+            print("DEBUG: WaveformView audioLevel changed from \(oldValue) to \(newValue)")
+            
+            // Update the view model with the new audio level
+            viewModel.update(audioLevel: newValue, isActive: isActive)
         }
         .onChange(of: isActive) { oldValue, newValue in
-            if newValue {
-                // Ensure level history is initialized when becoming active
-                if levelHistory.isEmpty || levelHistory.count != barCount {
-                    levelHistory = Array(repeating: 0, count: barCount)
-                }
-                
-                // Handle first activation specially
-                if isFirstActivation {
-                    // Insert a small delay to ensure audio engine is fully set up
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        startTimer()
-                        isFirstActivation = false
-                    }
-                } else {
-                    startTimer()
-                }
-            } else {
-                stopTimer()
+            print("DEBUG: WaveformView isActive changed from \(oldValue) to \(newValue)")
+            
+            // Update the view model with the new active state
+            viewModel.update(audioLevel: audioLevel, isActive: newValue)
+        }
+        // Add a timer to ensure continuous updates even if audioLevel doesn't change
+        .onReceive(Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()) { _ in
+            if isActive {
+                // Force a small update to keep the animation going
+                viewModel.update(audioLevel: audioLevel, isActive: true)
             }
         }
     }
@@ -90,12 +91,11 @@ struct WaveformView: View {
         
         // Draw each bar
         for i in 0..<barCount {
-            
-            if levelHistory.count <= i {
+            if viewModel.levelHistory.count <= i {
                 continue
             }
             
-            let level = levelHistory[i]
+            let level = viewModel.levelHistory[i]
             
             // Calculate bar height based on level (minimum 2 pixels)
             let barHeight = max(2, level * size.height)
@@ -118,53 +118,6 @@ struct WaveformView: View {
                 )
             )
         }
-    }
-    
-    /// Start the timer for waveform animation
-    private func startTimer() {
-        // Stop existing timer if any
-        stopTimer()
-        
-        // Create new timer
-        timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
-            updateLevelHistory()
-        }
-    }
-    
-    /// Stop the animation timer
-    private func stopTimer() {
-        timer?.invalidate()
-        timer = nil
-    }
-    
-    /// Update the level history for animation
-    private func updateLevelHistory() {
-        // Add new level at the beginning
-        var newHistory = levelHistory
-        
-        if isActive {
-            // When active, use the current audio level with some randomization for visual interest
-            let randomFactor = CGFloat.random(in: 0.8...1.2)
-            
-            // Ensure we have a visible level even if audioLevel is very low
-            // This helps especially during the first recording
-            let minVisibleLevel: CGFloat = 0.05
-            let adjustedLevel = max(minVisibleLevel, audioLevel)
-            
-            let newLevel = min(1.0, adjustedLevel * randomFactor)
-            newHistory.insert(newLevel, at: 0)
-        } else {
-            // When inactive, gradually reduce levels
-            newHistory.insert(0, at: 0)
-        }
-        
-        // Remove last element to maintain fixed size
-        if !newHistory.isEmpty {
-            newHistory.removeLast()
-        }
-        
-        // Update state
-        levelHistory = newHistory
     }
 }
 

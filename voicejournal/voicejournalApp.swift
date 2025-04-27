@@ -6,11 +6,20 @@
 //
 
 import SwiftUI
+import CoreData
+
+// Import our utility files
+@_exported import Foundation
 
 @main
 struct voicejournalApp: App {
     let persistenceController = PersistenceController.shared
     @StateObject private var authService = AuthenticationService()
+    
+    init() {
+        // Initialize all utility files
+        ImportUtility.initializeAll()
+    }
 
     var body: some Scene {
         WindowGroup {
