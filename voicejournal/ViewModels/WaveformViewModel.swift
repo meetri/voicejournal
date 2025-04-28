@@ -38,7 +38,7 @@ class WaveformViewModel: ObservableObject {
     private var lastProcessedLevel: CGFloat = 0.0
     
     /// The scaling factor to apply to the audio level
-    private let scalingFactor: CGFloat = 1
+    private let scalingFactor: CGFloat = 1.5
     
     // MARK: - Initialization
     

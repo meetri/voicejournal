@@ -19,7 +19,7 @@
 - [x] Start work on authentication system using LocalAuthentication framework (Completed: 4/27/2025)
 - [x] Create unit tests for authentication and Core Data models (Completed: 4/27/2025)
 - [x] Begin implementing audio recording functionality (Phase 2) (Completed: 4/27/2025)
-- [ ] Implement Speech-to-Text functionality for transcription
+- [x] Implement Speech-to-Text functionality for transcription (Completed: 4/27/2025)
 - [x] Enhance journal entry UI with audio playback capabilities (Completed: 4/27/2025)
 
 ### Core Data Model
@@ -51,10 +51,10 @@
 - [x] Improve waveform visibility during recording (Completed: 4/27/2025)
 
 ### Speech-to-Text
-- [ ] Integrate Speech framework for transcription
-- [ ] Implement background transcription processing
-- [ ] Create editing interface for transcription corrections
-- [ ] Add support for punctuation and formatting in transcripts
+- [x] Integrate Speech framework for transcription (Completed: 4/27/2025)
+- [x] Implement background transcription processing (Completed: 4/27/2025)
+- [x] Create editing interface for transcription corrections (Completed: 4/27/2025)
+- [x] Add support for punctuation and formatting in transcripts (Completed: 4/27/2025)
 
 ### Playback of Journal Recordings
 
@@ -154,12 +154,12 @@
 2. ✅ Implement the authentication system using LocalAuthentication
 3. ✅ Create the Core Data model for storing journal entries
 4. ✅ Build a simple recording interface with basic waveform visualization
-5. Implement the Speech framework integration for initial transcription testing
+5. ✅ Implement the Speech framework integration for initial transcription testing (Completed: 4/27/2025)
 
 ## Technical Research Tasks
 
 1. ✅ Evaluate waveform visualization libraries (DSWaveformImage, FDWaveformView) vs. custom implementation (Completed: 4/27/2025)
 2. ✅ Research best practices for Core Data encryption with biometric authentication (Completed: 4/27/2025)
-3. Investigate iOS 18's speech recognition limits and optimization strategies
+3. ✅ Investigate iOS 18's speech recognition limits and optimization strategies (Completed: 4/27/2025)
 4. ✅ Explore efficient methods for audio buffer processing for visualization (Completed: 4/27/2025)
 5. Research ChatGPT API integration patterns for iOS applications

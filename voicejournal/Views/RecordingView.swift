@@ -7,6 +7,7 @@
 
 import SwiftUI
 import CoreData
+import Speech
 
 /// The main view for recording audio journal entries
 struct RecordingView: View {
@@ -21,6 +22,8 @@ struct RecordingView: View {
     // MARK: - State
     
     @State private var showingPermissionSettings = false
+    @State private var showingSpeechPermissionSettings = false
+    @State private var showingTranscriptionEditor = false
     
     // MARK: - Initialization
     
@@ -65,6 +68,10 @@ struct RecordingView: View {
                 .foregroundColor(recordingColor)
                 .padding()
             
+            // Transcription status and text
+            transcriptionView
+                .padding(.horizontal)
+            
             Spacer()
             
             // Recording controls
@@ -86,8 +93,19 @@ struct RecordingView: View {
         } message: {
             Text("Voice Journal needs access to your microphone to record audio. Please grant permission in Settings.")
         }
+        .alert("Speech Recognition Access Required", isPresented: $viewModel.showSpeechPermissionDeniedAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Settings") {
+                showingSpeechPermissionSettings = true
+            }
+        } message: {
+            Text("Voice Journal needs access to speech recognition to transcribe your recordings. Please grant permission in Settings.")
+        }
         .sheet(isPresented: $showingPermissionSettings) {
-            SettingsView()
+            SettingsView(title: "Microphone Settings", message: "To enable microphone access, please go to your device settings.")
+        }
+        .sheet(isPresented: $showingSpeechPermissionSettings) {
+            SettingsView(title: "Speech Recognition Settings", message: "To enable speech recognition, please go to your device settings.")
         }
         .sheet(isPresented: viewModel.hasRecordingSavedBinding) {
             if let entry = viewModel.journalEntry {
@@ -95,7 +113,9 @@ struct RecordingView: View {
             }
         }
         .onAppear {
-            checkMicrophonePermission()
+            Task {
+                await checkPermissions()
+            }
         }
     }
     
@@ -181,26 +201,79 @@ struct RecordingView: View {
         }
     }
     
+    // MARK: - Subviews
+    
+    /// The transcription view
+    private var transcriptionView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if viewModel.isTranscribing || !viewModel.transcriptionText.isEmpty {
+                HStack {
+                    Text("Transcription")
+                        .font(.headline)
+                    
+                    Spacer()
+                    
+                    if viewModel.isTranscribing {
+                        HStack(spacing: 4) {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                            
+                            Text("\(Int(viewModel.transcriptionProgress * 100))%")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                
+                if !viewModel.transcriptionText.isEmpty {
+                    ScrollView {
+                        Text(viewModel.transcriptionText)
+                            .font(.body)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .cornerRadius(8)
+                    }
+                    .frame(maxHeight: 100)
+                } else if viewModel.isTranscribing {
+                    Text("Transcribing...")
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(8)
+                }
+            }
+        }
+    }
+    
     // MARK: - Methods
     
-    /// Check if microphone permission is granted
-    private func checkMicrophonePermission() {
-        Task {
-            _ = await viewModel.checkMicrophonePermission()
+    /// Check if microphone and speech recognition permissions are granted
+    private func checkPermissions() async {
+        _ = await viewModel.checkMicrophonePermission()
+        
+        // Also check speech recognition permission
+        if SFSpeechRecognizer.authorizationStatus() == .notDetermined {
+            await viewModel.requestSpeechRecognitionPermission()
         }
     }
 }
 
 /// A view that shows settings for the app
 struct SettingsView: View {
+    var title: String
+    var message: String
+    
     var body: some View {
         VStack(spacing: 20) {
-            Text("Settings")
+            Text(title)
                 .font(.largeTitle)
                 .fontWeight(.bold)
                 .padding(.top)
             
-            Text("To enable microphone access, please go to your device settings.")
+            Text(message)
                 .multilineTextAlignment(.center)
                 .padding()
             
@@ -223,53 +296,101 @@ struct RecordingSavedView: View {
     let journalEntry: JournalEntry
     
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.managedObjectContext) private var viewContext
+    
+    @State private var isEditingTranscription = false
+    @State private var transcriptionText: String = ""
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 20) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 80))
-                    .foregroundColor(.green)
-                    .padding()
-                
-                Text("Recording Saved!")
-                    .font(.title)
-                    .fontWeight(.bold)
-                
-                if let title = journalEntry.title {
-                    Text(title)
-                        .font(.headline)
-                }
-                
-                if let recording = journalEntry.audioRecording {
-                    VStack(alignment: .leading) {
-                        HStack {
-                            Text("Duration:")
-                            Spacer()
-                            Text(formatDuration(recording.duration))
-                        }
-                        
-                        HStack {
-                            Text("File Size:")
-                            Spacer()
-                            Text(formatFileSize(recording.fileSize))
-                        }
+            ScrollView {
+                VStack(spacing: 20) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 80))
+                        .foregroundColor(.green)
+                        .padding()
+                    
+                    Text("Recording Saved!")
+                        .font(.title)
+                        .fontWeight(.bold)
+                    
+                    if let title = journalEntry.title {
+                        Text(title)
+                            .font(.headline)
                     }
+                    
+                    if let recording = journalEntry.audioRecording {
+                        VStack(alignment: .leading) {
+                            HStack {
+                                Text("Duration:")
+                                Spacer()
+                                Text(formatDuration(recording.duration))
+                            }
+                            
+                            HStack {
+                                Text("File Size:")
+                                Spacer()
+                                Text(formatFileSize(recording.fileSize))
+                            }
+                        }
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(10)
+                        .padding(.horizontal)
+                    }
+                    
+                    // Transcription section
+                    if let transcription = journalEntry.transcription, let text = transcription.text {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("Transcription")
+                                    .font(.headline)
+                                
+                                Spacer()
+                                
+                                Button(action: {
+                                    transcriptionText = text
+                                    isEditingTranscription = true
+                                }) {
+                                    Image(systemName: "pencil")
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            
+                            Text(text)
+                                .font(.body)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding()
+                                .background(Color(.systemGray6))
+                                .cornerRadius(8)
+                        }
+                        .padding(.horizontal)
+                    } else {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Transcription")
+                                .font(.headline)
+                            
+                            Text("Processing transcription...")
+                                .font(.body)
+                                .foregroundColor(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding()
+                                .background(Color(.systemGray6))
+                                .cornerRadius(8)
+                        }
+                        .padding(.horizontal)
+                    }
+                    
+                    Spacer()
+                    
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .buttonStyle(.borderedProminent)
                     .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(10)
-                    .padding(.horizontal)
                 }
-                
-                Spacer()
-                
-                Button("Done") {
-                    dismiss()
-                }
-                .buttonStyle(.borderedProminent)
                 .padding()
             }
-            .padding()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -278,6 +399,31 @@ struct RecordingSavedView: View {
                     }
                 }
             }
+            .sheet(isPresented: $isEditingTranscription) {
+                TranscriptionEditView(
+                    journalEntry: journalEntry,
+                    transcriptionText: $transcriptionText,
+                    onSave: saveTranscription
+                )
+            }
+        }
+    }
+    
+    private func saveTranscription() {
+        // Check if entry already has a transcription
+        if let existingTranscription = journalEntry.transcription {
+            existingTranscription.text = transcriptionText
+            existingTranscription.modifiedAt = Date()
+        } else {
+            // Create new transcription
+            let _ = journalEntry.createTranscription(text: transcriptionText)
+        }
+        
+        // Save the context
+        do {
+            try viewContext.save()
+        } catch {
+            print("Error saving transcription: \(error.localizedDescription)")
         }
     }
     

@@ -25,6 +25,8 @@ struct JournalEntryView: View {
     @State private var showDeleteConfirmation = false
     @State private var isEditingTitle = false
     @State private var entryTitle: String
+    @State private var isEditingTranscription = false
+    @State private var transcriptionText: String = ""
     
     // MARK: - Initialization
     
@@ -174,15 +176,49 @@ struct JournalEntryView: View {
     
     private func transcriptionSection(text: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Transcription")
-                .font(.headline)
-                .padding(.bottom, 4)
+            HStack {
+                Text("Transcription")
+                    .font(.headline)
+                    .padding(.bottom, 4)
+                
+                Spacer()
+                
+                Button(action: {
+                    transcriptionText = text
+                    isEditingTranscription = true
+                }) {
+                    Image(systemName: "pencil")
+                        .foregroundColor(.blue)
+                }
+            }
             
             Text(text)
                 .font(.body)
                 .padding()
                 .background(Color(.systemGray6))
                 .cornerRadius(8)
+        }
+        .sheet(isPresented: $isEditingTranscription) {
+            TranscriptionEditView(
+                journalEntry: journalEntry,
+                transcriptionText: $transcriptionText,
+                onSave: saveTranscription
+            )
+        }
+    }
+    
+    /// Save edited transcription
+    private func saveTranscription() {
+        guard let transcription = journalEntry.transcription else { return }
+        
+        transcription.text = transcriptionText
+        transcription.modifiedAt = Date()
+        journalEntry.modifiedAt = Date()
+        
+        do {
+            try viewContext.save()
+        } catch {
+            print("Error saving transcription: \(error.localizedDescription)")
         }
     }
     
