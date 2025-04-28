@@ -132,9 +132,7 @@ class AudioPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegate {
         stopLevelUpdateTimer()
         
         // Unregister from audio session notifications
-        Task { @MainActor in
-            unregisterFromAudioSessionNotifications()
-        }
+        unregisterFromAudioSessionNotifications()
         
         // Deactivate audio session
         do {
@@ -292,7 +290,7 @@ class AudioPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegate {
         if let player = audioPlayer, state == .playing {
             player.rate = clampedRate
             print("DEBUG: AudioPlaybackService - Applied rate while playing: \(clampedRate)")
-        } else if audioPlayer != nil {
+        } else if let player = audioPlayer {
             print("DEBUG: AudioPlaybackService - Stored rate \(clampedRate) for later application (current state: \(state))")
         } else {
             print("DEBUG: AudioPlaybackService - Stored rate \(clampedRate) for future playback (no player available)")
@@ -461,7 +459,8 @@ class AudioPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegate {
             
             // Check if we should resume playback
             if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt,
-               AVAudioSession.InterruptionOptions(rawValue: optionsValue).contains(.shouldResume),
+               let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue),
+               options.contains(.shouldResume),
                case .paused = state {
                 
                 // Resume playback

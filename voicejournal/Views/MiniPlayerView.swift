@@ -150,7 +150,7 @@ struct MiniPlayerView: View {
            let journalEntry = recording.journalEntry,
            let title = journalEntry.title {
             return title
-        } else if let url = viewModel.currentAudioFileURL {
+        } else if let url = viewModel.audioFileURL {
             return url.lastPathComponent
         } else {
             return "Now Playing"
@@ -189,10 +189,10 @@ struct PlayerContainerView: View {
             PlaybackView(viewModel: viewModel)
                 .padding()
         }
-        .onChange(of: viewModel.isPlaybackInProgress) { oldValue, newValue in
+        .onChange(of: viewModel.isPlaybackInProgress) { isPlaying in
             // Show player when playback starts, hide when stopped
             withAnimation {
-                isPlayerVisible = newValue
+                isPlayerVisible = isPlaying
             }
         }
     }
@@ -207,14 +207,13 @@ struct PlayerContainerView: View {
         let playbackService = AudioPlaybackService()
         let viewModel = AudioPlaybackViewModel(playbackService: playbackService)
         
+        // For preview purposes, set some values
+        viewModel.setCurrentTimeForTesting(35)
+        
         MiniPlayerView(
             viewModel: viewModel,
             isExpanded: .constant(false)
         )
-        .onAppear {
-            // For preview purposes, set some values
-            viewModel.setCurrentTimeForTesting(35)
-        }
     }
 }
 
@@ -233,10 +232,9 @@ struct PlayerContainerView: View {
         let playbackService = AudioPlaybackService()
         let viewModel = AudioPlaybackViewModel(playbackService: playbackService)
         
+        // For preview purposes, set some values
+        viewModel.setCurrentTimeForTesting(35)
+        
         PlayerContainerView(viewModel: viewModel)
-            .onAppear {
-                // For preview purposes, set some values
-                viewModel.setCurrentTimeForTesting(35)
-            }
     }
 }
