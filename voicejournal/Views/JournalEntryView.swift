@@ -192,11 +192,25 @@ struct JournalEntryView: View {
                 }
             }
             
-            Text(text)
-                .font(.body)
+            // Use HighlightableText when playing audio, otherwise use regular Text
+            if playbackViewModel.isPlaybackInProgress {
+                HighlightableText(
+                    text: text,
+                    highlightRange: playbackViewModel.currentHighlightRange,
+                    highlightColor: .yellow.opacity(0.4),
+                    textColor: .primary,
+                    font: .body
+                )
                 .padding()
                 .background(Color(.systemGray6))
                 .cornerRadius(8)
+            } else {
+                Text(text)
+                    .font(.body)
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(8)
+            }
         }
         .sheet(isPresented: $isEditingTranscription) {
             TranscriptionEditView(

@@ -215,9 +215,12 @@ class AudioRecordingViewModel: ObservableObject {
                     speechRecognitionService.stopRecognition()
                     isTranscribing = false
                     
-                    // Get final transcription
+                    // Get final transcription and timing data
                     let finalTranscription = speechRecognitionService.transcription
                     transcriptionText = finalTranscription
+                    
+                    // Get timing data if available
+                    let timingDataJSON = speechRecognitionService.getTimingDataJSON()
                 }
                 
                 // Create a journal entry with the recording and transcription
@@ -413,7 +416,12 @@ class AudioRecordingViewModel: ObservableObject {
         
         // Add transcription if available
         if !transcriptionText.isEmpty {
-            let _ = entry.createTranscription(text: transcriptionText)
+            let transcription = entry.createTranscription(text: transcriptionText)
+            
+            // Store timing data if available
+            if let timingDataJSON = speechRecognitionService.getTimingDataJSON() {
+                transcription.timingData = timingDataJSON
+            }
         }
         
         // Save the context
@@ -432,9 +440,19 @@ class AudioRecordingViewModel: ObservableObject {
         if let existingTranscription = entry.transcription {
             existingTranscription.text = text
             existingTranscription.modifiedAt = Date()
+            
+            // Update timing data if available
+            if let timingDataJSON = speechRecognitionService.getTimingDataJSON() {
+                existingTranscription.timingData = timingDataJSON
+            }
         } else {
             // Create new transcription
-            let _ = entry.createTranscription(text: text)
+            let transcription = entry.createTranscription(text: text)
+            
+            // Store timing data if available
+            if let timingDataJSON = speechRecognitionService.getTimingDataJSON() {
+                transcription.timingData = timingDataJSON
+            }
         }
         
         // Save the context

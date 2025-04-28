@@ -18,6 +18,8 @@ struct PlaybackView: View {
     
     @State private var isEditingSlider = false
     @State private var sliderValue: Double = 0.0
+    @State private var showBookmarkList = false
+    @State private var newBookmarkLabel = ""
     
     // MARK: - Initialization
     
@@ -40,6 +42,11 @@ struct PlaybackView: View {
             .background(Color(.systemGray6))
             .cornerRadius(12)
             
+            // Bookmarks indicator
+            if !viewModel.bookmarks.isEmpty {
+                bookmarkIndicators
+            }
+            
             // Time and progress
             HStack {
                 Text(viewModel.formattedCurrentTime)
@@ -54,38 +61,61 @@ struct PlaybackView: View {
             }
             .padding(.horizontal)
             
-            // Progress slider
-            Slider(
-                value: $sliderValue,
-                in: 0...1,
-                onEditingChanged: { editing in
-                    isEditingSlider = editing
-                    
-                    if editing {
-                        // When user starts dragging, store the current value
-                        sliderValue = viewModel.progress
-                    } else {
-                        // When user finishes dragging, seek to the new position
-                        viewModel.seekToProgress(sliderValue)
+            // Progress slider with bookmark indicators
+            ZStack(alignment: .bottom) {
+                // Bookmark indicators
+                if !viewModel.bookmarks.isEmpty {
+                    GeometryReader { geometry in
+                        ForEach(viewModel.bookmarks, id: \.self) { bookmark in
+                            let position = bookmark.timestamp / viewModel.duration
+                            let xPosition = geometry.size.width * CGFloat(position)
+                            
+                            Rectangle()
+                                .fill(Color(hex: bookmark.color ?? "#FF5733"))
+                                .frame(width: 2, height: 12)
+                                .position(x: xPosition, y: 0)
+                        }
+                    }
+                    .frame(height: 12)
+                }
+                
+                // Progress slider
+                Slider(
+                    value: $sliderValue,
+                    in: 0...1,
+                    onEditingChanged: { editing in
+                        isEditingSlider = editing
+                        
+                        if editing {
+                            // When user starts dragging, store the current value
+                            sliderValue = viewModel.progress
+                        } else {
+                            // When user finishes dragging, seek to the new position
+                            viewModel.seekToProgress(sliderValue)
+                        }
+                    }
+                )
+                .onReceive(viewModel.$progress) { newProgress in
+                    // Only update the slider value when not being edited
+                    if !isEditingSlider {
+                        sliderValue = newProgress
                     }
                 }
-            )
-            .onReceive(viewModel.$progress) { newProgress in
-                // Only update the slider value when not being edited
-                if !isEditingSlider {
-                    sliderValue = newProgress
-                }
+                .accentColor(playbackColor)
             }
-            .accentColor(playbackColor)
             .padding(.horizontal)
             
             // Playback controls
             HStack(spacing: 24) {
-                // Skip backward button
+                // Skip to previous bookmark or backward 10 seconds
                 Button(action: {
-                    viewModel.skipBackward()
+                    if !viewModel.bookmarks.isEmpty {
+                        viewModel.skipToPreviousBookmark()
+                    } else {
+                        viewModel.skipBackward()
+                    }
                 }) {
-                    Image(systemName: "gobackward.10")
+                    Image(systemName: !viewModel.bookmarks.isEmpty ? "bookmark.fill.backward" : "gobackward.10")
                         .font(.system(size: 24))
                         .foregroundColor(.primary)
                 }
@@ -99,11 +129,15 @@ struct PlaybackView: View {
                         .foregroundColor(playbackColor)
                 }
                 
-                // Skip forward button
+                // Skip to next bookmark or forward 10 seconds
                 Button(action: {
-                    viewModel.skipForward()
+                    if !viewModel.bookmarks.isEmpty {
+                        viewModel.skipToNextBookmark()
+                    } else {
+                        viewModel.skipForward()
+                    }
                 }) {
-                    Image(systemName: "goforward.10")
+                    Image(systemName: !viewModel.bookmarks.isEmpty ? "bookmark.fill.forward" : "goforward.10")
                         .font(.system(size: 24))
                         .foregroundColor(.primary)
                 }
@@ -111,7 +145,7 @@ struct PlaybackView: View {
             .padding(.vertical, 8)
             
             // Additional controls
-            HStack(spacing: 32) {
+            HStack(spacing: 20) {
                 // Playback rate button
                 Button(action: {
                     viewModel.setRate(viewModel.nextRate)
@@ -120,6 +154,30 @@ struct PlaybackView: View {
                         .font(.system(.footnote, design: .rounded))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
+                        .background(Color(.systemGray5))
+                        .cornerRadius(8)
+                }
+                
+                // Bookmark button
+                Button(action: {
+                    viewModel.showBookmarkDialog = true
+                }) {
+                    Image(systemName: "bookmark.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(.blue)
+                        .padding(8)
+                        .background(Color(.systemGray5))
+                        .cornerRadius(8)
+                }
+                
+                // Bookmark list button
+                Button(action: {
+                    showBookmarkList.toggle()
+                }) {
+                    Image(systemName: "list.bullet")
+                        .font(.system(size: 18))
+                        .foregroundColor(.primary)
+                        .padding(8)
                         .background(Color(.systemGray5))
                         .cornerRadius(8)
                 }
@@ -137,6 +195,10 @@ struct PlaybackView: View {
                 }
             }
             .padding(.bottom, 8)
+            // Show bookmark list if enabled
+            if showBookmarkList {
+                bookmarkListView
+            }
         }
         .padding()
         .background(Color(.systemBackground))
@@ -146,6 +208,18 @@ struct PlaybackView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(viewModel.errorMessage ?? "An unknown error occurred")
+        }
+        .alert("Add Bookmark", isPresented: $viewModel.showBookmarkDialog) {
+            TextField("Bookmark Label", text: $newBookmarkLabel)
+            Button("Cancel", role: .cancel) {
+                newBookmarkLabel = ""
+            }
+            Button("Add") {
+                viewModel.createBookmark(label: newBookmarkLabel.isEmpty ? nil : newBookmarkLabel)
+                newBookmarkLabel = ""
+            }
+        } message: {
+            Text("Add a bookmark at the current position (\(viewModel.formattedCurrentTime))")
         }
     }
     
@@ -162,6 +236,99 @@ struct PlaybackView: View {
         } else {
             return .blue.opacity(0.7)
         }
+    }
+    
+    /// View showing bookmark indicators
+    private var bookmarkIndicators: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(viewModel.bookmarks, id: \.self) { bookmark in
+                    Button(action: {
+                        viewModel.seekToBookmark(bookmark)
+                    }) {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color(hex: bookmark.color ?? "#FF5733"))
+                                .frame(width: 8, height: 8)
+                            
+                            Text(bookmark.label ?? bookmark.formattedTimestamp)
+                                .font(.caption)
+                                .lineLimit(1)
+                        }
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color(hex: bookmark.color ?? "#FF5733"), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+            }
+            .padding(.horizontal)
+        }
+        .frame(height: 30)
+    }
+    
+    /// View showing the list of bookmarks
+    private var bookmarkListView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Bookmarks")
+                .font(.headline)
+                .padding(.bottom, 4)
+            
+            if viewModel.bookmarks.isEmpty {
+                Text("No bookmarks yet")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding()
+            } else {
+                ScrollView {
+                    VStack(spacing: 8) {
+                        ForEach(viewModel.bookmarks, id: \.self) { bookmark in
+                            HStack {
+                                Circle()
+                                    .fill(Color(hex: bookmark.color ?? "#FF5733"))
+                                    .frame(width: 12, height: 12)
+                                
+                                Text(bookmark.label ?? "Bookmark")
+                                    .font(.subheadline)
+                                
+                                Spacer()
+                                
+                                Text(bookmark.formattedTimestamp)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                Button(action: {
+                                    viewModel.seekToBookmark(bookmark)
+                                }) {
+                                    Image(systemName: "play.circle")
+                                        .foregroundColor(.blue)
+                                }
+                                
+                                Button(action: {
+                                    viewModel.deleteBookmark(bookmark)
+                                }) {
+                                    Image(systemName: "trash")
+                                        .foregroundColor(.red)
+                                }
+                            }
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 12)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(8)
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                }
+                .frame(maxHeight: 200)
+            }
+        }
+        .padding()
+        .background(Color(.systemGray5))
+        .cornerRadius(12)
+        .padding(.horizontal, 4)
     }
 }
 

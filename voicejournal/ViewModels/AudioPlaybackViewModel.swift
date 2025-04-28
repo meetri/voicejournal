@@ -52,11 +52,36 @@ class AudioPlaybackViewModel: ObservableObject {
     /// Whether audio is loaded and ready to play
     @Published private(set) var isAudioLoaded = false
     
+    /// Bookmarks for the current audio recording
+    @Published private(set) var bookmarks: [Bookmark] = []
+    
+    /// Currently selected bookmark
+    @Published private(set) var selectedBookmark: Bookmark?
+    
+    /// Whether to show the bookmark creation dialog
+    @Published var showBookmarkDialog = false
+    
+    /// Text for new bookmark label
+    @Published var newBookmarkLabel: String = ""
+    
+    /// Current text highlight range for transcription
+    @Published private(set) var currentHighlightRange: NSRange?
+    
+    /// Current audio recording being played
+    private(set) var currentRecording: AudioRecording?
+    
+    /// Current transcription being displayed
+    private(set) var currentTranscription: Transcription?
+    
+    /// Timing data for transcription text highlighting
+    private var transcriptionTimingData: [TranscriptionSegment] = []
+    
     // MARK: - Private Properties
     
     private let playbackService: AudioPlaybackService
     private var cancellables = Set<AnyCancellable>()
     private var audioFileURL: URL?
+    private var highlightUpdateTimer: Timer?
     
     // MARK: - Initialization
     
@@ -109,6 +134,21 @@ class AudioPlaybackViewModel: ObservableObject {
             return
         }
         
+        // Store the current recording
+        currentRecording = recording
+        
+        // Load bookmarks
+        loadBookmarks(for: recording)
+        
+        // Load transcription timing data if available
+        if let transcription = recording.journalEntry?.transcription {
+            currentTranscription = transcription
+            loadTranscriptionTimingData(from: transcription)
+        } else {
+            currentTranscription = nil
+            transcriptionTimingData = []
+        }
+        
         await loadAudio(from: url)
     }
     
@@ -118,6 +158,11 @@ class AudioPlaybackViewModel: ObservableObject {
             try playbackService.play()
             isPlaying = true
             isPaused = false
+            
+            // Start highlight update timer if we have timing data
+            if !transcriptionTimingData.isEmpty {
+                startHighlightUpdateTimer()
+            }
         } catch {
             handleError(error)
         }
@@ -129,6 +174,9 @@ class AudioPlaybackViewModel: ObservableObject {
             try playbackService.pause()
             isPlaying = false
             isPaused = true
+            
+            // Stop highlight update timer
+            stopHighlightUpdateTimer()
         } catch {
             handleError(error)
         }
@@ -140,6 +188,12 @@ class AudioPlaybackViewModel: ObservableObject {
             try playbackService.stop()
             isPlaying = false
             isPaused = false
+            
+            // Stop highlight update timer
+            stopHighlightUpdateTimer()
+            
+            // Clear highlight
+            currentHighlightRange = nil
         } catch {
             handleError(error)
         }
@@ -158,6 +212,9 @@ class AudioPlaybackViewModel: ObservableObject {
     func seek(to time: TimeInterval) {
         do {
             try playbackService.seek(to: time)
+            
+            // Update highlight immediately
+            updateHighlightedTextRange()
         } catch {
             handleError(error)
         }
@@ -207,6 +264,142 @@ class AudioPlaybackViewModel: ObservableObject {
         showErrorAlert = false
         isAudioLoaded = false
         audioFileURL = nil
+        
+        bookmarks = []
+        selectedBookmark = nil
+        currentRecording = nil
+        currentTranscription = nil
+        transcriptionTimingData = []
+        currentHighlightRange = nil
+        
+        stopHighlightUpdateTimer()
+    }
+    
+    // MARK: - Bookmark Management
+    
+    /// Load bookmarks for the given audio recording
+    private func loadBookmarks(for recording: AudioRecording) {
+        bookmarks = recording.allBookmarks
+    }
+    
+    /// Create a new bookmark at the current playback position
+    func createBookmark(label: String? = nil, color: String? = nil) {
+        guard let recording = currentRecording else { return }
+        
+        let bookmark = recording.createBookmark(
+            at: currentTime,
+            label: label,
+            color: color
+        )
+        
+        // Reload bookmarks to ensure they're sorted by timestamp
+        bookmarks = recording.allBookmarks
+        
+        // Select the newly created bookmark
+        selectedBookmark = bookmark
+    }
+    
+    /// Delete a bookmark
+    func deleteBookmark(_ bookmark: Bookmark) {
+        guard let recording = currentRecording else { return }
+        
+        // Clear selection if the deleted bookmark is selected
+        if selectedBookmark == bookmark {
+            selectedBookmark = nil
+        }
+        
+        recording.deleteBookmark(bookmark)
+        
+        // Reload bookmarks
+        bookmarks = recording.allBookmarks
+    }
+    
+    /// Seek to a specific bookmark
+    func seekToBookmark(_ bookmark: Bookmark) {
+        seek(to: bookmark.timestamp)
+        selectedBookmark = bookmark
+    }
+    
+    /// Find the nearest bookmark to the current playback position
+    func findNearestBookmark() -> Bookmark? {
+        guard let recording = currentRecording else { return nil }
+        return recording.nearestBookmark(to: currentTime)
+    }
+    
+    /// Skip to the next bookmark
+    func skipToNextBookmark() {
+        guard let recording = currentRecording else { return }
+        
+        if let nextBookmark = recording.nextBookmark(after: currentTime) {
+            seekToBookmark(nextBookmark)
+        }
+    }
+    
+    /// Skip to the previous bookmark
+    func skipToPreviousBookmark() {
+        guard let recording = currentRecording else { return }
+        
+        if let prevBookmark = recording.previousBookmark(before: currentTime) {
+            seekToBookmark(prevBookmark)
+        }
+    }
+    
+    // MARK: - Transcription Highlighting
+    
+    /// Load timing data from a transcription
+    private func loadTranscriptionTimingData(from transcription: Transcription) {
+        guard let timingDataString = transcription.timingData else {
+            transcriptionTimingData = []
+            return
+        }
+        
+        do {
+            // Parse JSON timing data
+            if let data = timingDataString.data(using: .utf8) {
+                let decoder = JSONDecoder()
+                transcriptionTimingData = try decoder.decode([TranscriptionSegment].self, from: data)
+            }
+        } catch {
+            print("ERROR: Failed to parse transcription timing data: \(error.localizedDescription)")
+            transcriptionTimingData = []
+        }
+    }
+    
+    /// Update the highlighted text range based on current playback position
+    private func updateHighlightedTextRange() {
+        guard !transcriptionTimingData.isEmpty else {
+            currentHighlightRange = nil
+            return
+        }
+        
+        // Find the segment that corresponds to the current playback time
+        let currentSegment = transcriptionTimingData.first { segment in
+            return currentTime >= segment.startTime && currentTime <= segment.endTime
+        }
+        
+        if let segment = currentSegment {
+            currentHighlightRange = NSRange(location: segment.textRange.location, length: segment.textRange.length)
+        } else {
+            currentHighlightRange = nil
+        }
+    }
+    
+    /// Start the timer for updating text highlighting
+    private func startHighlightUpdateTimer() {
+        stopHighlightUpdateTimer()
+        
+        // Only start if we have timing data
+        guard !transcriptionTimingData.isEmpty else { return }
+        
+        highlightUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            self?.updateHighlightedTextRange()
+        }
+    }
+    
+    /// Stop the highlight update timer
+    private func stopHighlightUpdateTimer() {
+        highlightUpdateTimer?.invalidate()
+        highlightUpdateTimer = nil
     }
     
     // MARK: - Private Methods
@@ -249,6 +442,9 @@ class AudioPlaybackViewModel: ObservableObject {
                 if self.duration > 0 {
                     self.progress = time / self.duration
                 }
+                
+                // Update highlighted text range
+                self.updateHighlightedTextRange()
             }
             .store(in: &cancellables)
         
@@ -345,5 +541,27 @@ extension AudioPlaybackViewModel {
         default:
             return 1.0
         }
+    }
+}
+
+// MARK: - Testing Support
+
+extension AudioPlaybackViewModel {
+    /// Set current time for testing
+    @MainActor
+    func setCurrentTimeForTesting(_ time: TimeInterval) {
+        self.currentTime = time
+    }
+    
+    /// Set transcription timing data for testing
+    @MainActor
+    func setTranscriptionTimingDataForTesting(_ segments: [TranscriptionSegment]) {
+        self.transcriptionTimingData = segments
+    }
+    
+    /// Update highlighted text range for testing
+    @MainActor
+    func updateHighlightedTextRangeForTesting() {
+        self.updateHighlightedTextRange()
     }
 }

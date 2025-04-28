@@ -72,8 +72,8 @@
 
 #### Visual Feedback & Enhanced Features
 - [x] Design and implement interactive waveform display for playback visualization (Completed: 4/27/2025)
-- [ ] Add audio bookmarking system for marking important moments
-- [ ] Create highlighting of transcribed text as audio plays
+- [x] Add audio bookmarking system for marking important moments (Completed: 4/27/2025)
+- [x] Create highlighting of transcribed text as audio plays (Completed: 4/27/2025)
 - [x] Implement audio level visualization during playback (Completed: 4/27/2025)
 
 #### System Integration
