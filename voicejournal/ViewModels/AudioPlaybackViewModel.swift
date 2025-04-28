@@ -550,6 +550,11 @@ extension AudioPlaybackViewModel {
             return 1.0
         }
     }
+    
+    /// Get the current audio file URL
+    var currentAudioFileURL: URL? {
+        return audioFileURL
+    }
 }
 
 // MARK: - Testing Support
