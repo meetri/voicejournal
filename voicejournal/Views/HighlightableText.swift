@@ -144,10 +144,13 @@ struct AttributedHighlightableText: View {
                 let validLength = min(highlightRange.length, maxLength)
                 
                 if validLength > 0 {
-                    // Convert NSRange to Range<String.Index>
-                    if let range = Range(NSRange(location: highlightRange.location, length: validLength), in: text) {
-                        attributedString[range].backgroundColor = highlightColor
+                // Convert NSRange to Range<String.Index>
+                if let stringRange = Range(NSRange(location: highlightRange.location, length: validLength), in: text) {
+                    // Convert Range<String.Index> to Range<AttributedString.Index>
+                    if let attributedRange = Range<AttributedString.Index>(stringRange, in: attributedString) {
+                        attributedString[attributedRange].backgroundColor = highlightColor
                     }
+                }
                 }
             }
         }

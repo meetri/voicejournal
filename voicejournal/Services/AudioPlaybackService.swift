@@ -106,6 +106,9 @@ class AudioPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegate {
     
     // MARK: - Private Properties
     
+    /// Desired playback rate (0.5 to 2.0) - persists across playback state changes
+    private var desiredRate: Float = 1.0
+    
     nonisolated(unsafe) private var audioPlayer: AVAudioPlayer?
     nonisolated(unsafe) private var progressTimer: Timer?
     nonisolated(unsafe) private var levelUpdateTimer: Timer?
@@ -156,6 +159,10 @@ class AudioPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegate {
             audioPlayer = try AVAudioPlayer(contentsOf: url)
             audioPlayer?.delegate = self
             
+            // Enable rate changes - this is required for playback rate to work
+            audioPlayer?.enableRate = true
+            print("DEBUG: AudioPlaybackService - Enabled rate changes for AVAudioPlayer")
+            
             // Enable metering to get audio levels
             audioPlayer?.isMeteringEnabled = true
             
@@ -165,6 +172,11 @@ class AudioPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegate {
             // Update properties
             audioFileURL = url
             duration = audioPlayer?.duration ?? 0.0
+            
+        // Apply the desired rate to the player
+        audioPlayer?.rate = desiredRate
+        print("DEBUG: AudioPlaybackService - Applied initial rate: \(desiredRate)")
+            
             state = .ready
             
             print("DEBUG: AudioPlaybackService - Audio loaded successfully, duration: \(duration) seconds")
@@ -185,6 +197,10 @@ class AudioPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegate {
         if !player.play() {
             throw AudioPlaybackError.playbackFailed
         }
+        
+        // Apply the desired rate immediately after starting playback
+        player.rate = desiredRate
+        print("DEBUG: AudioPlaybackService - Applied rate after starting playback: \(desiredRate)")
         
         // Update state
         state = .playing
@@ -248,17 +264,23 @@ class AudioPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegate {
     
     /// Set the playback rate
     func setRate(_ newRate: Float) throws {
-        guard let player = audioPlayer else {
-            throw AudioPlaybackError.noPlaybackInProgress
-        }
-        
         // Ensure rate is within valid range (0.5 to 2.0)
         let clampedRate = max(0.5, min(newRate, 2.0))
         
-        // Set player rate
-        player.rate = clampedRate
+        // Store the desired rate
+        desiredRate = clampedRate
         
-        // Update rate
+        // Apply rate immediately if player exists and is playing
+        if let player = audioPlayer, state == .playing {
+            player.rate = clampedRate
+            print("DEBUG: AudioPlaybackService - Applied rate while playing: \(clampedRate)")
+        } else if let player = audioPlayer {
+            print("DEBUG: AudioPlaybackService - Stored rate \(clampedRate) for later application (current state: \(state))")
+        } else {
+            print("DEBUG: AudioPlaybackService - Stored rate \(clampedRate) for future playback (no player available)")
+        }
+        
+        // Update published rate property
         rate = clampedRate
     }
     
@@ -278,7 +300,10 @@ class AudioPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegate {
         currentTime = 0
         duration = 0
         audioLevel = 0
-        rate = 1.0
+        
+        // Note: We don't reset desiredRate here to maintain the user's preferred rate
+        // But we do update the published rate to match the current state
+        rate = desiredRate
         
         // Deactivate audio session
         do {

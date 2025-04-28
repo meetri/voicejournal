@@ -192,9 +192,9 @@ struct JournalEntryView: View {
                 }
             }
             
-            // Use HighlightableText when playing audio, otherwise use regular Text
+            // Use AttributedHighlightableText when playing audio, otherwise use regular Text
             if playbackViewModel.isPlaybackInProgress {
-                HighlightableText(
+                AttributedHighlightableText(
                     text: text,
                     highlightRange: playbackViewModel.currentHighlightRange,
                     highlightColor: .yellow.opacity(0.4),

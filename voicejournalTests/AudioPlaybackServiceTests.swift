@@ -180,6 +180,93 @@ final class AudioPlaybackServiceTests: XCTestCase {
         XCTAssertEqual(playbackService.rate, 0.5)
     }
     
+    func testPlaybackRatePersistence() async throws {
+        // Skip test if file doesn't exist
+        guard FileManager.default.fileExists(atPath: testAudioURL.path) else {
+            XCTFail("Test audio file does not exist")
+            return
+        }
+        
+        // Load audio file
+        try await playbackService.loadAudio(from: testAudioURL)
+        
+        // Set rate to 1.5x before playing
+        try playbackService.setRate(1.5)
+        XCTAssertEqual(playbackService.rate, 1.5)
+        
+        // Start playback
+        try playbackService.play()
+        XCTAssertEqual(playbackService.state, .playing)
+        
+        // Verify rate is maintained during playback
+        XCTAssertEqual(playbackService.rate, 1.5)
+        
+        // Pause playback
+        try playbackService.pause()
+        XCTAssertEqual(playbackService.state, .paused)
+        
+        // Verify rate is maintained while paused
+        XCTAssertEqual(playbackService.rate, 1.5)
+        
+        // Resume playback
+        try playbackService.play()
+        XCTAssertEqual(playbackService.state, .playing)
+        
+        // Verify rate is maintained after resuming
+        XCTAssertEqual(playbackService.rate, 1.5)
+        
+        // Stop playback
+        try playbackService.stop()
+        XCTAssertEqual(playbackService.state, .stopped)
+        
+        // Verify rate is maintained after stopping
+        XCTAssertEqual(playbackService.rate, 1.5)
+        
+        // Start playback again
+        try playbackService.play()
+        
+        // Verify rate is still maintained when starting playback again
+        XCTAssertEqual(playbackService.rate, 1.5)
+    }
+    
+    func testEnableRateProperty() async throws {
+        // Skip test if file doesn't exist
+        guard FileManager.default.fileExists(atPath: testAudioURL.path) else {
+            XCTFail("Test audio file does not exist")
+            return
+        }
+        
+        // Load audio file
+        try await playbackService.loadAudio(from: testAudioURL)
+        
+        // Access the private audioPlayer property using reflection
+        let mirror = Mirror(reflecting: playbackService)
+        let audioPlayerProperty = mirror.children.first { $0.label == "audioPlayer" }
+        
+        // Verify that the audioPlayer property exists
+        guard let audioPlayerWrapper = audioPlayerProperty?.value else {
+            XCTFail("Could not access audioPlayer property")
+            return
+        }
+        
+        // Get the actual AVAudioPlayer instance
+        let audioPlayerMirror = Mirror(reflecting: audioPlayerWrapper)
+        guard let audioPlayer = audioPlayerMirror.children.first?.value as? AVAudioPlayer else {
+            XCTFail("Could not access AVAudioPlayer instance")
+            return
+        }
+        
+        // Verify that enableRate is set to true
+        XCTAssertTrue(audioPlayer.enableRate, "enableRate should be set to true")
+        
+        // Test changing rates
+        try playbackService.setRate(2.0)
+        try playbackService.play()
+        
+        // Verify the rate was applied to the player
+        XCTAssertEqual(audioPlayer.rate, 2.0, "AVAudioPlayer rate should be 2.0")
+    }
+    
     func testReset() async throws {
         // Skip test if file doesn't exist
         guard FileManager.default.fileExists(atPath: testAudioURL.path) else {
@@ -189,6 +276,9 @@ final class AudioPlaybackServiceTests: XCTestCase {
         
         // Load audio file
         try await playbackService.loadAudio(from: testAudioURL)
+        
+        // Set a custom rate
+        try playbackService.setRate(1.5)
         
         // Play
         try playbackService.play()
@@ -201,7 +291,8 @@ final class AudioPlaybackServiceTests: XCTestCase {
         XCTAssertEqual(playbackService.currentTime, 0.0)
         XCTAssertEqual(playbackService.duration, 0.0)
         XCTAssertEqual(playbackService.audioLevel, 0.0)
-        XCTAssertEqual(playbackService.rate, 1.0)
+        // Rate should be maintained at 1.5 after reset
+        XCTAssertEqual(playbackService.rate, 1.5)
         XCTAssertNil(playbackService.audioFileURL)
     }
     

@@ -68,12 +68,14 @@
 - [x] Design playback interface with intuitive controls (Completed: 4/27/2025)
 - [x] Implement playback progress tracking with time display (Completed: 4/27/2025)
 - [x] Add playback rate control (0.5x, 1x, 1.5x, 2x speeds) (Completed: 4/27/2025)
+- [x] Fix playback rate button not changing audio speed by enabling AVAudioPlayer rate changes (Completed: 4/27/2025)
 - [x] Implement playback position seeking (scrubbing) functionality (Completed: 4/27/2025)
 
 #### Visual Feedback & Enhanced Features
 - [x] Design and implement interactive waveform display for playback visualization (Completed: 4/27/2025)
 - [x] Add audio bookmarking system for marking important moments (Completed: 4/27/2025)
 - [x] Create highlighting of transcribed text as audio plays (Completed: 4/27/2025)
+- [x] Fix text highlighting for multiline text by using AttributedHighlightableText (Completed: 4/27/2025)
 - [x] Implement audio level visualization during playback (Completed: 4/27/2025)
 
 #### System Integration
