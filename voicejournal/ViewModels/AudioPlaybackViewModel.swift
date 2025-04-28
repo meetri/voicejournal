@@ -10,7 +10,6 @@ import SwiftUI
 import Combine
 import AVFoundation
 import CoreData
-import MediaPlayer
 
 /// ViewModel for handling audio playback functionality
 @MainActor
@@ -151,10 +150,6 @@ class AudioPlaybackViewModel: ObservableObject {
         }
         
         await loadAudio(from: url)
-        
-        // Set up remote controls with entry title
-        let entryTitle = recording.journalEntry?.title ?? "Voice Journal Entry"
-        playbackService.setupRemoteControls(title: entryTitle)
     }
     
     /// Start or resume playback
@@ -278,9 +273,6 @@ class AudioPlaybackViewModel: ObservableObject {
         currentHighlightRange = nil
         
         stopHighlightUpdateTimer()
-        
-        // Clear remote controls
-        RemoteControlManager.shared.clearRemoteControls()
     }
     
     // MARK: - Bookmark Management

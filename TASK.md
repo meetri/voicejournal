@@ -79,10 +79,10 @@
 - [x] Implement audio level visualization during playback (Completed: 4/27/2025)
 
 #### System Integration
-- [x] Create a mini-player for continued playback while navigating the app (Completed: 4/27/2025)
-- [x] Implement background audio playback capabilities (Completed: 4/27/2025)
-- [x] Add lock screen and Control Center media controls (Completed: 4/27/2025)
-- [x] Implement AirPlay and external device playback support (Completed: 4/27/2025)
+- [ ] Create a mini-player for continued playback while navigating the app
+- [ ] Implement background audio playback capabilities
+- [ ] Add lock screen and Control Center media controls
+- [ ] Implement AirPlay and external device playback support
 
 ## Phase 3: Journal Interface & Organization
 

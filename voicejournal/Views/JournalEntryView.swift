@@ -7,7 +7,6 @@
 
 import SwiftUI
 import CoreData
-import Combine
 
 /// A view that displays a journal entry with audio playback capabilities
 struct JournalEntryView: View {
@@ -22,7 +21,7 @@ struct JournalEntryView: View {
     
     // MARK: - State
     
-    @ObservedObject private var playerManager = PlayerManager.shared
+    @StateObject private var playbackViewModel: AudioPlaybackViewModel
     @State private var showDeleteConfirmation = false
     @State private var isEditingTitle = false
     @State private var entryTitle: String
@@ -33,6 +32,10 @@ struct JournalEntryView: View {
     
     init(journalEntry: JournalEntry) {
         self.journalEntry = journalEntry
+        
+        // Initialize playback view model
+        let playbackService = AudioPlaybackService()
+        _playbackViewModel = StateObject(wrappedValue: AudioPlaybackViewModel(playbackService: playbackService))
         
         // Initialize title state
         _entryTitle = State(initialValue: journalEntry.title ?? "Untitled Entry")
@@ -51,25 +54,8 @@ struct JournalEntryView: View {
                 
                 // Audio playback
                 if let recording = journalEntry.audioRecording {
-                    Button(action: {
-                        Task {
-                            await playerManager.playAudio(from: journalEntry)
-                        }
-                    }) {
-                        HStack {
-                            Image(systemName: "play.circle.fill")
-                                .font(.system(size: 24))
-                            
-                            Text("Play Recording")
-                                .font(.headline)
-                        }
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.blue.opacity(0.1))
-                        .foregroundColor(.blue)
-                        .cornerRadius(12)
-                    }
-                    .padding(.vertical)
+                    PlaybackView(viewModel: playbackViewModel)
+                        .padding(.vertical)
                 }
                 
                 // Transcription
@@ -122,11 +108,16 @@ struct JournalEntryView: View {
         } message: {
             Text("Are you sure you want to delete this journal entry? This action cannot be undone.")
         }
+        .alert("Playback Error", isPresented: $playbackViewModel.showErrorAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(playbackViewModel.errorMessage ?? "An unknown error occurred")
+        }
         .onAppear {
-            // Check if this entry is already playing
-            if playerManager.currentJournalEntry?.id != journalEntry.id {
-                playerManager.stopPlayback()
-            }
+            loadAudio()
+        }
+        .onDisappear {
+            playbackViewModel.stop()
         }
     }
     
@@ -202,10 +193,10 @@ struct JournalEntryView: View {
             }
             
             // Use AttributedHighlightableText when playing audio, otherwise use regular Text
-            if playerManager.isPlayerActive && playerManager.currentJournalEntry?.id == journalEntry.id {
+            if playbackViewModel.isPlaybackInProgress {
                 AttributedHighlightableText(
                     text: text,
-                    highlightRange: playerManager.playbackViewModel.currentHighlightRange,
+                    highlightRange: playbackViewModel.currentHighlightRange,
                     highlightColor: .yellow.opacity(0.4),
                     textColor: .primary,
                     font: .body
@@ -280,6 +271,22 @@ struct JournalEntryView: View {
     
     // MARK: - Methods
     
+    /// Load the audio file for playback
+    private func loadAudio() {
+        guard let recording = journalEntry.audioRecording,
+              let filePath = recording.filePath else {
+            print("DEBUG: JournalEntryView - No audio recording or filePath is nil")
+            return
+        }
+        
+        print("DEBUG: JournalEntryView - Loading audio from filePath: \(filePath)")
+        
+        // Use the AudioPlaybackViewModel's method which properly handles path conversion
+        Task {
+            await playbackViewModel.loadAudio(from: recording)
+            print("DEBUG: JournalEntryView - Audio loading completed, isAudioLoaded: \(playbackViewModel.isAudioLoaded)")
+        }
+    }
     
     /// Update the journal entry title
     private func updateEntryTitle() {
@@ -295,10 +302,8 @@ struct JournalEntryView: View {
     
     /// Delete the journal entry
     private func deleteEntry() {
-        // Stop playback if this entry is currently playing
-        if playerManager.currentJournalEntry?.id == journalEntry.id {
-            playerManager.stopPlayback()
-        }
+        // Stop playback
+        playbackViewModel.stop()
         
         // Delete the entry
         viewContext.delete(journalEntry)
@@ -307,7 +312,7 @@ struct JournalEntryView: View {
             try viewContext.save()
             dismiss()
         } catch {
-            print("ERROR: JournalEntryView - Failed to delete entry: \(error.localizedDescription)")
+            print("Error deleting entry: \(error.localizedDescription)")
         }
     }
     
