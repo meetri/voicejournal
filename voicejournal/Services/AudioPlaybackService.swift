@@ -8,6 +8,7 @@
 import Foundation
 import AVFoundation
 import Combine
+import MediaPlayer
 
 /// Enum representing the possible states of audio playback
 enum PlaybackState {
@@ -118,11 +119,27 @@ class AudioPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegate {
     
     override init() {
         super.init()
+        
+        // Set up audio session for background playback
+        setupAudioSession()
+        
+        // Register for audio session notifications
+        registerForAudioSessionNotifications()
     }
     
     deinit {
         stopProgressTimer()
         stopLevelUpdateTimer()
+        
+        // Unregister from audio session notifications
+        unregisterFromAudioSessionNotifications()
+        
+        // Deactivate audio session
+        do {
+            try audioSession.setActive(false, options: .notifyOthersOnDeactivation)
+        } catch {
+            print("ERROR: AudioPlaybackService - Failed to deactivate audio session: \(error.localizedDescription)")
+        }
     }
     
     // MARK: - Public Methods
@@ -134,13 +151,12 @@ class AudioPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegate {
         // Reset current state
         reset()
         
-        // Set up audio session
+        // Activate audio session
         do {
-            try audioSession.setCategory(.playback, mode: .default)
-            try audioSession.setActive(true)
+            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
             print("DEBUG: AudioPlaybackService - Audio session activated successfully")
         } catch {
-            print("ERROR: AudioPlaybackService - Failed to set up audio session: \(error.localizedDescription)")
+            print("ERROR: AudioPlaybackService - Failed to activate audio session: \(error.localizedDescription)")
             throw AudioPlaybackError.audioSessionSetupFailed
         }
         
@@ -305,11 +321,14 @@ class AudioPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegate {
         // But we do update the published rate to match the current state
         rate = desiredRate
         
+        // Clear remote controls
+        RemoteControlManager.shared.clearRemoteControls()
+        
         // Deactivate audio session
         do {
             try audioSession.setActive(false, options: .notifyOthersOnDeactivation)
         } catch {
-            print("Error deactivating audio session: \(error.localizedDescription)")
+            print("ERROR: AudioPlaybackService - Failed to deactivate audio session: \(error.localizedDescription)")
         }
     }
     
@@ -329,6 +348,17 @@ class AudioPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegate {
             // Stop timers
             stopProgressTimer()
             stopLevelUpdateTimer()
+            
+            // Update remote controls
+            if flag {
+                // Set playback rate to 0 to indicate playback has stopped
+                RemoteControlManager.shared.updateNowPlayingInfo(
+                    title: audioFileURL?.lastPathComponent ?? "Voice Journal",
+                    duration: duration,
+                    currentTime: duration,
+                    rate: 0.0
+                )
+            }
         }
     }
     
@@ -343,7 +373,180 @@ class AudioPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegate {
             // Stop timers
             stopProgressTimer()
             stopLevelUpdateTimer()
+            
+            // Clear remote controls
+            RemoteControlManager.shared.clearRemoteControls()
         }
+    }
+    
+    // MARK: - Audio Session Management
+    
+    /// Set up the audio session for background playback
+    private func setupAudioSession() {
+        do {
+            // Configure audio session for playback with AirPlay and Bluetooth support
+            try audioSession.setCategory(
+                .playback,
+                mode: .default,
+                options: [.allowAirPlay, .allowBluetooth]
+            )
+            
+            print("DEBUG: AudioPlaybackService - Audio session category set to playback with AirPlay and Bluetooth support")
+        } catch {
+            print("ERROR: AudioPlaybackService - Failed to set audio session category: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Register for audio session notifications
+    private func registerForAudioSessionNotifications() {
+        // Register for interruption notifications
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAudioSessionInterruption),
+            name: AVAudioSession.interruptionNotification,
+            object: audioSession
+        )
+        
+        // Register for route change notifications
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAudioRouteChange),
+            name: AVAudioSession.routeChangeNotification,
+            object: audioSession
+        )
+        
+        // Register for media server reset notifications
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleMediaServerReset),
+            name: AVAudioSession.mediaServicesWereResetNotification,
+            object: nil
+        )
+    }
+    
+    /// Unregister from audio session notifications
+    private func unregisterFromAudioSessionNotifications() {
+        NotificationCenter.default.removeObserver(self, name: AVAudioSession.interruptionNotification, object: audioSession)
+        NotificationCenter.default.removeObserver(self, name: AVAudioSession.routeChangeNotification, object: audioSession)
+        NotificationCenter.default.removeObserver(self, name: AVAudioSession.mediaServicesWereResetNotification, object: nil)
+    }
+    
+    /// Handle audio session interruptions (e.g., phone calls)
+    @objc private func handleAudioSessionInterruption(notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
+            return
+        }
+        
+        switch type {
+        case .began:
+            // Interruption began, pause playback
+            print("DEBUG: AudioPlaybackService - Audio session interruption began")
+            
+            if case .playing = state {
+                // Save the current state
+                do {
+                    try pause()
+                } catch {
+                    print("ERROR: AudioPlaybackService - Failed to pause during interruption: \(error.localizedDescription)")
+                }
+            }
+            
+        case .ended:
+            // Interruption ended, resume playback if needed
+            print("DEBUG: AudioPlaybackService - Audio session interruption ended")
+            
+            // Check if we should resume playback
+            if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt,
+               let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue),
+               options.contains(.shouldResume),
+               case .paused = state {
+                
+                // Resume playback
+                do {
+                    try play()
+                } catch {
+                    print("ERROR: AudioPlaybackService - Failed to resume after interruption: \(error.localizedDescription)")
+                }
+            }
+            
+        @unknown default:
+            print("WARNING: AudioPlaybackService - Unknown interruption type: \(type)")
+        }
+    }
+    
+    /// Handle audio route changes (e.g., headphones disconnected)
+    @objc private func handleAudioRouteChange(notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
+              let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else {
+            return
+        }
+        
+        switch reason {
+        case .oldDeviceUnavailable:
+            // Old device is unavailable (e.g., headphones unplugged)
+            print("DEBUG: AudioPlaybackService - Audio route changed: old device unavailable")
+            
+            // Pause playback when headphones are unplugged
+            if case .playing = state {
+                do {
+                    try pause()
+                } catch {
+                    print("ERROR: AudioPlaybackService - Failed to pause after route change: \(error.localizedDescription)")
+                }
+            }
+            
+        case .newDeviceAvailable:
+            // New device is available (e.g., headphones plugged in)
+            print("DEBUG: AudioPlaybackService - Audio route changed: new device available")
+            
+        case .categoryChange:
+            // Category changed
+            print("DEBUG: AudioPlaybackService - Audio route changed: category change")
+            
+        default:
+            // Other route changes
+            print("DEBUG: AudioPlaybackService - Audio route changed: \(reason)")
+        }
+        
+        // Log current route
+        let outputs = audioSession.currentRoute.outputs
+        let outputNames = outputs.map { $0.portName }.joined(separator: ", ")
+        print("DEBUG: AudioPlaybackService - Current audio route outputs: \(outputNames)")
+    }
+    
+    /// Handle media server reset
+    @objc private func handleMediaServerReset(notification: Notification) {
+        print("DEBUG: AudioPlaybackService - Media server reset")
+        
+        // Recreate audio player if needed
+        if let url = audioFileURL, case .playing = state {
+            Task {
+                do {
+                    try await loadAudio(from: url)
+                    try play()
+                } catch {
+                    print("ERROR: AudioPlaybackService - Failed to restore playback after media server reset: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    // MARK: - Remote Control Integration
+    
+    /// Set up remote controls for the current audio file
+    func setupRemoteControls(title: String? = nil, artwork: UIImage? = nil) {
+        // Get title from audio file URL if not provided
+        let displayTitle = title ?? audioFileURL?.lastPathComponent ?? "Voice Journal"
+        
+        // Set up remote controls
+        RemoteControlManager.shared.setupRemoteControls(
+            for: self,
+            title: displayTitle,
+            artwork: artwork
+        )
     }
     
     // MARK: - Private Methods
