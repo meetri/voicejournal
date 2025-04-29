@@ -29,6 +29,13 @@ struct JournalEntryEditView: View {
     @State private var showingDiscardAlert = false
     @State private var showingDeleteAlert = false
     @State private var showingRecordingView = false
+    @State private var suggestedTagNames: [String] = [] // State for suggested tags
+    
+    // Fetch existing tags for suggestion logic
+    @FetchRequest(
+        entity: Tag.entity(),
+        sortDescriptors: [NSSortDescriptor(keyPath: \Tag.name, ascending: true)]
+    ) private var allTags: FetchedResults<Tag>
     
     // MARK: - Initialization
     
@@ -80,9 +87,10 @@ struct JournalEntryEditView: View {
                             .foregroundColor(.secondary)
                             .italic()
                     } else {
+                        // Display selected tags
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
-                                ForEach(Array(selectedTags), id: \.self) { tag in
+                                ForEach(Array(selectedTags).sorted(by: { $0.name ?? "" < $1.name ?? "" })) { tag in
                                     if let name = tag.name, let color = tag.color {
                                         HStack(spacing: 4) {
                                             Circle()
@@ -110,6 +118,35 @@ struct JournalEntryEditView: View {
                             }
                         }
                         .padding(.vertical, 4)
+                    }
+                    
+                    // Display suggested tags if available
+                    if !suggestedTagNames.isEmpty {
+                        Divider()
+                        VStack(alignment: .leading) {
+                            Text("Suggestions:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(suggestedTagNames, id: \.self) { tagName in
+                                        Button(action: {
+                                            addSuggestedTag(tagName)
+                                        }) {
+                                            Text(tagName)
+                                                .font(.caption)
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 4)
+                                                .background(Color.gray.opacity(0.2))
+                                                .foregroundColor(.primary)
+                                                .cornerRadius(10)
+                                        }
+                                        .buttonStyle(BorderlessButtonStyle())
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.top, 8)
                     }
                 }
                 
@@ -256,6 +293,14 @@ struct JournalEntryEditView: View {
             } message: {
                 Text("Are you sure you want to delete this entry? This action cannot be undone.")
             }
+            .onAppear {
+                // Generate initial suggestions when the view appears
+                generateTagSuggestions()
+            }
+            .onChange(of: transcriptionText) { _, _ in
+                 // Regenerate suggestions if transcription text changes (e.g., after editing)
+                 generateTagSuggestions()
+             }
         }
     }
     
@@ -300,7 +345,7 @@ struct JournalEntryEditView: View {
         }
     }
     
-    /// Save edited transcription
+    /// Save edited transcription and regenerate suggestions
     private func saveTranscription() {
         guard let transcription = journalEntry.transcription else { return }
         
@@ -310,9 +355,35 @@ struct JournalEntryEditView: View {
         
         do {
             try viewContext.save()
+            // Regenerate suggestions after saving new transcription text
+            generateTagSuggestions()
         } catch {
             print("Error saving transcription: \(error.localizedDescription)")
         }
+    }
+    
+    /// Generate tag suggestions based on the current transcription text
+    private func generateTagSuggestions() {
+        // Use the placeholder suggestion logic from Tag+Extensions
+        // Pass the current transcription text and the fetched list of all tags
+        suggestedTagNames = Tag.suggestTags(
+            for: transcriptionText,
+            existingTags: Array(allTags),
+            context: viewContext
+        )
+        // Filter out suggestions that are already selected
+        suggestedTagNames.removeAll { suggestedName in
+            selectedTags.contains { $0.name?.lowercased() == suggestedName.lowercased() }
+        }
+    }
+    
+    /// Add a suggested tag to the selected tags set
+    private func addSuggestedTag(_ tagName: String) {
+        // Find or create the tag using the method from Tag+Extensions
+        let tag = Tag.findOrCreate(name: tagName, in: viewContext)
+        selectedTags.insert(tag)
+        // Remove the tag from suggestions once added
+        suggestedTagNames.removeAll { $0.lowercased() == tagName.lowercased() }
     }
     
     /// Delete the journal entry

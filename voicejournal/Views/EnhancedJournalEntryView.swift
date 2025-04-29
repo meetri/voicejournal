@@ -374,15 +374,22 @@ struct EnhancedJournalEntryView: View {
     
     // MARK: - Helper Views
     
-    /// An enhanced tag view
+    /// An enhanced tag view, now with icon support
     struct EnhancedTagView: View {
         let tag: Tag
         
         var body: some View {
             HStack(spacing: 6) {
-                Circle()
-                    .fill(Color(hex: tag.color ?? "#007AFF"))
-                    .frame(width: 8, height: 8)
+                // Display icon if available, otherwise color circle
+                if let iconName = tag.iconName, !iconName.isEmpty {
+                    Image(systemName: iconName)
+                        .font(.caption) // Adjust size as needed
+                        .foregroundColor(Color(hex: tag.color ?? "#007AFF"))
+                } else {
+                    Circle()
+                        .fill(Color(hex: tag.color ?? "#007AFF"))
+                        .frame(width: 8, height: 8)
+                }
                 
                 Text(tag.name ?? "")
                     .font(.subheadline)

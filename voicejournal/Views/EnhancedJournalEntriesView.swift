@@ -19,7 +19,8 @@ struct EnhancedJournalEntriesView: View {
     @State private var searchText = ""
     @State private var showingFilterOptions = false
     @State private var showingSortOptions = false
-    @State private var selectedFilterTag: String? = nil
+    @State private var selectedFilterTags: Set<String> = [] // Tags to include
+    @State private var excludedFilterTags: Set<String> = [] // Tags to exclude
     @State private var sortOption: SortOption = .dateNewest
     @State private var showingNewEntrySheet = false
     @State private var selectedEntryForEdit: JournalEntry? = nil
@@ -125,11 +126,16 @@ struct EnhancedJournalEntriesView: View {
                 }
             }
             .sheet(isPresented: $showingFilterOptions) {
-                FilterOptionsView(selectedTag: $selectedFilterTag, onDismiss: {
-                    showingFilterOptions = false
-                    updateFetchRequest()
-                })
-                .presentationDetents([.medium])
+                // Pass bindings to both tag sets
+                FilterOptionsView(
+                    selectedTags: $selectedFilterTags,
+                    excludedTags: $excludedFilterTags,
+                    onDismiss: {
+                        showingFilterOptions = false
+                        updateFetchRequest()
+                    }
+                )
+                .presentationDetents([.medium, .large])
             }
             .sheet(isPresented: $showingNewEntrySheet) {
                 EntryCreationView(isPresented: $showingNewEntrySheet)
@@ -181,13 +187,27 @@ struct EnhancedJournalEntriesView: View {
     private var filterChipsView: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                if let selectedTag = selectedFilterTag {
+                // Display chips for each included tag
+                ForEach(selectedFilterTags.sorted(), id: \.self) { tag in
                     FilterChip(
-                        label: "Tag: \(selectedTag)",
+                        label: "Include: \(tag)",
                         systemImage: "tag.fill",
                         isSelected: true,
                         action: {
-                            self.selectedFilterTag = nil
+                            selectedFilterTags.remove(tag)
+                            updateFetchRequest()
+                        }
+                    )
+                }
+                
+                // Display chips for each excluded tag
+                ForEach(excludedFilterTags.sorted(), id: \.self) { tag in
+                    FilterChip(
+                        label: "Exclude: \(tag)",
+                        systemImage: "tag.slash",
+                        isSelected: true,
+                        action: {
+                            excludedFilterTags.remove(tag)
                             updateFetchRequest()
                         }
                     )
@@ -297,8 +317,10 @@ struct EnhancedJournalEntriesView: View {
             if hasActiveFilters {
                 Button("Clear Filters") {
                     searchText = ""
-                    selectedFilterTag = nil
+                    selectedFilterTags = [] // Clear included tags
+                    excludedFilterTags = [] // Clear excluded tags
                     setSortOption(.dateNewest)
+                    // updateFetchRequest() will be called by setSortOption
                 }
                 .buttonStyle(.bordered)
             } else {
@@ -365,7 +387,7 @@ struct EnhancedJournalEntriesView: View {
     
     /// Check if any filters are active
     private var hasActiveFilters: Bool {
-        !searchText.isEmpty || selectedFilterTag != nil || sortOption != .dateNewest
+        !searchText.isEmpty || !selectedFilterTags.isEmpty || !excludedFilterTags.isEmpty || sortOption != .dateNewest
     }
     
     /// Message to display when no entries are found
@@ -398,7 +420,7 @@ struct EnhancedJournalEntriesView: View {
     // MARK: - Methods
     
     /// Create a fetch request based on search, filter, and sort options
-    private func createFetchRequest(searchText: String, filterTag: String?, sortOption: SortOption) -> NSFetchRequest<JournalEntry> {
+    private func createFetchRequest(searchText: String, filterTags: Set<String>, excludedTags: Set<String>, sortOption: SortOption) -> NSFetchRequest<JournalEntry> {
         let request: NSFetchRequest<JournalEntry> = JournalEntry.fetchRequest()
         
         // Build predicates
@@ -412,9 +434,16 @@ struct EnhancedJournalEntriesView: View {
             predicates.append(searchPredicate)
         }
         
-        if let tag = filterTag {
-            let tagPredicate = NSPredicate(format: "ANY tags.name == %@", tag)
+        // Predicate for included tags
+        if !filterTags.isEmpty {
+            let tagPredicate = NSPredicate(format: "ANY tags.name IN %@", filterTags)
             predicates.append(tagPredicate)
+        }
+        
+        // Predicate for excluded tags
+        if !excludedTags.isEmpty {
+            let excludePredicate = NSPredicate(format: "NONE tags.name IN %@", excludedTags)
+            predicates.append(excludePredicate)
         }
         
         if !predicates.isEmpty {
@@ -431,7 +460,8 @@ struct EnhancedJournalEntriesView: View {
     private func updateFetchRequest() {
         entries.nsPredicate = createFetchRequest(
             searchText: searchText,
-            filterTag: selectedFilterTag,
+            filterTags: selectedFilterTags,
+            excludedTags: excludedFilterTags,
             sortOption: sortOption
         ).predicate
         
@@ -569,7 +599,8 @@ enum SortOption: String, CaseIterable {
 /// A view for selecting filter options
 struct FilterOptionsView: View {
     @Environment(\.managedObjectContext) private var viewContext
-    @Binding var selectedTag: String?
+    @Binding var selectedTags: Set<String> // Tags to include
+    @Binding var excludedTags: Set<String> // Tags to exclude
     let onDismiss: () -> Void
     
     @FetchRequest(
@@ -577,44 +608,94 @@ struct FilterOptionsView: View {
         sortDescriptors: [NSSortDescriptor(keyPath: \Tag.name, ascending: true)]
     ) private var tags: FetchedResults<Tag>
     
+    @State private var filterMode: FilterMode = .include
+    
+    enum FilterMode {
+        case include
+        case exclude
+    }
+    
     var body: some View {
         NavigationView {
             List {
-                Section(header: Text("Filter by Tag")) {
-                    Button {
-                        selectedTag = nil
-                        onDismiss()
-                    } label: {
-                        HStack {
-                            Text("All Entries")
-                            Spacer()
-                            if selectedTag == nil {
-                                Image(systemName: "checkmark")
-                                    .foregroundColor(.blue)
+                // Filter mode picker
+                Section {
+                    Picker("Filter Mode", selection: $filterMode) {
+                        Text("Include Tags").tag(FilterMode.include)
+                        Text("Exclude Tags").tag(FilterMode.exclude)
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                }
+                
+                // Include tags section
+                if filterMode == .include {
+                    Section(header: Text("Include Entries With These Tags")) {
+                        // Button to clear all tag selections
+                        Button {
+                            selectedTags.removeAll()
+                        } label: {
+                            HStack {
+                                Text("Clear Selection")
+                                Spacer()
+                                if selectedTags.isEmpty {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                        }
+                        .foregroundColor(selectedTags.isEmpty ? .blue : .primary)
+                        
+                        // List each tag for inclusion
+                        ForEach(tags, id: \.self) { tag in
+                            if let name = tag.name {
+                                Button {
+                                    // Toggle membership in the include set
+                                    if selectedTags.contains(name) {
+                                        selectedTags.remove(name)
+                                    } else {
+                                        selectedTags.insert(name)
+                                    }
+                                } label: {
+                                    tagRow(tag: tag, isSelected: selectedTags.contains(name ?? ""))
+                                }
+                                .foregroundColor(.primary)
                             }
                         }
                     }
-                    
-                    ForEach(tags, id: \.self) { tag in
+                }
+                
+                // Exclude tags section
+                if filterMode == .exclude {
+                    Section(header: Text("Exclude Entries With These Tags")) {
+                        // Button to clear all excluded tags
                         Button {
-                            selectedTag = tag.name
-                            onDismiss()
+                            excludedTags.removeAll()
                         } label: {
                             HStack {
-                                if let color = tag.color, let name = tag.name {
-                                    Circle()
-                                        .fill(Color(hex: color))
-                                        .frame(width: 12, height: 12)
-                                    
-                                    Text(name)
-                                    
-                                    Spacer()
-                                    
-                                    if selectedTag == tag.name {
-                                        Image(systemName: "checkmark")
-                                            .foregroundColor(.blue)
-                                    }
+                                Text("Clear Exclusions")
+                                Spacer()
+                                if excludedTags.isEmpty {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(.blue)
                                 }
+                            }
+                        }
+                        .foregroundColor(excludedTags.isEmpty ? .blue : .primary)
+                        
+                        // List each tag for exclusion
+                        ForEach(tags, id: \.self) { tag in
+                            if let name = tag.name {
+                                Button {
+                                    // Toggle membership in the exclude set
+                                    if excludedTags.contains(name) {
+                                        excludedTags.remove(name)
+                                    } else {
+                                        excludedTags.insert(name)
+                                    }
+                                } label: {
+                                    tagRow(tag: tag, isSelected: excludedTags.contains(name ?? ""))
+                                }
+                                .foregroundColor(.primary)
                             }
                         }
                     }
@@ -629,6 +710,31 @@ struct FilterOptionsView: View {
                         onDismiss()
                     }
                 }
+            }
+        }
+    }
+    
+    // Helper function to create consistent tag rows
+    private func tagRow(tag: Tag, isSelected: Bool) -> some View {
+        HStack {
+            // Display icon if available, otherwise color circle
+            if let iconName = tag.iconName, !iconName.isEmpty {
+                Image(systemName: iconName)
+                    .font(.caption)
+                    .foregroundColor(Color(hex: tag.color ?? "#007AFF"))
+            } else if let color = tag.color {
+                Circle()
+                    .fill(Color(hex: color))
+                    .frame(width: 12, height: 12)
+            }
+            
+            Text(tag.name ?? "")
+            Spacer()
+            
+            // Show checkmark if selected
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .foregroundColor(.blue)
             }
         }
     }
@@ -690,13 +796,26 @@ struct EnhancedJournalEntryRow: View {
                     HStack(spacing: 4) {
                         ForEach(Array(tags), id: \.self) { tag in
                             if let name = tag.name, let color = tag.color {
-                                Text(name)
-                                    .font(.caption2)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color(hex: color).opacity(0.2))
-                                    .foregroundColor(Color(hex: color))
-                                    .cornerRadius(4)
+                                HStack(spacing: 4) {
+                                    // Display icon if available, otherwise color circle
+                                    if let iconName = tag.iconName, !iconName.isEmpty {
+                                        Image(systemName: iconName)
+                                            .font(.caption2)
+                                            .foregroundColor(Color(hex: color))
+                                    } else {
+                                        Circle()
+                                            .fill(Color(hex: color))
+                                            .frame(width: 6, height: 6)
+                                    }
+                                    
+                                    Text(name)
+                                        .font(.caption2)
+                                }
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color(hex: color).opacity(0.2))
+                                .foregroundColor(Color(hex: color))
+                                .cornerRadius(4)
                             }
                         }
                     }
