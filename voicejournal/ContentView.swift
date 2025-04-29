@@ -16,26 +16,19 @@ struct ContentView: View {
     
     var body: some View {
         TabView(selection: $selectedTab) {
-            // Recording tab
-            RecordingView()
-                .tabItem {
-                    Label("Record", systemImage: "mic.fill")
-                }
-                .tag(0)
-            
-            // Journal entries tab
-            JournalEntriesView()
+            // Journal entries tab (now primary tab)
+            EnhancedJournalEntriesView()
                 .tabItem {
                     Label("Journal", systemImage: "book.fill")
                 }
-                .tag(1)
+                .tag(0)
             
             // Settings tab
             SettingsTabView()
                 .tabItem {
                     Label("Settings", systemImage: "gear")
                 }
-                .tag(2)
+                .tag(1)
         }
         .accentColor(.blue)
     }

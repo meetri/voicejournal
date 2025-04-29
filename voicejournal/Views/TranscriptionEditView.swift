@@ -274,9 +274,7 @@ struct TranscriptionEditView: View {
             "hasnt": "hasn't",
             "havent": "haven't",
             "hadnt": "hadn't",
-            "doesnt": "doesn't",
-            "dont": "don't",
-            "didnt": "didn't"
+            "doesnt": "doesn't"            
         ]
         
         // Apply corrections

@@ -82,10 +82,11 @@ class AudioRecordingViewModel: ObservableObject {
     
     // MARK: - Initialization
     
-    init(context: NSManagedObjectContext, recordingService: AudioRecordingService, speechRecognitionService: SpeechRecognitionService = SpeechRecognitionService()) {
+    init(context: NSManagedObjectContext, recordingService: AudioRecordingService, speechRecognitionService: SpeechRecognitionService = SpeechRecognitionService(), existingEntry: JournalEntry? = nil) {
         self.managedObjectContext = context
         self.recordingService = recordingService
         self.speechRecognitionService = speechRecognitionService
+        self.journalEntry = existingEntry
         
         // Set up publishers
         setupPublishers()
@@ -140,12 +141,12 @@ class AudioRecordingViewModel: ObservableObject {
             // to properly handle low audio levels
             print("DEBUG: ViewModel - Recording started")
             
-            isRecording = true
-            isPaused = false
-            hasRecordingSaved = false
-            journalEntry = nil
-            
-            // Start speech recognition if permission is granted
+        isRecording = true
+        isPaused = false
+        hasRecordingSaved = false
+        // Removed: journalEntry = nil (This was causing the double entry bug)
+        
+        // Start speech recognition if permission is granted
             if checkSpeechRecognitionPermission() {
                 try await startSpeechRecognition()
             } else {
@@ -402,9 +403,15 @@ class AudioRecordingViewModel: ObservableObject {
     }
     
     private func createJournalEntry(recordingURL: URL) async {
-        // Create a new journal entry
-        let entry = JournalEntry.create(in: managedObjectContext)
-        entry.title = "Voice Journal - \(Date().formatted(date: .abbreviated, time: .shortened))"
+        // Use existing entry or create a new one
+        let entry: JournalEntry
+        
+        if let existingEntry = journalEntry {
+            entry = existingEntry
+        } else {
+            entry = JournalEntry.create(in: managedObjectContext)
+            entry.title = "Voice Journal - \(Date().formatted(date: .abbreviated, time: .shortened))"
+        }
         
         // Convert absolute path to relative path before storing
         let relativePath = FilePathUtility.toRelativePath(from: recordingURL.path)

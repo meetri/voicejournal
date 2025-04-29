@@ -32,7 +32,7 @@ class WaveformViewModel: ObservableObject {
     
     /// Smoothing factor for audio level changes (0.0 to 1.0)
     /// Lower values make the waveform more responsive, higher values make it smoother
-    private let smoothingFactor: CGFloat = 0.0
+    private let smoothingFactor: CGFloat = 0.3
     
     /// The last processed audio level (for smoothing)
     private var lastProcessedLevel: CGFloat = 0.0
@@ -60,8 +60,6 @@ class WaveformViewModel: ObservableObject {
         if oldIsActive != isActive {
             handleActiveStateChange(isActive: isActive)
         }
-        
-        print("DEBUG: WaveformViewModel - Updated with audioLevel: \(audioLevel), isActive: \(isActive)")
     }
     
     /// Start the timer for waveform animation
@@ -69,19 +67,16 @@ class WaveformViewModel: ObservableObject {
         // Stop existing timer if any
         stopTimer()
         
-        // Create new timer
-        timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+        // Create new timer with balanced frequency (0.05s → 0.1s)
+        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             self?.updateLevelHistory()
         }
-        
-        print("DEBUG: WaveformViewModel - Timer started")
     }
     
     /// Stop the animation timer
     func stopTimer() {
         timer?.invalidate()
         timer = nil
-        print("DEBUG: WaveformViewModel - Timer stopped")
     }
     
     // MARK: - Private Methods
@@ -107,51 +102,41 @@ class WaveformViewModel: ObservableObject {
     
     /// Update the level history for animation
     private func updateLevelHistory() {
-        // Add new level at the beginning
-        var newHistory = levelHistory
+        // Memory optimization: Create a new array only when necessary
+        // and reuse the existing array when possible
+        var newLevels = [CGFloat]()
+        newLevels.reserveCapacity(barCount)
         
         if isActive {
             // Apply exponential smoothing to the audio level
             let smoothedLevel = (smoothingFactor * lastProcessedLevel) + ((1 - smoothingFactor) * audioLevel)
             lastProcessedLevel = smoothedLevel
             
-            print("DEBUG: WaveformViewModel - Raw audioLevel: \(audioLevel), Smoothed: \(smoothedLevel)")
-            
             // Apply scaling and ensure we have a visible level
             let scaledLevel = min(1.0, smoothedLevel * scalingFactor)
             
-            // For playback, ensure we always have some visible activity
-            if audioLevel > 0.01 {
-                // Use the actual level when it's significant
-                newHistory.insert(scaledLevel, at: 0)
-                print("DEBUG: WaveformViewModel - Inserted new level: \(scaledLevel)")
-            } else if isActive {
-                // If audio level is very low but we're active, use a random small value to show some activity
-                // This creates a more natural-looking waveform during quiet parts
-                newHistory.insert(scaledLevel, at: 0)
-
-                // let minLevel: CGFloat = 0.05
-                // let maxLevel: CGFloat = 0.15
-                // let randomLevel = minLevel + CGFloat.random(in: 0...1) * (maxLevel - minLevel)
-                // newHistory.insert(randomLevel, at: 0)
-                // print("DEBUG: WaveformViewModel - Using random level: \(randomLevel)")
-            } else {
-                // When inactive, use zero
-                newHistory.insert(0, at: 0)
+            // Add the new level at the beginning
+            newLevels.append(scaledLevel)
+            
+            // Copy existing levels (up to barCount-1)
+            let existingLevelsToKeep = min(barCount - 1, levelHistory.count)
+            if existingLevelsToKeep > 0 {
+                newLevels.append(contentsOf: levelHistory[0..<existingLevelsToKeep])
             }
         } else {
             // When inactive, gradually reduce levels
-            newHistory.insert(0, at: 0)
-        }
-        
-        // Remove last element to maintain fixed size
-        if !newHistory.isEmpty && newHistory.count > barCount {
-            newHistory.removeLast()
+            newLevels.append(0)
+            
+            // Copy existing levels (up to barCount-1)
+            let existingLevelsToKeep = min(barCount - 1, levelHistory.count)
+            if existingLevelsToKeep > 0 {
+                newLevels.append(contentsOf: levelHistory[0..<existingLevelsToKeep])
+            }
         }
         
         // Update state on the main thread
         DispatchQueue.main.async {
-            self.levelHistory = newHistory
+            self.levelHistory = newLevels
         }
     }
 }
