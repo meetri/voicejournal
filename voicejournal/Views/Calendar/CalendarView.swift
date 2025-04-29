@@ -18,6 +18,7 @@ struct CalendarView: View {
     
     @StateObject private var viewModel: CalendarViewModel
     @State private var selectedEntry: JournalEntry? = nil
+    @State private var showingEntryCreation = false
     
     // MARK: - Initialization
     
@@ -29,22 +30,49 @@ struct CalendarView: View {
     // MARK: - Body
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Calendar header
-            calendarHeader
+        ZStack {
+            VStack(spacing: 0) {
+                // Calendar header
+                calendarHeader
+                
+                // Calendar content based on zoom level
+                switch viewModel.zoomLevel {
+                case .year:
+                    YearCalendarView(viewModel: viewModel)
+                case .month:
+                    MonthCalendarView(viewModel: viewModel)
+                case .week:
+                    WeekCalendarView(viewModel: viewModel)
+                }
+            }
             
-            // Calendar content based on zoom level
-            switch viewModel.zoomLevel {
-            case .year:
-                YearCalendarView(viewModel: viewModel)
-            case .month:
-                MonthCalendarView(viewModel: viewModel)
-            case .week:
-                WeekCalendarView(viewModel: viewModel)
+            // Floating Action Button for creating new recordings
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        showingEntryCreation = true
+                    }) {
+                        Image(systemName: "mic.fill")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                            .frame(width: 60, height: 60)
+                            .background(Color.blue)
+                            .clipShape(Circle())
+                            .shadow(radius: 4)
+                    }
+                    .padding([.bottom, .trailing], 20)
+                    .accessibilityLabel("New Recording")
+                }
             }
         }
         .sheet(item: $selectedEntry) { entry in
             JournalEntryView(journalEntry: entry)
+        }
+        .sheet(isPresented: $showingEntryCreation) {
+            EntryCreationView(isPresented: $showingEntryCreation)
+                .environment(\.managedObjectContext, viewContext)
         }
     }
     
@@ -246,6 +274,12 @@ struct MonthCalendarView: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
         }
+        .onAppear {
+            // Ensure today's date is selected by default
+            if Calendar.current.isDateInToday(viewModel.selectedDate) == false {
+                viewModel.moveToToday()
+            }
+        }
     }
     
     /// A cell representing a day in the month view
@@ -273,11 +307,11 @@ struct MonthCalendarView: View {
             .background(
                 RoundedRectangle(cornerRadius: 4)
                     .fill(cellBackgroundColor())
-                    .padding(2)
             )
             .opacity(viewModel.isInCurrentMonth(date) ? 1.0 : 0.4)
             .onTapGesture {
                 viewModel.selectDate(date)
+                viewModel.setZoomLevel(.week)
             }
         }
         
@@ -327,7 +361,7 @@ struct MonthCalendarView: View {
             if viewModel.isToday(date) {
                 return .blue
             } else if viewModel.isSelected(date) {
-                return Color.blue.opacity(0.1)
+                return Color.purple.opacity(0.3)
             } else {
                 return Color.clear
             }
@@ -373,6 +407,12 @@ struct WeekCalendarView: View {
                 }
             }
         }
+        .onAppear {
+            // Ensure today's date is selected by default
+            if Calendar.current.isDateInToday(viewModel.selectedDate) == false {
+                viewModel.moveToToday()
+            }
+        }
     }
     
     /// A cell representing a day in the week view
@@ -413,7 +453,6 @@ struct WeekCalendarView: View {
             .background(
                 RoundedRectangle(cornerRadius: 8)
                     .fill(cellBackgroundColor())
-                    .padding(2)
             )
             .onTapGesture {
                 viewModel.selectDate(date)
@@ -466,7 +505,7 @@ struct WeekCalendarView: View {
             if viewModel.isToday(date) {
                 return .blue
             } else if viewModel.isSelected(date) {
-                return Color.blue.opacity(0.1)
+                return Color.purple.opacity(0.3)
             } else {
                 return Color.clear
             }
@@ -564,6 +603,86 @@ struct WeekCalendarView: View {
     }
 }
 
+
+// MARK: - Selected Day Entry Row
+
+/// A row representing an entry for the selected day
+struct SelectedDayEntryRow: View {
+    let entry: JournalEntry
+    
+    var body: some View {
+        NavigationLink(destination: JournalEntryView(journalEntry: entry)) {
+            VStack(alignment: .leading, spacing: 4) {
+                // Title and time
+                HStack {
+                    Text(entry.title ?? "Untitled Entry")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    Spacer()
+                    
+                    if let date = entry.createdAt {
+                        Text(date, formatter: timeFormatter)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                // Tags
+                if let tags = entry.tags as? Set<Tag>, !tags.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 4) {
+                            ForEach(Array(tags), id: \.self) { tag in
+                                if let name = tag.name, let color = tag.color {
+                                    HStack(spacing: 4) {
+                                        // Display icon if available, otherwise color circle
+                                        if let iconName = tag.iconName, !iconName.isEmpty {
+                                            Image(systemName: iconName)
+                                                .font(.caption2)
+                                                .foregroundColor(Color(hex: color))
+                                        } else {
+                                            Circle()
+                                                .fill(Color(hex: color))
+                                                .frame(width: 6, height: 6)
+                                        }
+                                        
+                                        Text(name)
+                                            .font(.caption2)
+                                    }
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color(hex: color).opacity(0.2))
+                                    .foregroundColor(Color(hex: color))
+                                    .cornerRadius(4)
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Preview of transcription
+                if let transcription = entry.transcription, let text = transcription.text, !text.isEmpty {
+                    Text(text)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                        .padding(.top, 2)
+                }
+            }
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color(.secondarySystemBackground))
+            )
+        }
+    }
+    
+    private let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a"
+        return formatter
+    }()
+}
 
 // MARK: - Preview
 

@@ -57,6 +57,37 @@ class TimelineViewModel: ObservableObject {
     
     // MARK: - Public Methods
     
+    /// Toggle the lock state of a journal entry
+    func toggleEntryLock(_ entry: JournalEntry) {
+        if entry.isLocked {
+            entry.unlock()
+        } else {
+            entry.lock()
+        }
+        
+        // Refresh the UI
+        objectWillChange.send()
+    }
+    
+    /// Delete a journal entry
+    func deleteEntry(_ entry: JournalEntry) {
+        // Don't allow deletion of locked entries
+        guard !entry.isLocked, let context = entry.managedObjectContext else { return }
+        
+        // Delete the entry
+        context.delete(entry)
+        
+        // Save changes
+        do {
+            try context.save()
+            
+            // Refresh the data
+            fetchEntriesForDateRange()
+        } catch {
+            print("Error deleting journal entry: \(error)")
+        }
+    }
+    
     /// Set the date range for the timeline
     func setDateRange(_ range: DateRange) {
         dateRange = range

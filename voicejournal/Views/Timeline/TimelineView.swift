@@ -21,6 +21,11 @@ struct TimelineView: View {
     @State private var showingRangePicker = false
     @State private var selectedEntry: JournalEntry? = nil
     @State private var scrollToDate: Date? = nil
+    @State private var showingEntryCreation = false
+    @State private var selectedEntryToDelete: JournalEntry? = nil
+    @State private var showDeleteConfirmation = false
+    @State private var showLockConfirmation = false
+    @State private var selectedEntryToToggleLock: JournalEntry? = nil
     
     // MARK: - Initialization
     
@@ -32,26 +37,73 @@ struct TimelineView: View {
     // MARK: - Body
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Timeline header
-            timelineHeader
+        ZStack {
+            VStack(spacing: 0) {
+                // Timeline header
+                timelineHeader
+                
+                // Timeline content
+                if viewModel.isLoading {
+                    loadingView
+                } else if viewModel.sortedDates.isEmpty {
+                    emptyStateView
+                } else {
+                    timelineContent
+                }
+            }
             
-            // Timeline content
-            if viewModel.isLoading {
-                loadingView
-            } else if viewModel.sortedDates.isEmpty {
-                emptyStateView
-            } else {
-                timelineContent
+            // Floating Action Button for creating new recordings
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        showingEntryCreation = true
+                    }) {
+                        Image(systemName: "mic.fill")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                            .frame(width: 60, height: 60)
+                            .background(Color.blue)
+                            .clipShape(Circle())
+                            .shadow(radius: 4)
+                    }
+                    .padding([.bottom, .trailing], 20)
+                    .accessibilityLabel("New Recording")
+                }
             }
         }
+        .alert("Delete Entry", isPresented: $showDeleteConfirmation, actions: {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                if let entryToDelete = selectedEntryToDelete {
+                    viewModel.deleteEntry(entryToDelete)
+                    selectedEntryToDelete = nil
+                }
+            }
+        }, message: {
+            Text("Are you sure you want to delete this journal entry? This action cannot be undone.")
+        })
+        .alert("Lock Entry", isPresented: $showLockConfirmation, actions: {
+            Button("Cancel", role: .cancel) {}
+            Button(selectedEntryToToggleLock?.isLocked == true ? "Unlock" : "Lock") {
+                if let entryToToggle = selectedEntryToToggleLock {
+                    viewModel.toggleEntryLock(entryToToggle)
+                    selectedEntryToToggleLock = nil
+                }
+            }
+        }, message: {
+            Text(selectedEntryToToggleLock?.isLocked == true ? 
+                "Unlock this entry? Anyone with access to the app will be able to view it." : 
+                "Lock this entry? It will require authentication to view.")
+        })
         .sheet(isPresented: $showingDatePicker) {
             DatePickerView(onDateSelected: { date in
                 viewModel.jumpToDate(date)
                 scrollToDate = date
                 showingDatePicker = false
             })
-            .presentationDetents([.medium])
+            .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showingRangePicker) {
             DateRangePickerView(
@@ -67,6 +119,10 @@ struct TimelineView: View {
         .sheet(item: $selectedEntry) { entry in
             JournalEntryView(journalEntry: entry)
         }
+        .sheet(isPresented: $showingEntryCreation) {
+            EntryCreationView(isPresented: $showingEntryCreation)
+                .environment(\.managedObjectContext, viewContext)
+        }
     }
     
     // MARK: - Subviews
@@ -74,12 +130,24 @@ struct TimelineView: View {
     /// Timeline header with date range selection
     private var timelineHeader: some View {
         VStack(spacing: 8) {
-            // Title and date range
+            // Combined header with all controls in one row
             HStack {
                 Text("Timeline")
                     .font(.headline)
                 
                 Spacer()
+                
+                Button(action: {
+                    showingDatePicker = true
+                }) {
+                    Image(systemName: "calendar")
+                        .font(.caption)
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 8)
+                        .background(Color(.secondarySystemBackground))
+                        .foregroundColor(.primary)
+                        .cornerRadius(8)
+                }
                 
                 Button(action: {
                     showingRangePicker = true
@@ -100,28 +168,6 @@ struct TimelineView: View {
             }
             .padding(.horizontal)
             
-            // Jump to date and entry count
-            HStack {
-                Button(action: {
-                    showingDatePicker = true
-                }) {
-                    Label("Jump to Date", systemImage: "calendar")
-                        .font(.caption)
-                        .padding(.vertical, 4)
-                        .padding(.horizontal, 8)
-                        .background(Color(.secondarySystemBackground))
-                        .foregroundColor(.primary)
-                        .cornerRadius(8)
-                }
-                
-                Spacer()
-                
-                Text("\(viewModel.totalEntryCount()) entries")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .padding(.horizontal)
-            
             Divider()
         }
         .padding(.vertical, 8)
@@ -130,28 +176,52 @@ struct TimelineView: View {
     
     /// Timeline content with entries grouped by date
     private var timelineContent: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 16, pinnedViews: [.sectionHeaders]) {
-                ForEach(viewModel.sortedDates, id: \.self) { date in
-                    if let entries = viewModel.entriesByDate[date], !entries.isEmpty {
-                        Section(header: dateHeader(for: date)) {
-                            VStack(spacing: 12) {
-                                ForEach(entries) { entry in
-                                    TimelineEntryRow(entry: entry)
-                                        .onTapGesture {
-                                            selectedEntry = entry
-                                        }
+        List {
+            ForEach(viewModel.sortedDates, id: \.self) { date in
+                if let entries = viewModel.entriesByDate[date], !entries.isEmpty {
+                    Section(header: dateHeader(for: date)) {
+                        ForEach(entries) { entry in
+                            TimelineEntryRow(entry: entry, onToggleLock: { toggledEntry in
+                                selectedEntryToToggleLock = toggledEntry
+                                showLockConfirmation = true
+                            })
+                            .swipeActions(edge: .trailing) {
+                                // Only show delete action for unlocked entries
+                                if !entry.isLocked {
+                                    Button(role: .destructive) {
+                                        selectedEntryToDelete = entry
+                                        showDeleteConfirmation = true
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
                                 }
                             }
-                            .padding(.horizontal)
+                            .swipeActions(edge: .leading) {
+                                Button {
+                                    selectedEntryToToggleLock = entry
+                                    showLockConfirmation = true
+                                } label: {
+                                    Label(entry.isLocked ? "Unlock" : "Lock", 
+                                          systemImage: entry.isLocked ? "lock.open" : "lock")
+                                }
+                                .tint(entry.isLocked ? .green : .blue)
+                            }
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                selectedEntry = entry
+                            }
                         }
                     }
                 }
-                
-                // Bottom padding
+            }
+            
+            // Bottom padding
+            Section {
                 Color.clear.frame(height: 40)
+                    .listRowBackground(Color.clear)
             }
         }
+        .listStyle(PlainListStyle())
         .onChange(of: scrollToDate) { oldValue, newValue in
             if let date = newValue {
                 // Find the closest date in our sorted dates
@@ -247,6 +317,7 @@ struct TimelineView: View {
 /// A row representing an entry in the timeline
 struct TimelineEntryRow: View {
     let entry: JournalEntry
+    var onToggleLock: ((JournalEntry) -> Void)?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -269,11 +340,14 @@ struct TimelineEntryRow: View {
                 
                 Spacer()
                 
-                if entry.isLocked {
-                    Image(systemName: "lock.fill")
+                Button(action: {
+                    onToggleLock?(entry)
+                }) {
+                    Image(systemName: entry.isLocked ? "lock.fill" : "lock.open.fill")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
+                .buttonStyle(BorderlessButtonStyle())
             }
             
             // Title
@@ -322,11 +396,9 @@ struct TimelineEntryRow: View {
                     .padding(.top, 2)
             }
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.secondarySystemBackground))
-        )
+        .padding(.vertical, 8)
+        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+        .listRowBackground(Color.clear)
     }
     
     /// Format duration in seconds to MM:SS
@@ -353,7 +425,7 @@ struct DatePickerView: View {
     
     var body: some View {
         NavigationView {
-            VStack {
+            VStack(spacing: 16) {
                 DatePicker(
                     "Select a date",
                     selection: $selectedDate,
@@ -361,6 +433,8 @@ struct DatePickerView: View {
                 )
                 .datePickerStyle(GraphicalDatePickerStyle())
                 .padding()
+                
+                Spacer().frame(height: 10)
                 
                 Button(action: {
                     onDateSelected(selectedDate)
@@ -374,7 +448,7 @@ struct DatePickerView: View {
                         .cornerRadius(10)
                 }
                 .padding(.horizontal)
-                .padding(.bottom)
+                .padding(.bottom, 20)
             }
             .navigationTitle("Jump to Date")
             .navigationBarTitleDisplayMode(.inline)
