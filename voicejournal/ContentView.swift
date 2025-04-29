@@ -16,19 +16,32 @@ struct ContentView: View {
     
     var body: some View {
         TabView(selection: $selectedTab) {
-            // Journal entries tab (now primary tab)
-            EnhancedJournalEntriesView()
-                .tabItem {
-                    Label("Journal", systemImage: "book.fill")
-                }
-                .tag(0)
+            // Timeline tab
+            NavigationView {
+                TimelineView(context: viewContext)
+                    .navigationTitle("Timeline")
+            }
+            .tabItem {
+                Label("Timeline", systemImage: "clock")
+            }
+            .tag(0)
+            
+            // Calendar tab
+            NavigationView {
+                CalendarView(context: viewContext)
+                    .navigationTitle("Calendar")
+            }
+            .tabItem {
+                Label("Calendar", systemImage: "calendar")
+            }
+            .tag(1)
             
             // Settings tab
             SettingsTabView()
                 .tabItem {
                     Label("Settings", systemImage: "gear")
                 }
-                .tag(1)
+                .tag(2)
         }
         .accentColor(.blue)
     }

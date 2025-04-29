@@ -11,6 +11,7 @@ The Voice Journal app follows the **Model-View-ViewModel (MVVM)** architecture p
    - AudioRecording
    - Bookmark
    - TranscriptionSegment
+   - Tag
 
 2. **Views**: SwiftUI views for the user interface
    - Authentication views
@@ -18,6 +19,8 @@ The Voice Journal app follows the **Model-View-ViewModel (MVVM)** architecture p
    - Journal entry views
    - Playback interface
    - Waveform visualization
+   - Tag management interface
+   - Tag filtering and search interface
 
 3. **ViewModels**: Intermediaries between Models and Views
    - AudioRecordingViewModel
@@ -37,6 +40,12 @@ The Voice Journal app follows the **Model-View-ViewModel (MVVM)** architecture p
    - MigrationUtility
 
 ## Key Technical Decisions
+
+### 0. Tagging System
+- Tag entity with Core Data relationships to journal entries
+- SF Symbols integration for visual tag icons
+- Advanced tag suggestion algorithms using NLP techniques
+- Multi-tag filtering with inclusion and exclusion capabilities
 
 ### 1. SwiftUI as Primary UI Framework
 - Modern declarative UI approach
@@ -69,6 +78,10 @@ The Voice Journal app follows the **Model-View-ViewModel (MVVM)** architecture p
 - Multiple visualization styles
 
 ## Design Patterns
+
+### 0. Strategy Pattern
+- Used in tag suggestion system to apply different suggestion algorithms
+- Allows for flexible combination of keyword extraction, frequency analysis, and category identification
 
 ### 1. Dependency Injection
 - Services are injected into ViewModels
