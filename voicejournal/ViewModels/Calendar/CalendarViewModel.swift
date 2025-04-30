@@ -39,7 +39,7 @@ class CalendarViewModel: ObservableObject {
     
     init(context: NSManagedObjectContext) {
         self.viewContext = context
-        
+        print("calendar view create")
         // Set up publishers to refresh data when display date or zoom level changes
         $displayDate
             .combineLatest($zoomLevel)
@@ -233,6 +233,37 @@ class CalendarViewModel: ObservableObject {
     /// Check if a date is the selected date
     func isSelected(_ date: Date) -> Bool {
         calendar.isDate(date, equalTo: selectedDate, toGranularity: .day)
+    }
+    
+    /// Delete a journal entry
+    func deleteEntry(_ entry: JournalEntry) {
+        // Don't allow deletion of locked entries
+        guard !entry.isLocked, let context = entry.managedObjectContext else { return }
+        
+        // Delete the entry
+        context.delete(entry)
+        
+        // Save changes
+        do {
+            try context.save()
+            
+            // Refresh the data
+            fetchEntriesForVisibleRange()
+        } catch {
+            print("Error deleting journal entry: \(error)")
+        }
+    }
+    
+    /// Toggle the lock state of a journal entry
+    func toggleEntryLock(_ entry: JournalEntry) {
+        if entry.isLocked {
+            entry.unlock()
+        } else {
+            entry.lock()
+        }
+        
+        // Refresh the UI
+        objectWillChange.send()
     }
     
     // MARK: - Private Methods

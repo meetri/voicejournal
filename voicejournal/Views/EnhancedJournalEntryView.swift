@@ -67,6 +67,7 @@ struct EnhancedJournalEntryView: View {
             VStack(spacing: 0) {
                 // Header with title and date
                 headerSection
+                    .padding(.bottom, 24)
                 
                 // Content sections
                 VStack(spacing: 24) {

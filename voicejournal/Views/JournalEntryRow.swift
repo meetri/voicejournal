@@ -1,0 +1,135 @@
+//
+//  JournalEntryRow.swift
+//  voicejournal
+//
+//  Created on 4/29/25.
+//
+
+import SwiftUI
+import CoreData
+
+/// A reusable row component for displaying journal entries in lists
+struct JournalEntryRow: View {
+    let entry: JournalEntry
+    var onToggleLock: ((JournalEntry) -> Void)?
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Time and duration
+            HStack {
+                if let date = entry.createdAt {
+                    Text(date, formatter: timeFormatter)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                if let recording = entry.audioRecording {
+                    Text("•")
+                        .foregroundColor(.secondary)
+                    
+                    Text(formatDuration(recording.duration))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                Button(action: {
+                    onToggleLock?(entry)
+                }) {
+                    Image(systemName: entry.isLocked ? "lock.fill" : "lock.open.fill")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(BorderlessButtonStyle())
+            }
+            
+            // Title
+            Text(entry.title ?? "Untitled Entry")
+                .font(.headline)
+                .lineLimit(1)
+            
+            // Tags
+            if let tags = entry.tags as? Set<Tag>, !tags.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 4) {
+                        ForEach(Array(tags), id: \.self) { tag in
+                            if let name = tag.name, let color = tag.color {
+                                HStack(spacing: 4) {
+                                    // Display icon if available, otherwise color circle
+                                    if let iconName = tag.iconName, !iconName.isEmpty {
+                                        Image(systemName: iconName)
+                                            .font(.caption2)
+                                            .foregroundColor(Color(hex: color))
+                                    } else {
+                                        Circle()
+                                            .fill(Color(hex: color))
+                                            .frame(width: 6, height: 6)
+                                    }
+                                    
+                                    Text(name)
+                                        .font(.caption2)
+                                }
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color(hex: color).opacity(0.2))
+                                .foregroundColor(Color(hex: color))
+                                .cornerRadius(4)
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Preview of transcription
+            if let transcription = entry.transcription, let text = transcription.text, !text.isEmpty {
+                Text(text)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .lineLimit(3)
+                    .padding(.top, 2)
+            }
+        }
+        .padding(.vertical, 8)
+        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+        .listRowBackground(Color.clear)
+    }
+    
+    /// Format duration in seconds to MM:SS
+    private func formatDuration(_ duration: Double) -> String {
+        let minutes = Int(duration) / 60
+        let seconds = Int(duration) % 60
+        return String(format: "%d:%02d", minutes, seconds)
+    }
+    
+    private let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .short
+        return formatter
+    }()
+}
+
+#Preview {
+    let context = PersistenceController.preview.container.viewContext
+    let entry = JournalEntry.create(in: context)
+    entry.title = "Sample Journal Entry"
+    entry.createdAt = Date()
+    
+    // Create audio recording
+    let recording = entry.createAudioRecording(filePath: "/path/to/audio.m4a")
+    recording.duration = 125.5
+    recording.fileSize = 1024 * 1024 * 2 // 2 MB
+    
+    // Create transcription
+    let transcription = entry.createTranscription(text: "This is a sample transcription of a voice journal entry. It contains the text that would be generated from the audio recording using speech recognition.")
+    
+    // Add tags
+    let _ = entry.addTag("Personal", color: "#FF5733")
+    let _ = entry.addTag("Ideas", color: "#33FF57")
+    
+    return List {
+        JournalEntryRow(entry: entry, onToggleLock: { _ in })
+    }
+    .environment(\.managedObjectContext, context)
+}

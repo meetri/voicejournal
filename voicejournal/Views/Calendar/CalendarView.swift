@@ -7,6 +7,7 @@
 
 import SwiftUI
 import CoreData
+// Import the shared JournalEntryRow component
 
 /// A view that displays a calendar with journal entries
 struct CalendarView: View {
@@ -19,6 +20,10 @@ struct CalendarView: View {
     @StateObject private var viewModel: CalendarViewModel
     @State private var selectedEntry: JournalEntry? = nil
     @State private var showingEntryCreation = false
+    @State private var selectedEntryToDelete: JournalEntry? = nil
+    @State private var showDeleteConfirmation = false
+    @State private var selectedEntryToToggleLock: JournalEntry? = nil
+    @State private var showLockConfirmation = false
     
     // MARK: - Initialization
     
@@ -30,7 +35,8 @@ struct CalendarView: View {
     // MARK: - Body
     
     var body: some View {
-        ZStack {
+        NavigationStack {
+            ZStack {
             VStack(spacing: 0) {
                 // Calendar header
                 calendarHeader
@@ -42,7 +48,13 @@ struct CalendarView: View {
                 case .month:
                     MonthCalendarView(viewModel: viewModel)
                 case .week:
-                    WeekCalendarView(viewModel: viewModel)
+                    WeekCalendarView(
+                        viewModel: viewModel,
+                        selectedEntryToDelete: $selectedEntryToDelete,
+                        showDeleteConfirmation: $showDeleteConfirmation,
+                        selectedEntryToToggleLock: $selectedEntryToToggleLock,
+                        showLockConfirmation: $showLockConfirmation
+                    )
                 }
             }
             
@@ -73,6 +85,31 @@ struct CalendarView: View {
         .sheet(isPresented: $showingEntryCreation) {
             EntryCreationView(isPresented: $showingEntryCreation)
                 .environment(\.managedObjectContext, viewContext)
+        }
+        .alert("Delete Entry", isPresented: $showDeleteConfirmation, actions: {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                if let entryToDelete = selectedEntryToDelete {
+                    viewModel.deleteEntry(entryToDelete)
+                    selectedEntryToDelete = nil
+                }
+            }
+        }, message: {
+            Text("Are you sure you want to delete this journal entry? This action cannot be undone.")
+        })
+        .alert("Lock Entry", isPresented: $showLockConfirmation, actions: {
+            Button("Cancel", role: .cancel) {}
+            Button(selectedEntryToToggleLock?.isLocked == true ? "Unlock" : "Lock") {
+                if let entryToToggle = selectedEntryToToggleLock {
+                    viewModel.toggleEntryLock(entryToToggle)
+                    selectedEntryToToggleLock = nil
+                }
+            }
+        }, message: {
+            Text(selectedEntryToToggleLock?.isLocked == true ? 
+                "Unlock this entry? Anyone with access to the app will be able to view it." : 
+                "Lock this entry? It will require authentication to view.")
+        })
         }
     }
     
@@ -374,6 +411,10 @@ struct MonthCalendarView: View {
 /// A view that displays a week calendar
 struct WeekCalendarView: View {
     @ObservedObject var viewModel: CalendarViewModel
+    @Binding var selectedEntryToDelete: JournalEntry?
+    @Binding var showDeleteConfirmation: Bool
+    @Binding var selectedEntryToToggleLock: JournalEntry?
+    @Binding var showLockConfirmation: Bool
     
     var body: some View {
         VStack(spacing: 0) {
@@ -386,25 +427,49 @@ struct WeekCalendarView: View {
             .padding(.horizontal, 8)
             
             // Entries for selected day
-            ScrollView {
-                let entries = viewModel.entries(for: viewModel.selectedDate)
-                if !entries.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        ForEach(entries) { entry in
-                            SelectedDayEntryRow(entry: entry)
+            let entries = viewModel.entries(for: viewModel.selectedDate)
+            if !entries.isEmpty {
+                List {
+                    ForEach(entries) { entry in
+                        NavigationLink(destination: JournalEntryView(journalEntry: entry)) {
+                            JournalEntryRow(entry: entry, onToggleLock: { toggledEntry in
+                                selectedEntryToToggleLock = toggledEntry
+                                showLockConfirmation = true
+                            })
+                        }
+                        .swipeActions(edge: .trailing) {
+                            // Only show delete action for unlocked entries
+                            if !entry.isLocked {
+                                Button(role: .destructive) {
+                                    selectedEntryToDelete = entry
+                                    showDeleteConfirmation = true
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                        }
+                        .swipeActions(edge: .leading) {
+                            Button {
+                                selectedEntryToToggleLock = entry
+                                showLockConfirmation = true
+                            } label: {
+                                Label(entry.isLocked ? "Unlock" : "Lock", 
+                                      systemImage: entry.isLocked ? "lock.open" : "lock")
+                            }
+                            .tint(entry.isLocked ? .green : .blue)
                         }
                     }
-                    .padding()
-                } else {
-                    VStack {
-                        Spacer()
-                        Text("No entries for this day")
-                            .font(.headline)
-                            .foregroundColor(.secondary)
-                        Spacer()
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 200)
                 }
+                .listStyle(PlainListStyle())
+            } else {
+                VStack {
+                    Spacer()
+                    Text("No entries for this day")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, minHeight: 200)
             }
         }
         .onAppear {
@@ -524,169 +589,32 @@ struct WeekCalendarView: View {
         }()
     }
     
-    /// A row representing an entry for the selected day
-    struct SelectedDayEntryRow: View {
-        let entry: JournalEntry
-        
-        var body: some View {
-            NavigationLink(destination: JournalEntryView(journalEntry: entry)) {
-                VStack(alignment: .leading, spacing: 4) {
-                    // Title and time
-                    HStack {
-                        Text(entry.title ?? "Untitled Entry")
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                        
-                        Spacer()
-                        
-                        if let date = entry.createdAt {
-                            Text(date, formatter: timeFormatter)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    
-                    // Tags
-                    if let tags = entry.tags as? Set<Tag>, !tags.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 4) {
-                                ForEach(Array(tags), id: \.self) { tag in
-                                    if let name = tag.name, let color = tag.color {
-                                        HStack(spacing: 4) {
-                                            // Display icon if available, otherwise color circle
-                                            if let iconName = tag.iconName, !iconName.isEmpty {
-                                                Image(systemName: iconName)
-                                                    .font(.caption2)
-                                                    .foregroundColor(Color(hex: color))
-                                            } else {
-                                                Circle()
-                                                    .fill(Color(hex: color))
-                                                    .frame(width: 6, height: 6)
-                                            }
-                                            
-                                            Text(name)
-                                                .font(.caption2)
-                                        }
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(Color(hex: color).opacity(0.2))
-                                        .foregroundColor(Color(hex: color))
-                                        .cornerRadius(4)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Preview of transcription
-                    if let transcription = entry.transcription, let text = transcription.text, !text.isEmpty {
-                        Text(text)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .lineLimit(2)
-                            .padding(.top, 2)
-                    }
-                }
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(.secondarySystemBackground))
-                )
-            }
-        }
-        
-        private let timeFormatter: DateFormatter = {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "h:mm a"
-            return formatter
-        }()
-    }
+    // Removed duplicate SelectedDayEntryRow struct
 }
 
 
-// MARK: - Selected Day Entry Row
-
-/// A row representing an entry for the selected day
-struct SelectedDayEntryRow: View {
-    let entry: JournalEntry
-    
-    var body: some View {
-        NavigationLink(destination: JournalEntryView(journalEntry: entry)) {
-            VStack(alignment: .leading, spacing: 4) {
-                // Title and time
-                HStack {
-                    Text(entry.title ?? "Untitled Entry")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    Spacer()
-                    
-                    if let date = entry.createdAt {
-                        Text(date, formatter: timeFormatter)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                // Tags
-                if let tags = entry.tags as? Set<Tag>, !tags.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 4) {
-                            ForEach(Array(tags), id: \.self) { tag in
-                                if let name = tag.name, let color = tag.color {
-                                    HStack(spacing: 4) {
-                                        // Display icon if available, otherwise color circle
-                                        if let iconName = tag.iconName, !iconName.isEmpty {
-                                            Image(systemName: iconName)
-                                                .font(.caption2)
-                                                .foregroundColor(Color(hex: color))
-                                        } else {
-                                            Circle()
-                                                .fill(Color(hex: color))
-                                                .frame(width: 6, height: 6)
-                                        }
-                                        
-                                        Text(name)
-                                            .font(.caption2)
-                                    }
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color(hex: color).opacity(0.2))
-                                    .foregroundColor(Color(hex: color))
-                                    .cornerRadius(4)
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // Preview of transcription
-                if let transcription = entry.transcription, let text = transcription.text, !text.isEmpty {
-                    Text(text)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(2)
-                        .padding(.top, 2)
-                }
-            }
-            .padding()
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(.secondarySystemBackground))
-            )
-        }
-    }
-    
-    private let timeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
-        return formatter
-    }()
-}
 
 // MARK: - Preview
 
 #Preview {
     CalendarView()
         .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+}
+
+// Preview for WeekCalendarView
+struct WeekCalendarView_Previews: PreviewProvider {
+    static var previews: some View {
+        @State var selectedEntryToDelete: JournalEntry? = nil
+        @State var showDeleteConfirmation = false
+        @State var selectedEntryToToggleLock: JournalEntry? = nil
+        @State var showLockConfirmation = false
+        
+        return WeekCalendarView(
+            viewModel: CalendarViewModel(context: PersistenceController.preview.container.viewContext),
+            selectedEntryToDelete: .constant(nil),
+            showDeleteConfirmation: .constant(false),
+            selectedEntryToToggleLock: .constant(nil),
+            showLockConfirmation: .constant(false)
+        )
+    }
 }

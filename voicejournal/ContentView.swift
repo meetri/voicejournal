@@ -96,31 +96,6 @@ struct JournalEntriesView: View {
     }
 }
 
-/// Row view for a journal entry in the list
-struct JournalEntryRow: View {
-    let entry: JournalEntry
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(entry.title ?? "Untitled Entry")
-                .font(.headline)
-            
-            HStack {
-                if entry.audioRecording != nil {
-                    Image(systemName: "waveform")
-                        .foregroundColor(.blue)
-                }
-                
-                if let createdAt = entry.createdAt {
-                    Text(createdAt, formatter: itemFormatter)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-        }
-        .padding(.vertical, 4)
-    }
-}
 
 /// Detail view for a journal entry
 struct JournalEntryDetailView: View {
