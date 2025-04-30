@@ -83,17 +83,17 @@ class SpeechRecognitionService: ObservableObject {
     /// Current state of speech recognition
     @Published private(set) var state: SpeechRecognitionState = .ready
     
-/// Current transcription text
-@Published private(set) var transcription: String = ""
+    /// Current transcription text
+    @Published private(set) var transcription: String = ""
 
-/// Interim transcription text (not finalized)
-@Published private(set) var interimTranscription: String = ""
+    /// Interim transcription text (not finalized)
+    @Published private(set) var interimTranscription: String = ""
 
-/// Recognition progress (0.0 to 1.0)
-@Published private(set) var progress: Float = 0.0
+    /// Recognition progress (0.0 to 1.0)
+    @Published private(set) var progress: Float = 0.0
 
-/// Timing data for transcription segments
-@Published private(set) var timingData: [TranscriptionSegment] = []
+    /// Timing data for transcription segments
+    @Published private(set) var timingData: [TranscriptionSegment] = []
     
     /// Whether speech recognition is available on this device
     @Published private(set) var isAvailable: Bool = false
@@ -260,76 +260,76 @@ class SpeechRecognitionService: ObservableObject {
         state = .recognizing
     }
     
-/// Start speech recognition from an audio file
-func recognizeFromFile(url: URL) async throws -> String {
-    // Check authorization
-    let permission = checkAuthorization()
-    guard permission == .granted else {
-        throw SpeechRecognitionError.authorizationFailed
-    }
-    
-    // Check availability
-    guard speechRecognizer?.isAvailable == true else {
-        throw SpeechRecognitionError.noRecognitionAvailable
-    }
-    
-    // Check if file exists
-    guard FileManager.default.fileExists(atPath: url.path) else {
-        throw SpeechRecognitionError.fileNotFound
-    }
-    
-    // Reset transcription
-    transcription = ""
-    interimTranscription = ""
-    progress = 0.0
-    timingData = []
-    
-    state = .recognizing
-    
-    // Create recognition request
-    let recognitionRequest = SFSpeechURLRecognitionRequest(url: url)
-    
-    // Configure request
-    recognitionRequest.shouldReportPartialResults = true
-    
-    // Start recognition task
-    return try await withCheckedThrowingContinuation { continuation in
-        self.recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
-            guard let self = self else {
-                continuation.resume(throwing: SpeechRecognitionError.recognitionFailed)
-                return
-            }
-            
-            if let error = error {
-                Task { @MainActor in
-                    self.state = .error(error)
+    /// Start speech recognition from an audio file
+    func recognizeFromFile(url: URL) async throws -> String {
+        // Check authorization
+        let permission = checkAuthorization()
+        guard permission == .granted else {
+            throw SpeechRecognitionError.authorizationFailed
+        }
+        
+        // Check availability
+        guard speechRecognizer?.isAvailable == true else {
+            throw SpeechRecognitionError.noRecognitionAvailable
+        }
+        
+        // Check if file exists
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw SpeechRecognitionError.fileNotFound
+        }
+        
+        // Reset transcription
+        transcription = ""
+        interimTranscription = ""
+        progress = 0.0
+        timingData = []
+        
+        state = .recognizing
+        
+        // Create recognition request
+        let recognitionRequest = SFSpeechURLRecognitionRequest(url: url)
+        
+        // Configure request
+        recognitionRequest.shouldReportPartialResults = true
+        
+        // Start recognition task
+        return try await withCheckedThrowingContinuation { continuation in
+            self.recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+                guard let self = self else {
+                    continuation.resume(throwing: SpeechRecognitionError.recognitionFailed)
+                    return
                 }
-                continuation.resume(throwing: SpeechRecognitionError.unknown(error))
-                return
-            }
-            
-            if let result = result {
-                Task { @MainActor in
-                    // Update interim transcription with partial results
-                    self.interimTranscription = result.bestTranscription.formattedString
-                    
-                    // Update progress
-                    self.progress = result.isFinal ? 1.0 : min(0.99, Float(result.bestTranscription.formattedString.count) / 100.0)
-                    
-                    // If final result, update the main transcription and complete
-                    if result.isFinal {
-                        self.transcription = result.bestTranscription.formattedString
+                
+                if let error = error {
+                    Task { @MainActor in
+                        self.state = .error(error)
+                    }
+                    continuation.resume(throwing: SpeechRecognitionError.unknown(error))
+                    return
+                }
+                
+                if let result = result {
+                    Task { @MainActor in
+                        // Update interim transcription with partial results
+                        self.interimTranscription = result.bestTranscription.formattedString
                         
-                        // Extract timing data from transcription segments
-                        self.extractTimingData(from: result.bestTranscription)
+                        // Update progress
+                        self.progress = result.isFinal ? 1.0 : min(0.99, Float(result.bestTranscription.formattedString.count) / 100.0)
                         
-                        self.state = .finished
-                        continuation.resume(returning: result.bestTranscription.formattedString)
+                        // If final result, update the main transcription and complete
+                        if result.isFinal {
+                            self.transcription = result.bestTranscription.formattedString
+                            
+                            // Extract timing data from transcription segments
+                            self.extractTimingData(from: result.bestTranscription)
+                            
+                            self.state = .finished
+                            continuation.resume(returning: result.bestTranscription.formattedString)
+                        }
                     }
                 }
             }
         }
-    }
     }
     
     /// Pause speech recognition
@@ -365,69 +365,65 @@ func recognizeFromFile(url: URL) async throws -> String {
         if state == .recognizing || state == .paused {
             state = .finished
         }
-        
     }
     
-/// Reset the service
-func reset() {
-    stopRecognition()
-    transcription = ""
-    interimTranscription = ""
-    progress = 0.0
-    timingData = []
-    state = .ready
+    /// Reset the service
+    func reset() {
+        stopRecognition()
+        transcription = ""
+        interimTranscription = ""
+        progress = 0.0
+        timingData = []
+        state = .ready
     }
     
-// MARK: - Helper Methods
+    // MARK: - Helper Methods
 
-/// Get the combined transcription (final + interim)
-var currentTranscription: String {
-    if interimTranscription.isEmpty {
-        return transcription
-    } else {
-        return transcription + interimTranscription
+    /// Get the combined transcription (final + interim)
+    var currentTranscription: String {
+        if interimTranscription.isEmpty {
+            return transcription
+        } else {
+            return transcription + interimTranscription
+        }
     }
-}
 
-/// Extract timing data from a transcription
-private func extractTimingData(from transcription: SFTranscription) {
-    var segments: [TranscriptionSegment] = []
-    
-    // Process each segment in the transcription
-    for i in 0..<transcription.segments.count {
-        let segment = transcription.segments[i]
+    /// Extract timing data from a transcription
+    private func extractTimingData(from transcription: SFTranscription) {
+        var segments: [TranscriptionSegment] = []
         
-        // Create a segment with timing information
-        let transcriptionSegment = TranscriptionSegment(
-            text: segment.substring,
-            startTime: segment.timestamp,
-            endTime: segment.timestamp + segment.duration,
-            range: segment.substringRange
-        )
+        // Process each segment in the transcription
+        for i in 0..<transcription.segments.count {
+            let segment = transcription.segments[i]
+            
+            // Create a segment with timing information
+            let transcriptionSegment = TranscriptionSegment(
+                text: segment.substring,
+                startTime: segment.timestamp,
+                endTime: segment.timestamp + segment.duration,
+                range: segment.substringRange
+            )
+            
+            segments.append(transcriptionSegment)
+        }
         
-        segments.append(transcriptionSegment)
+        // Store the timing data
+        timingData = segments
     }
-    
-    // Store the timing data
-    timingData = segments
-    
-    // Log the timing data for debugging
-    print("DEBUG: Extracted \(segments.count) timing segments from transcription")
-}
 
-/// Get the timing data as a JSON string
-func getTimingDataJSON() -> String? {
-    guard !timingData.isEmpty else { return nil }
-    
-    do {
-        let encoder = JSONEncoder()
-        let data = try encoder.encode(timingData)
-        return String(data: data, encoding: .utf8)
-    } catch {
-        print("ERROR: Failed to encode timing data to JSON: \(error.localizedDescription)")
-        return nil
+    /// Get the timing data as a JSON string
+    func getTimingDataJSON() -> String? {
+        guard !timingData.isEmpty else { return nil }
+        
+        do {
+            let encoder = JSONEncoder()
+            let data = try encoder.encode(timingData)
+            return String(data: data, encoding: .utf8)
+        } catch {
+            // Error handling without debug logs
+            return nil
+        }
     }
-}
 }
 
 // MARK: - Testing Support

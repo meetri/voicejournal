@@ -39,7 +39,6 @@ class CalendarViewModel: ObservableObject {
     
     init(context: NSManagedObjectContext) {
         self.viewContext = context
-        print("calendar view create")
         // Set up publishers to refresh data when display date or zoom level changes
         $displayDate
             .combineLatest($zoomLevel)
@@ -60,7 +59,10 @@ class CalendarViewModel: ObservableObject {
         case .month:
             displayDate = calendar.date(byAdding: .month, value: 1, to: displayDate) ?? displayDate
         case .week:
-            displayDate = calendar.date(byAdding: .weekOfYear, value: 1, to: displayDate) ?? displayDate
+            // Update both displayDate and selectedDate to keep them in sync
+            let newDate = calendar.date(byAdding: .weekOfYear, value: 1, to: selectedDate) ?? selectedDate
+            displayDate = newDate
+            selectedDate = newDate
         }
     }
     
@@ -72,7 +74,10 @@ class CalendarViewModel: ObservableObject {
         case .month:
             displayDate = calendar.date(byAdding: .month, value: -1, to: displayDate) ?? displayDate
         case .week:
-            displayDate = calendar.date(byAdding: .weekOfYear, value: -1, to: displayDate) ?? displayDate
+            // Update both displayDate and selectedDate to keep them in sync
+            let newDate = calendar.date(byAdding: .weekOfYear, value: -1, to: selectedDate) ?? selectedDate
+            displayDate = newDate
+            selectedDate = newDate
         }
     }
     
@@ -84,12 +89,34 @@ class CalendarViewModel: ObservableObject {
     
     /// Select a specific date
     func selectDate(_ date: Date) {
+        let normalizedDate = normalizeDate(date)
+        
         selectedDate = date
+        displayDate = date  // Add this line to sync the display date
+        
+        // Log the week that contains this date
+        let weekStart = startOfWeek(for: date)
+        let weekDays = (0..<7).compactMap { day in
+            calendar.date(byAdding: .day, value: day, to: weekStart)
+        }
     }
     
     /// Change the zoom level
     func setZoomLevel(_ level: CalendarZoomLevel) {
+        // If switching to week view, ensure the week containing the selected date is displayed
+        if level == .week && zoomLevel != .week {
+            // Force a refresh of the week view based on the selected date
+            let weekStart = startOfWeek(for: selectedDate)
+            
+            displayDate = weekStart
+        }
+        
         zoomLevel = level
+        
+        // Log the days that will be shown in the week view
+        if level == .week {
+            let weekDays = daysInWeek()
+        }
     }
     
     /// Get entries for a specific date
@@ -126,8 +153,9 @@ class CalendarViewModel: ObservableObject {
         case .month:
             dateFormatter.dateFormat = "MMMM yyyy"
         case .week:
-            // For week view, show the date range
-            let weekStart = startOfWeek(for: displayDate)
+            // For week view, show the date range based on the selected date
+            let dateToUse = selectedDate
+            let weekStart = startOfWeek(for: dateToUse)
             let weekEnd = calendar.date(byAdding: .day, value: 6, to: weekStart) ?? weekStart
             
             let startFormatter = DateFormatter()
@@ -201,7 +229,11 @@ class CalendarViewModel: ObservableObject {
     
     /// Get the days in the current week
     func daysInWeek() -> [Date] {
-        let weekStart = startOfWeek(for: displayDate)
+        // Always use selectedDate to ensure the selected date is in the displayed week
+        let dateToUse = selectedDate
+        
+        let weekStart = startOfWeek(for: dateToUse)
+        
         var days: [Date] = []
         
         for day in 0..<7 {
@@ -216,8 +248,14 @@ class CalendarViewModel: ObservableObject {
     /// Get the start of the week for a given date
     func startOfWeek(for date: Date) -> Date {
         let weekday = calendar.component(.weekday, from: date)
-        let daysToSubtract = (weekday - calendar.firstWeekday + 7) % 7
-        return calendar.date(byAdding: .day, value: -daysToSubtract, to: date) ?? date
+        
+        let firstWeekday = calendar.firstWeekday
+        
+        let daysToSubtract = (weekday - firstWeekday + 7) % 7
+        
+        let weekStart = calendar.date(byAdding: .day, value: -daysToSubtract, to: date) ?? date
+        
+        return weekStart
     }
     
     /// Check if a date is in the current month
@@ -232,7 +270,13 @@ class CalendarViewModel: ObservableObject {
     
     /// Check if a date is the selected date
     func isSelected(_ date: Date) -> Bool {
-        calendar.isDate(date, equalTo: selectedDate, toGranularity: .day)
+        // Normalize both dates to start of day for comparison
+        let normalizedDate = normalizeDate(date)
+        let normalizedSelectedDate = normalizeDate(selectedDate)
+        
+        let result = calendar.isDate(date, equalTo: selectedDate, toGranularity: .day)
+        
+        return result
     }
     
     /// Delete a journal entry
@@ -250,7 +294,7 @@ class CalendarViewModel: ObservableObject {
             // Refresh the data
             fetchEntriesForVisibleRange()
         } catch {
-            print("Error deleting journal entry: \(error)")
+            // Error handling without debug logs
         }
     }
     
@@ -316,7 +360,9 @@ class CalendarViewModel: ObservableObject {
             }
             
         case .week:
-            startDate = startOfWeek(for: displayDate)
+            // Use selectedDate for week view to ensure we fetch entries for the selected date's week
+            let dateToUse = selectedDate
+            startDate = startOfWeek(for: dateToUse)
             endDate = calendar.date(byAdding: .day, value: 7, to: startDate) ?? startDate
         }
         
@@ -337,7 +383,7 @@ class CalendarViewModel: ObservableObject {
             let fetchedEntries = try viewContext.fetch(request)
             processEntries(fetchedEntries)
         } catch {
-            print("Error fetching calendar entries: \(error)")
+            // Error handling without debug logs
         }
     }
     

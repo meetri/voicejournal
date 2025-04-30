@@ -96,15 +96,11 @@ class AudioPlaybackViewModel: ObservableObject {
     
     /// Load an audio file for playback
     func loadAudio(from url: URL) async {
-        print("DEBUG: AudioPlaybackViewModel - Loading audio from URL: \(url.path)")
-        
         do {
             try await playbackService.loadAudio(from: url)
             audioFileURL = url
             isAudioLoaded = true
-            print("DEBUG: AudioPlaybackViewModel - Successfully loaded audio from URL")
         } catch {
-            print("ERROR: AudioPlaybackViewModel - Failed to load audio: \(error.localizedDescription)")
             handleError(error)
             isAudioLoaded = false
         }
@@ -113,23 +109,17 @@ class AudioPlaybackViewModel: ObservableObject {
     /// Load an audio file from an AudioRecording entity
     func loadAudio(from recording: AudioRecording) async {
         guard let filePath = recording.filePath else {
-            print("ERROR: AudioPlaybackViewModel - Recording filePath is nil")
             handleError(AudioPlaybackError.fileNotFound)
             return
         }
         
-        print("DEBUG: AudioPlaybackViewModel - Loading audio from recording with filePath: \(filePath)")
-        
         // Convert relative path to absolute path
         let url = FilePathUtility.toAbsolutePath(from: filePath)
-        print("DEBUG: AudioPlaybackViewModel - Converted to absolute URL: \(url.path)")
         
         // Check if file exists before attempting to load
         let fileExists = FileManager.default.fileExists(atPath: url.path)
-        print("DEBUG: AudioPlaybackViewModel - File exists at path: \(fileExists ? "YES" : "NO")")
         
         if !fileExists {
-            print("ERROR: AudioPlaybackViewModel - Audio file not found at path: \(url.path)")
             handleError(AudioPlaybackError.fileNotFound)
             return
         }
@@ -360,7 +350,7 @@ class AudioPlaybackViewModel: ObservableObject {
                 transcriptionTimingData = try decoder.decode([TranscriptionSegment].self, from: data)
             }
         } catch {
-            print("ERROR: Failed to parse transcription timing data: \(error.localizedDescription)")
+            // Error handling without debug logs
             transcriptionTimingData = []
         }
     }

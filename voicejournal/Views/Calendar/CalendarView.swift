@@ -384,9 +384,9 @@ struct MonthCalendarView: View {
         
         /// Determine the text color for the day number
         private func textColor() -> Color {
-            if viewModel.isToday(date) {
+            if viewModel.isSelected(date) {
                 return .white
-            } else if viewModel.isSelected(date) {
+            } else if viewModel.isToday(date) {
                 return .blue
             } else {
                 return .primary
@@ -395,9 +395,9 @@ struct MonthCalendarView: View {
         
         /// Determine the background color for the cell
         private func cellBackgroundColor() -> Color {
-            if viewModel.isToday(date) {
+            if viewModel.isSelected(date) {
                 return .blue
-            } else if viewModel.isSelected(date) {
+            } else if viewModel.isToday(date) {
                 return Color.purple.opacity(0.3)
             } else {
                 return Color.clear
@@ -556,9 +556,9 @@ struct WeekCalendarView: View {
         
         /// Determine the text color for the day number
         private func textColor() -> Color {
-            if viewModel.isToday(date) {
+            if viewModel.isSelected(date) {
                 return .white
-            } else if viewModel.isSelected(date) {
+            } else if viewModel.isToday(date) {
                 return .blue
             } else {
                 return .primary
@@ -567,9 +567,9 @@ struct WeekCalendarView: View {
         
         /// Determine the background color for the cell
         private func cellBackgroundColor() -> Color {
-            if viewModel.isToday(date) {
+            if viewModel.isSelected(date) {
                 return .blue
-            } else if viewModel.isSelected(date) {
+            } else if viewModel.isToday(date) {
                 return Color.purple.opacity(0.3)
             } else {
                 return Color.clear
@@ -588,11 +588,7 @@ struct WeekCalendarView: View {
             return formatter
         }()
     }
-    
-    // Removed duplicate SelectedDayEntryRow struct
 }
-
-
 
 // MARK: - Preview
 

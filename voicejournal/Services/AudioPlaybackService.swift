@@ -129,8 +129,6 @@ class AudioPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegate {
     
     /// Load an audio file for playback
     func loadAudio(from url: URL) async throws {
-        print("DEBUG: AudioPlaybackService - Loading audio from URL: \(url.path)")
-        
         // Reset current state
         reset()
         
@@ -138,51 +136,41 @@ class AudioPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegate {
         do {
             try audioSession.setCategory(.playback, mode: .default)
             try audioSession.setActive(true)
-            print("DEBUG: AudioPlaybackService - Audio session activated successfully")
         } catch {
-            print("ERROR: AudioPlaybackService - Failed to set up audio session: \(error.localizedDescription)")
             throw AudioPlaybackError.audioSessionSetupFailed
         }
         
         // Check if file exists
         let fileExists = FileManager.default.fileExists(atPath: url.path)
-        print("DEBUG: AudioPlaybackService - File exists at path: \(fileExists ? "YES" : "NO")")
         
         guard fileExists else {
-            print("ERROR: AudioPlaybackService - File not found at path: \(url.path)")
             throw AudioPlaybackError.fileNotFound
         }
         
         // Initialize audio player
         do {
-            print("DEBUG: AudioPlaybackService - Creating AVAudioPlayer with URL: \(url.path)")
             audioPlayer = try AVAudioPlayer(contentsOf: url)
             audioPlayer?.delegate = self
             
             // Enable rate changes - this is required for playback rate to work
             audioPlayer?.enableRate = true
-            print("DEBUG: AudioPlaybackService - Enabled rate changes for AVAudioPlayer")
             
             // Enable metering to get audio levels
             audioPlayer?.isMeteringEnabled = true
             
             audioPlayer?.prepareToPlay()
-            print("DEBUG: AudioPlaybackService - Audio player prepared successfully")
             
             // Update properties
             audioFileURL = url
             duration = audioPlayer?.duration ?? 0.0
             
-        // Apply the desired rate to the player
-        audioPlayer?.rate = desiredRate
-        print("DEBUG: AudioPlaybackService - Applied initial rate: \(desiredRate)")
+            // Apply the desired rate to the player
+            audioPlayer?.rate = desiredRate
             
             state = .ready
             
-            print("DEBUG: AudioPlaybackService - Audio loaded successfully, duration: \(duration) seconds")
             return
         } catch {
-            print("ERROR: AudioPlaybackService - Failed to initialize audio player: \(error.localizedDescription)")
             throw AudioPlaybackError.playerInitializationFailed
         }
     }
@@ -200,7 +188,6 @@ class AudioPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegate {
         
         // Apply the desired rate immediately after starting playback
         player.rate = desiredRate
-        print("DEBUG: AudioPlaybackService - Applied rate after starting playback: \(desiredRate)")
         
         // Update state
         state = .playing
@@ -273,11 +260,6 @@ class AudioPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegate {
         // Apply rate immediately if player exists and is playing
         if let player = audioPlayer, state == .playing {
             player.rate = clampedRate
-            print("DEBUG: AudioPlaybackService - Applied rate while playing: \(clampedRate)")
-        } else if let player = audioPlayer {
-            print("DEBUG: AudioPlaybackService - Stored rate \(clampedRate) for later application (current state: \(state))")
-        } else {
-            print("DEBUG: AudioPlaybackService - Stored rate \(clampedRate) for future playback (no player available)")
         }
         
         // Update published rate property
@@ -309,7 +291,7 @@ class AudioPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegate {
         do {
             try audioSession.setActive(false, options: .notifyOthersOnDeactivation)
         } catch {
-            print("Error deactivating audio session: \(error.localizedDescription)")
+            // Error handling without debug logs
         }
     }
     
@@ -387,9 +369,6 @@ class AudioPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 // Apply the same scaling factor as in AudioRecordingService (0.5)
                 let scalingFactor: Float = 0.5
                 let scaledLevel = min(1.0, normalizedLevel * scalingFactor)
-                
-                print("DEBUG: PlaybackService - Raw level: \(level)dB, Normalized: \(normalizedLevel), Scaled: \(scaledLevel)")
-            
                 
                 self.audioLevel = scaledLevel
             }

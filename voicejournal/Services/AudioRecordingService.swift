@@ -238,7 +238,7 @@ class AudioRecordingService: ObservableObject {
             do {
                 try self.audioFile?.write(from: buffer)
             } catch {
-                print("Error writing buffer to file: \(error.localizedDescription)")
+                // Error handling without debug logs
             }
             
             // Calculate audio level
@@ -258,9 +258,6 @@ class AudioRecordingService: ObservableObject {
         // Update state and start timers
         recordingStartTime = Date()
         recordingPausedTime = 0
-        
-        // We no longer need to set an initial audio level as we've improved the waveform visualization
-        print("DEBUG: AudioRecordingService - Recording started")
         
         startTimers()
         
@@ -339,7 +336,7 @@ class AudioRecordingService: ObservableObject {
         do {
             try audioSession.setActive(false, options: .notifyOthersOnDeactivation)
         } catch {
-            print("Error deactivating audio session: \(error.localizedDescription)")
+            // Error handling without debug logs
         }
         
         // Update state
@@ -356,7 +353,7 @@ class AudioRecordingService: ObservableObject {
             try FileManager.default.removeItem(at: url)
             recordingURL = nil
         } catch {
-            print("Error deleting recording: \(error.localizedDescription)")
+            // Error handling without debug logs
         }
     }
     
@@ -383,7 +380,6 @@ class AudioRecordingService: ObservableObject {
                     // Gradually decrease audio level if no new audio is detected
                     // Use a smaller decrement to make the decay more gradual
                     self.audioLevel = max(0, self.audioLevel - 0.02)
-                    print("DEBUG: Timer decreasing audio level to: \(self.audioLevel)")
                 }
             }
         }
@@ -400,14 +396,11 @@ class AudioRecordingService: ObservableObject {
     // Make this function properly handle actor isolation
     private func calculateAudioLevel(buffer: AVAudioPCMBuffer) async {
         guard let channelData = buffer.floatChannelData else { 
-            print("DEBUG: Audio buffer has no channel data")
             return 
         }
         
         let channelCount = Int(buffer.format.channelCount)
         let frameLength = Int(buffer.frameLength)
-        
-        print("DEBUG: Processing audio buffer - Channels: \(channelCount), Frames: \(frameLength)")
         
         // Calculate RMS (root mean square) for audio level
         var rms: Float = 0.0
@@ -422,7 +415,6 @@ class AudioRecordingService: ObservableObject {
         }
         
         rms = sqrt(rms / Float(frameLength * channelCount))
-        print("DEBUG: Raw RMS value: \(rms)")
         
         // Convert to decibels and normalize to 0-1 range
         var decibels: Float = 0.0
@@ -431,7 +423,6 @@ class AudioRecordingService: ObservableObject {
         } else {
             decibels = -160 // Silence
         }
-        print("DEBUG: Decibels: \(decibels) dB")
         
         // Normalize to 0-1 range with enhanced scaling for better visibility
         // Using -70dB to 0dB range instead of -50dB for better sensitivity to quiet sounds
@@ -442,17 +433,9 @@ class AudioRecordingService: ObservableObject {
         let scalingFactor: Float = 0.5 // Reduced from 2.0 to 1.5 for better balance
         let scaledLevel = min(1.0, normalizedLevel * scalingFactor)
         
-        print("DEBUG: Normalized level: \(normalizedLevel), Scaled level: \(scaledLevel)")
-        
         // Update audio level on main thread
         await MainActor.run {
-            // Check if the current level is suspiciously close to 0.95
-            if abs(self.audioLevel - 0.95) < 0.01 {
-                print("DEBUG: WARNING - Audio level is suspiciously close to 0.95: \(self.audioLevel)")
-            }
-            
             self.audioLevel = scaledLevel
-            print("DEBUG: Updated audio level to: \(self.audioLevel), normalized: \(normalizedLevel)")
         }
     }
 }
@@ -504,7 +487,7 @@ extension AudioRecordingService {
             let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
             return attributes[.size] as? Int64
         } catch {
-            print("Error getting file size: \(error.localizedDescription)")
+            // Error handling without debug logs
             return nil
         }
     }

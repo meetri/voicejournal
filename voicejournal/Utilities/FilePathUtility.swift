@@ -12,18 +12,10 @@ struct FilePathUtility {
     
     // MARK: - Properties
     
-    /// Enable detailed logging for debugging
-    static let enableLogging = true
-    
     /// The recordings directory within the app's documents directory
     static var recordingsDirectory: URL {
         let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
         let recordingsDir = paths[0].appendingPathComponent("Recordings", isDirectory: true)
-        
-        if enableLogging {
-            print("DEBUG: FilePathUtility - Recordings directory: \(recordingsDir.path)")
-        }
-        
         return recordingsDir
     }
     
@@ -35,11 +27,6 @@ struct FilePathUtility {
     static func toRelativePath(from absolutePath: String) -> String {
         let url = URL(fileURLWithPath: absolutePath)
         let filename = url.lastPathComponent
-        
-        if enableLogging {
-            print("DEBUG: FilePathUtility - Converting absolute path to relative: \(absolutePath) -> \(filename)")
-        }
-        
         return filename
     }
     
@@ -50,23 +37,11 @@ struct FilePathUtility {
         // If the path already contains directory components, assume it's already an absolute path
         // This is for backward compatibility with existing data
         if relativePath.contains("/") {
-            if enableLogging {
-                print("DEBUG: FilePathUtility - Path appears to be absolute already: \(relativePath)")
-            }
             return URL(fileURLWithPath: relativePath)
         }
         
         // Otherwise, treat it as a filename and append it to the recordings directory
         let absoluteURL = recordingsDirectory.appendingPathComponent(relativePath)
-        
-        if enableLogging {
-            print("DEBUG: FilePathUtility - Converting relative path to absolute: \(relativePath) -> \(absoluteURL.path)")
-            
-            // Check if the file exists at this path
-            let exists = FileManager.default.fileExists(atPath: absoluteURL.path)
-            print("DEBUG: FilePathUtility - File exists at path: \(exists ? "YES" : "NO")")
-        }
-        
         return absoluteURL
     }
     
@@ -75,19 +50,13 @@ struct FilePathUtility {
         let directoryPath = recordingsDirectory.path
         
         if FileManager.default.fileExists(atPath: directoryPath) {
-            if enableLogging {
-                print("DEBUG: FilePathUtility - Recordings directory already exists at: \(directoryPath)")
-            }
             return
         }
         
         do {
             try FileManager.default.createDirectory(at: recordingsDirectory, withIntermediateDirectories: true)
-            if enableLogging {
-                print("DEBUG: FilePathUtility - Created recordings directory at: \(directoryPath)")
-            }
         } catch {
-            print("ERROR: FilePathUtility - Failed to create recordings directory: \(error.localizedDescription)")
+            // Error handling without debug logs
         }
     }
     
@@ -106,11 +75,6 @@ struct FilePathUtility {
         }
         
         let exists = FileManager.default.fileExists(atPath: absolutePath)
-        
-        if enableLogging {
-            print("DEBUG: FilePathUtility - Checking if file exists at: \(absolutePath) - \(exists ? "YES" : "NO")")
-        }
-        
         return exists
     }
 }

@@ -137,16 +137,12 @@ class AudioRecordingViewModel: ObservableObject {
             // Start recording
             try await recordingService.startRecording()
             
-            // We no longer need to set an initial audio level as we've improved the waveform visualization
-            // to properly handle low audio levels
-            print("DEBUG: ViewModel - Recording started")
-            
-        isRecording = true
-        isPaused = false
-        hasRecordingSaved = false
-        // Removed: journalEntry = nil (This was causing the double entry bug)
+            isRecording = true
+            isPaused = false
+            hasRecordingSaved = false
+            // Removed: journalEntry = nil (This was causing the double entry bug)
         
-        // Start speech recognition if permission is granted
+            // Start speech recognition if permission is granted
             if checkSpeechRecognitionPermission() {
                 try await startSpeechRecognition()
             } else {
@@ -168,7 +164,6 @@ class AudioRecordingViewModel: ObservableObject {
             transcriptionText = ""
             transcriptionProgress = 0.0
         } catch {
-            print("Speech recognition error: \(error.localizedDescription)")
             // Don't stop recording if speech recognition fails
             isTranscribing = false
         }
@@ -261,7 +256,6 @@ class AudioRecordingViewModel: ObservableObject {
                 await updateJournalEntryWithTranscription(entry, text: transcription)
             }
         } catch {
-            print("Error processing audio file for transcription: \(error.localizedDescription)")
             isTranscribing = false
             transcriptionProgress = 0.0
         }
@@ -326,7 +320,6 @@ class AudioRecordingViewModel: ObservableObject {
             .receive(on: RunLoop.main)
             .sink { [weak self] level in
                 self?.audioLevel = level
-                print("DEBUG: ViewModel received audio level: \(level)")
             }
             .store(in: &cancellables)
         
@@ -466,7 +459,7 @@ class AudioRecordingViewModel: ObservableObject {
         do {
             try managedObjectContext.save()
         } catch {
-            print("Error saving transcription: \(error.localizedDescription)")
+            // Error handling without debug logs
         }
     }
 }
@@ -476,9 +469,7 @@ class AudioRecordingViewModel: ObservableObject {
 extension AudioRecordingViewModel {
     /// Get audio level for visualization (0.0 to 1.0)
     var visualizationLevel: CGFloat {
-        let level = CGFloat(audioLevel)
-        print("DEBUG: ViewModel providing visualization level: \(level)")
-        return level
+        return CGFloat(audioLevel)
     }
     
     /// Get recording duration in seconds
