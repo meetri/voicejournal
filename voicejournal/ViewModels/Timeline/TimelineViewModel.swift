@@ -43,11 +43,7 @@ class TimelineViewModel: ObservableObject {
     @Published var tagFilterMode: TagFilterMode = .any
     
     /// Current sort order for entries
-    @Published var sortOrder: SortOrder = .newestFirst {
-        willSet {
-            print("⚠️ sortOrder property is about to change from \(sortOrder.rawValue) to \(newValue.rawValue)")
-        }
-    }
+    @Published var sortOrder: SortOrder = .newestFirst
     
     /// Computed property to determine if any filtering is active
     var isFilteringActive: Bool {
@@ -84,7 +80,6 @@ class TimelineViewModel: ObservableObject {
         // Monitor sort order changes - removed .dropFirst() to ensure initial sort is applied
         $sortOrder
             .sink { [weak self] newSortOrder in
-                print("Sort order changed to: \(newSortOrder.rawValue)")
                 self?.fetchEntriesForDateRange()
             }
             .store(in: &cancellables)
@@ -92,8 +87,7 @@ class TimelineViewModel: ObservableObject {
         // Register for Core Data change notifications
         registerForCoreDataNotifications()
         
-        // Initial data fetch with explicit logging
-        print("🚀 Performing initial data fetch with sort order: \(sortOrder.rawValue)")
+        // Initial data fetch
         fetchEntriesForDateRange()
     }
     
@@ -131,7 +125,7 @@ class TimelineViewModel: ObservableObject {
             // Refresh the data
             fetchEntriesForDateRange()
         } catch {
-            print("Error deleting journal entry: \(error)")
+            // Error handling without debug logs
         }
     }
     
@@ -212,8 +206,6 @@ class TimelineViewModel: ObservableObject {
     
     /// Apply a new sort order and immediately fetch entries
     func applySortOrder(_ order: SortOrder) {
-        print("🔄 Directly applying sort order: \(order.rawValue)")
-        
         // Update the sort order property
         sortOrder = order
         
@@ -225,8 +217,6 @@ class TimelineViewModel: ObservableObject {
     
     /// Register for Core Data change notifications
     private func registerForCoreDataNotifications() {
-        print("📣 Registering for Core Data change notifications")
-        
         // Register for NSManagedObjectContextDidSave notifications
         NotificationCenter.default.addObserver(
             self,
@@ -238,8 +228,6 @@ class TimelineViewModel: ObservableObject {
     
     /// Unregister from Core Data change notifications
     private func unregisterForCoreDataNotifications() {
-        print("📣 Unregistering from Core Data change notifications")
-        
         // Remove observer for NSManagedObjectContextDidSave notifications
         NotificationCenter.default.removeObserver(
             self,
@@ -257,8 +245,6 @@ class TimelineViewModel: ObservableObject {
         
         // Only process notifications from our view context or its parent
         if context == viewContext || context == viewContext.parent {
-            print("📣 Received Core Data change notification - refreshing timeline data")
-            
             // Check if the changes include JournalEntry objects
             let insertedObjects = notification.userInfo?[NSInsertedObjectsKey] as? Set<NSManagedObject> ?? []
             let updatedObjects = notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject> ?? []
@@ -315,10 +301,7 @@ class TimelineViewModel: ObservableObject {
     private func fetchEntriesForDateRange() {
         isLoading = true
         
-        print("⏳ fetchEntriesForDateRange - Current sort order: \(sortOrder.rawValue)")
-        
         let (startDate, endDate) = calculateDateRange()
-        print("📅 Date range: \(startDate) to \(endDate)")
         
         fetchEntries(from: startDate, to: endDate)
     }
@@ -385,7 +368,6 @@ class TimelineViewModel: ObservableObject {
             let fetchedEntries = try viewContext.fetch(request)
             processEntries(fetchedEntries)
         } catch {
-            print("Error fetching timeline entries: \(error)")
             DispatchQueue.main.async {
                 self.isLoading = false
             }
@@ -425,8 +407,6 @@ class TimelineViewModel: ObservableObject {
     
     /// Get sort descriptors based on the current sort order
     private func getSortDescriptors() -> [NSSortDescriptor] {
-        print("🔄 getSortDescriptors called with sort order: \(sortOrder.rawValue)")
-        
         var descriptors: [NSSortDescriptor]
         
         switch sortOrder {
@@ -456,7 +436,6 @@ class TimelineViewModel: ObservableObject {
             ]
         }
         
-        print("📊 Created sort descriptors: \(descriptors.map { "\($0.key?.description ?? "nil") \($0.ascending ? "ASC" : "DESC")" })")
         return descriptors
     }
     
@@ -472,16 +451,6 @@ class TimelineViewModel: ObservableObject {
         // Sort all entries according to the selected sort order
         // Note: Entries should already be sorted by Core Data, but we sort again to ensure consistency
         var sortedEntries: [JournalEntry] = []
-        
-        print("🔍 processEntries - Applying sort order: \(sortOrder.rawValue) to \(entries.count) entries")
-        
-        // Log the first few entries before sorting
-        if !entries.isEmpty {
-            print("📋 First few entries BEFORE sorting:")
-            for (index, entry) in entries.prefix(min(3, entries.count)).enumerated() {
-                print("  \(index): Title: \(entry.title ?? "nil"), Date: \(entry.createdAt?.description ?? "nil"), Duration: \(entry.audioRecording?.duration ?? 0)")
-            }
-        }
         
         // Apply the same sorting logic as in getSortDescriptors() for consistency
         switch sortOrder {
@@ -535,20 +504,9 @@ class TimelineViewModel: ObservableObject {
             })
         }
         
-        // Log the first few entries after sorting
-        if !sortedEntries.isEmpty {
-            print("📋 First few entries AFTER sorting:")
-            for (index, entry) in sortedEntries.prefix(min(3, sortedEntries.count)).enumerated() {
-                print("  \(index): Title: \(entry.title ?? "nil"), Date: \(entry.createdAt?.description ?? "nil"), Duration: \(entry.audioRecording?.duration ?? 0)")
-            }
-        }
-        
         newEntriesByDate[globalDateKey] = sortedEntries
         
-        print("✅ Finished processing entries with sort order: \(sortOrder.rawValue)")
-        
         DispatchQueue.main.async {
-            print("🔄 Updating UI with sorted entries")
             self.entriesByDate = newEntriesByDate
             self.sortedDates = newSortedDates
             self.isLoading = false

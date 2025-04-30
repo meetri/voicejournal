@@ -56,20 +56,14 @@ struct WaveformView: View {
             drawWaveform(context: context, size: size)
         }
         .onAppear {
-            print("DEBUG: WaveformView appeared with audioLevel: \(audioLevel), isActive: \(isActive)")
-            
             // Update the view model with the current audio level and active state
             viewModel.update(audioLevel: audioLevel, isActive: isActive)
         }
         .onChange(of: audioLevel) { oldValue, newValue in
-            print("DEBUG: WaveformView audioLevel changed from \(oldValue) to \(newValue)")
-            
             // Update the view model with the new audio level
             viewModel.update(audioLevel: newValue, isActive: isActive)
         }
         .onChange(of: isActive) { oldValue, newValue in
-            print("DEBUG: WaveformView isActive changed from \(oldValue) to \(newValue)")
-            
             // Update the view model with the new active state
             viewModel.update(audioLevel: audioLevel, isActive: newValue)
         }
