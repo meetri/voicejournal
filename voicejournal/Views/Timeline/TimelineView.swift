@@ -40,7 +40,8 @@ struct TimelineView: View {
     // MARK: - Body
     
     var body: some View {
-        ZStack {
+        NavigationStack {
+            ZStack {
             VStack(spacing: 0) {
                 // Timeline header
                 timelineHeader
@@ -119,9 +120,7 @@ struct TimelineView: View {
             )
             .presentationDetents([.medium, .large])
         }
-        .sheet(item: $selectedEntry) { entry in
-            JournalEntryView(journalEntry: entry)
-        }
+        // Removed sheet presentation in favor of NavigationLink
         .sheet(isPresented: $showingEntryCreation) {
             EntryCreationView(isPresented: $showingEntryCreation)
                 .environment(\.managedObjectContext, viewContext)
@@ -132,6 +131,7 @@ struct TimelineView: View {
                 filterMode: $viewModel.tagFilterMode
             )
             .environment(\.managedObjectContext, viewContext)
+            }
         }
     }
     
@@ -265,34 +265,32 @@ struct TimelineView: View {
                 if let entries = viewModel.entriesByDate[date], !entries.isEmpty {
                     // Display all entries without section headers
                     ForEach(entries) { entry in
-                        TimelineEntryRow(entry: entry, onToggleLock: { toggledEntry in
-                            selectedEntryToToggleLock = toggledEntry
-                            showLockConfirmation = true
-                        })
-                        .swipeActions(edge: .trailing) {
-                            // Only show delete action for unlocked entries
-                            if !entry.isLocked {
-                                Button(role: .destructive) {
-                                    selectedEntryToDelete = entry
-                                    showDeleteConfirmation = true
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
+                        NavigationLink(destination: JournalEntryView(journalEntry: entry)) {
+                            TimelineEntryRow(entry: entry, onToggleLock: { toggledEntry in
+                                selectedEntryToToggleLock = toggledEntry
+                                showLockConfirmation = true
+                            })
+                            .swipeActions(edge: .trailing) {
+                                // Only show delete action for unlocked entries
+                                if !entry.isLocked {
+                                    Button(role: .destructive) {
+                                        selectedEntryToDelete = entry
+                                        showDeleteConfirmation = true
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
                                 }
                             }
-                        }
-                        .swipeActions(edge: .leading) {
-                            Button {
-                                selectedEntryToToggleLock = entry
-                                showLockConfirmation = true
-                            } label: {
-                                Label(entry.isLocked ? "Unlock" : "Lock", 
-                                      systemImage: entry.isLocked ? "lock.open" : "lock")
+                            .swipeActions(edge: .leading) {
+                                Button {
+                                    selectedEntryToToggleLock = entry
+                                    showLockConfirmation = true
+                                } label: {
+                                    Label(entry.isLocked ? "Unlock" : "Lock", 
+                                          systemImage: entry.isLocked ? "lock.open" : "lock")
+                                }
+                                .tint(entry.isLocked ? .green : .blue)
                             }
-                            .tint(entry.isLocked ? .green : .blue)
-                        }
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            selectedEntry = entry
                         }
                     }
                 }
