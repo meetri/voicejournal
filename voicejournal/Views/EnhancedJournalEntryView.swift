@@ -32,6 +32,8 @@ struct EnhancedJournalEntryView: View {
     @State private var showingShareSheet = false
     @State private var showingOptions = false
     @State private var scrollOffset: CGFloat = 0
+    @State private var showingTagSelection = false
+    @State private var selectedTags = Set<Tag>()
     
     // MARK: - Initialization
     
@@ -49,6 +51,13 @@ struct EnhancedJournalEntryView: View {
         if let transcription = journalEntry.transcription, let text = transcription.text {
             _transcriptionText = State(initialValue: text)
         }
+        
+        // Initialize selected tags
+        var tags = Set<Tag>()
+        if let entryTags = journalEntry.tags as? Set<Tag> {
+            tags = entryTags
+        }
+        _selectedTags = State(initialValue: tags)
     }
     
     // MARK: - Body
@@ -71,10 +80,8 @@ struct EnhancedJournalEntryView: View {
                         transcriptionSection(text: text)
                     }
                     
-                    // Tags
-                    if let tags = journalEntry.tags, tags.count > 0 {
-                        tagSection(tags: tags)
-                    }
+                    // Tags - always show the tag section, even if there are no tags yet
+                    tagSection(tags: journalEntry.tags ?? NSSet())
                     
                     // Metadata
                     metadataSection
@@ -293,9 +300,21 @@ struct EnhancedJournalEntryView: View {
     /// Tags section
     private func tagSection(tags: NSSet) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Section header
-            Label("Tags", systemImage: "tag")
-                .font(.headline)
+            // Section header with edit button
+            HStack {
+                Label("Tags", systemImage: "tag")
+                    .font(.headline)
+                
+                Spacer()
+                
+                Button(action: {
+                    showingTagSelection = true
+                }) {
+                    Label("Edit", systemImage: "pencil")
+                        .font(.subheadline)
+                        .foregroundColor(.blue)
+                }
+            }
             
             // Tags cloud
             FlowLayout(spacing: 8) {
@@ -310,6 +329,13 @@ struct EnhancedJournalEntryView: View {
                 .fill(Color(.systemBackground))
                 .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 2)
         )
+        .sheet(isPresented: $showingTagSelection) {
+            TagSelectionView(selectedTags: $selectedTags)
+                .environment(\.managedObjectContext, viewContext)
+                .onDisappear {
+                    updateEntryTags()
+                }
+        }
     }
     
     /// Metadata section
@@ -560,6 +586,42 @@ struct EnhancedJournalEntryView: View {
         byteCountFormatter.countStyle = .file
         
         return byteCountFormatter.string(fromByteCount: size)
+    }
+    
+    /// Update the journal entry's tags based on the selected tags
+    private func updateEntryTags() {
+        // Get the current tags
+        let currentTags = journalEntry.tags as? Set<Tag> ?? Set<Tag>()
+        
+        // If nothing changed, return early
+        if currentTags == selectedTags {
+            return
+        }
+        
+        // Remove tags that are no longer selected
+        for tag in currentTags {
+            if !selectedTags.contains(tag) {
+                journalEntry.removeFromTags(tag)
+            }
+        }
+        
+        // Add new tags
+        for tag in selectedTags {
+            if !currentTags.contains(tag) {
+                journalEntry.addToTags(tag)
+            }
+        }
+        
+        // Update modified date
+        journalEntry.modifiedAt = Date()
+        
+        // Save changes
+        do {
+            try viewContext.save()
+            print("Tags updated successfully")
+        } catch {
+            print("Error updating tags: \(error.localizedDescription)")
+        }
     }
 }
 
