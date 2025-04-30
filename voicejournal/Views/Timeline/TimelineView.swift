@@ -530,7 +530,8 @@ struct TimelineEntryRow: View {
     
     private let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
+        formatter.dateStyle = .short
+        formatter.timeStyle = .short
         return formatter
     }()
 }

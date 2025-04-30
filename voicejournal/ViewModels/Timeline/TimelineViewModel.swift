@@ -9,6 +9,7 @@ import Foundation
 import CoreData
 import Combine
 import SwiftUI
+import NotificationCenter
 
 /// View model for the timeline view that manages chronological entry data
 class TimelineViewModel: ObservableObject {
@@ -88,9 +89,17 @@ class TimelineViewModel: ObservableObject {
             }
             .store(in: &cancellables)
         
+        // Register for Core Data change notifications
+        registerForCoreDataNotifications()
+        
         // Initial data fetch with explicit logging
         print("🚀 Performing initial data fetch with sort order: \(sortOrder.rawValue)")
         fetchEntriesForDateRange()
+    }
+    
+    deinit {
+        // Unregister from notifications when this view model is deallocated
+        unregisterForCoreDataNotifications()
     }
     
     // MARK: - Public Methods
@@ -210,6 +219,62 @@ class TimelineViewModel: ObservableObject {
         
         // Force immediate fetch with the new sort order
         fetchEntriesForDateRange()
+    }
+    
+    // MARK: - Core Data Notification Methods
+    
+    /// Register for Core Data change notifications
+    private func registerForCoreDataNotifications() {
+        print("📣 Registering for Core Data change notifications")
+        
+        // Register for NSManagedObjectContextDidSave notifications
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(managedObjectContextDidSave),
+            name: NSNotification.Name.NSManagedObjectContextDidSave,
+            object: nil
+        )
+    }
+    
+    /// Unregister from Core Data change notifications
+    private func unregisterForCoreDataNotifications() {
+        print("📣 Unregistering from Core Data change notifications")
+        
+        // Remove observer for NSManagedObjectContextDidSave notifications
+        NotificationCenter.default.removeObserver(
+            self,
+            name: NSNotification.Name.NSManagedObjectContextDidSave,
+            object: nil
+        )
+    }
+    
+    /// Handle NSManagedObjectContextDidSave notifications
+    @objc private func managedObjectContextDidSave(_ notification: Notification) {
+        // Check if the notification is from our view context or a parent context
+        guard let context = notification.object as? NSManagedObjectContext else {
+            return
+        }
+        
+        // Only process notifications from our view context or its parent
+        if context == viewContext || context == viewContext.parent {
+            print("📣 Received Core Data change notification - refreshing timeline data")
+            
+            // Check if the changes include JournalEntry objects
+            let insertedObjects = notification.userInfo?[NSInsertedObjectsKey] as? Set<NSManagedObject> ?? []
+            let updatedObjects = notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject> ?? []
+            let deletedObjects = notification.userInfo?[NSDeletedObjectsKey] as? Set<NSManagedObject> ?? []
+            
+            let hasJournalEntryChanges = insertedObjects.contains(where: { $0 is JournalEntry }) ||
+                                         updatedObjects.contains(where: { $0 is JournalEntry }) ||
+                                         deletedObjects.contains(where: { $0 is JournalEntry })
+            
+            if hasJournalEntryChanges {
+                // Refresh the timeline data on the main thread
+                DispatchQueue.main.async { [weak self] in
+                    self?.fetchEntriesForDateRange()
+                }
+            }
+        }
     }
     
     /// Jump to a specific date in the timeline

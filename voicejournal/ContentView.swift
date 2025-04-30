@@ -19,7 +19,7 @@ struct ContentView: View {
             // Timeline tab
             NavigationView {
                 TimelineView(context: viewContext)
-                    .navigationTitle("Timeline")
+                    .navigationTitle("Voice Journal")
             }
             .tabItem {
                 Label("Timeline", systemImage: "clock")
