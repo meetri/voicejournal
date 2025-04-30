@@ -73,6 +73,9 @@
 - ✅ Timeline view for chronological browsing
 - ✅ Date filtering options
 - ✅ Visual indicators for entry types/moods
+- ✅ Search filter for timeline entries
+- ✅ Tag filtering with multiple modes (all, any, exclude)
+- ✅ Sort order options (newest/oldest, duration, title)
 
 ### AI Integration
 - ❌ OpenAI API integration
@@ -151,6 +154,10 @@
 - Restructured main tab bar to directly expose Timeline and Calendar views (4/29/2025)
 - Removed redundant List view in favor of Timeline functionality (4/29/2025)
 - Improved navigation hierarchy for more intuitive user experience (4/29/2025)
+- Added search filter to timeline view for finding entries by title or content (4/29/2025)
+- Implemented tag filtering in timeline with three modes: all, any, and exclude (4/29/2025)
+- Added sort order options to timeline (newest/oldest first, duration, alphabetical) (4/29/2025)
+- Enhanced empty state views with context-aware messages and actions (4/29/2025)
 
 ## Next Priorities
 1. Begin work on mini-player and background playback

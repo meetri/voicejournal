@@ -32,6 +32,27 @@ class TimelineViewModel: ObservableObject {
     /// Flag indicating if data is currently loading
     @Published var isLoading: Bool = false
     
+    /// Text to search for in journal entries
+    @Published var searchText: String = ""
+    
+    /// Tags selected for filtering
+    @Published var selectedTags: Set<Tag> = []
+    
+    /// Mode for tag filtering
+    @Published var tagFilterMode: TagFilterMode = .any
+    
+    /// Current sort order for entries
+    @Published var sortOrder: SortOrder = .newestFirst {
+        willSet {
+            print("⚠️ sortOrder property is about to change from \(sortOrder.rawValue) to \(newValue.rawValue)")
+        }
+    }
+    
+    /// Computed property to determine if any filtering is active
+    var isFilteringActive: Bool {
+        return !searchText.isEmpty || !selectedTags.isEmpty
+    }
+    
     // MARK: - Private Properties
     
     private var viewContext: NSManagedObjectContext
@@ -51,7 +72,24 @@ class TimelineViewModel: ObservableObject {
             }
             .store(in: &cancellables)
         
-        // Initial data fetch
+        // Set up publishers for search, tags, and sort order
+        Publishers.CombineLatest3($searchText, $selectedTags, $tagFilterMode)
+            .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
+            .sink { [weak self] (_, _, _) in
+                self?.fetchEntriesForDateRange()
+            }
+            .store(in: &cancellables)
+        
+        // Monitor sort order changes - removed .dropFirst() to ensure initial sort is applied
+        $sortOrder
+            .sink { [weak self] newSortOrder in
+                print("Sort order changed to: \(newSortOrder.rawValue)")
+                self?.fetchEntriesForDateRange()
+            }
+            .store(in: &cancellables)
+        
+        // Initial data fetch with explicit logging
+        print("🚀 Performing initial data fetch with sort order: \(sortOrder.rawValue)")
         fetchEntriesForDateRange()
     }
     
@@ -163,6 +201,17 @@ class TimelineViewModel: ObservableObject {
         }
     }
     
+    /// Apply a new sort order and immediately fetch entries
+    func applySortOrder(_ order: SortOrder) {
+        print("🔄 Directly applying sort order: \(order.rawValue)")
+        
+        // Update the sort order property
+        sortOrder = order
+        
+        // Force immediate fetch with the new sort order
+        fetchEntriesForDateRange()
+    }
+    
     /// Jump to a specific date in the timeline
     func jumpToDate(_ date: Date) {
         // Find the closest date in our sorted dates
@@ -201,7 +250,11 @@ class TimelineViewModel: ObservableObject {
     private func fetchEntriesForDateRange() {
         isLoading = true
         
+        print("⏳ fetchEntriesForDateRange - Current sort order: \(sortOrder.rawValue)")
+        
         let (startDate, endDate) = calculateDateRange()
+        print("📅 Date range: \(startDate) to \(endDate)")
+        
         fetchEntries(from: startDate, to: endDate)
     }
     
@@ -260,12 +313,8 @@ class TimelineViewModel: ObservableObject {
     /// Fetch entries between two dates
     private func fetchEntries(from startDate: Date, to endDate: Date) {
         let request: NSFetchRequest<JournalEntry> = JournalEntry.fetchRequest()
-        request.predicate = NSPredicate(
-            format: "createdAt >= %@ AND createdAt < %@",
-            startDate as NSDate,
-            endDate as NSDate
-        )
-        request.sortDescriptors = [NSSortDescriptor(keyPath: \JournalEntry.createdAt, ascending: false)]
+        request.predicate = buildPredicate(from: startDate, to: endDate)
+        request.sortDescriptors = getSortDescriptors()
         
         do {
             let fetchedEntries = try viewContext.fetch(request)
@@ -278,36 +327,163 @@ class TimelineViewModel: ObservableObject {
         }
     }
     
+    /// Build a predicate that combines date range, search text, and tag filters
+    private func buildPredicate(from startDate: Date, to endDate: Date) -> NSPredicate {
+        var predicates: [NSPredicate] = [
+            NSPredicate(format: "createdAt >= %@ AND createdAt < %@", startDate as NSDate, endDate as NSDate)
+        ]
+        
+        // Add search predicate if needed
+        if !searchText.isEmpty {
+            predicates.append(NSPredicate(format: "title CONTAINS[cd] %@ OR transcription.text CONTAINS[cd] %@", searchText, searchText))
+        }
+        
+        // Add tag filter predicate if needed
+        if !selectedTags.isEmpty {
+            switch tagFilterMode {
+            case .all:
+                // Entries must have ALL selected tags
+                for tag in selectedTags {
+                    predicates.append(NSPredicate(format: "ANY tags == %@", tag))
+                }
+            case .any:
+                // Entries must have ANY selected tag
+                predicates.append(NSPredicate(format: "ANY tags IN %@", selectedTags))
+            case .exclude:
+                // Entries must NOT have selected tags
+                predicates.append(NSPredicate(format: "NONE tags IN %@", selectedTags))
+            }
+        }
+        
+        return NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
+    }
+    
+    /// Get sort descriptors based on the current sort order
+    private func getSortDescriptors() -> [NSSortDescriptor] {
+        print("🔄 getSortDescriptors called with sort order: \(sortOrder.rawValue)")
+        
+        var descriptors: [NSSortDescriptor]
+        
+        switch sortOrder {
+        case .newestFirst:
+            descriptors = [NSSortDescriptor(keyPath: \JournalEntry.createdAt, ascending: false)]
+        case .oldestFirst:
+            descriptors = [NSSortDescriptor(keyPath: \JournalEntry.createdAt, ascending: true)]
+        case .durationLongest:
+            descriptors = [
+                NSSortDescriptor(keyPath: \JournalEntry.audioRecording?.duration, ascending: false),
+                NSSortDescriptor(keyPath: \JournalEntry.createdAt, ascending: false)
+            ]
+        case .durationShortest:
+            descriptors = [
+                NSSortDescriptor(keyPath: \JournalEntry.audioRecording?.duration, ascending: true),
+                NSSortDescriptor(keyPath: \JournalEntry.createdAt, ascending: false)
+            ]
+        case .titleAZ:
+            descriptors = [
+                NSSortDescriptor(keyPath: \JournalEntry.title, ascending: true),
+                NSSortDescriptor(keyPath: \JournalEntry.createdAt, ascending: false)
+            ]
+        case .titleZA:
+            descriptors = [
+                NSSortDescriptor(keyPath: \JournalEntry.title, ascending: false),
+                NSSortDescriptor(keyPath: \JournalEntry.createdAt, ascending: false)
+            ]
+        }
+        
+        print("📊 Created sort descriptors: \(descriptors.map { "\($0.key?.description ?? "nil") \($0.ascending ? "ASC" : "DESC")" })")
+        return descriptors
+    }
+    
     /// Process fetched entries to organize by date
     private func processEntries(_ entries: [JournalEntry]) {
         var newEntriesByDate: [Date: [JournalEntry]] = [:]
         var newSortedDates: [Date] = []
         
-        for entry in entries {
-            guard let createdAt = entry.createdAt else { continue }
-            
-            let normalizedDate = calendar.startOfDay(for: createdAt)
-            
-            // Add entry to the entries dictionary
-            if newEntriesByDate[normalizedDate] == nil {
-                newEntriesByDate[normalizedDate] = [entry]
-                newSortedDates.append(normalizedDate)
-            } else {
-                newEntriesByDate[normalizedDate]?.append(entry)
+        // Use a single date key for all entries to avoid grouping by day
+        let globalDateKey = Date.distantPast
+        newSortedDates = [globalDateKey]
+        
+        // Sort all entries according to the selected sort order
+        // Note: Entries should already be sorted by Core Data, but we sort again to ensure consistency
+        var sortedEntries: [JournalEntry] = []
+        
+        print("🔍 processEntries - Applying sort order: \(sortOrder.rawValue) to \(entries.count) entries")
+        
+        // Log the first few entries before sorting
+        if !entries.isEmpty {
+            print("📋 First few entries BEFORE sorting:")
+            for (index, entry) in entries.prefix(min(3, entries.count)).enumerated() {
+                print("  \(index): Title: \(entry.title ?? "nil"), Date: \(entry.createdAt?.description ?? "nil"), Duration: \(entry.audioRecording?.duration ?? 0)")
             }
         }
         
-        // Sort the dates in descending order (newest first)
-        newSortedDates.sort(by: >)
-        
-        // Sort entries within each date by creation time (newest first)
-        for (date, dateEntries) in newEntriesByDate {
-            newEntriesByDate[date] = dateEntries.sorted(by: { 
+        // Apply the same sorting logic as in getSortDescriptors() for consistency
+        switch sortOrder {
+        case .newestFirst:
+            sortedEntries = entries.sorted(by: { 
                 ($0.createdAt ?? Date.distantPast) > ($1.createdAt ?? Date.distantPast)
+            })
+        case .oldestFirst:
+            sortedEntries = entries.sorted(by: { 
+                ($0.createdAt ?? Date.distantPast) < ($1.createdAt ?? Date.distantPast)
+            })
+        case .durationLongest:
+            sortedEntries = entries.sorted(by: { 
+                let duration1 = $0.audioRecording?.duration ?? 0
+                let duration2 = $1.audioRecording?.duration ?? 0
+                if duration1 == duration2 {
+                    // Secondary sort by date if durations are equal
+                    return ($0.createdAt ?? Date.distantPast) > ($1.createdAt ?? Date.distantPast)
+                }
+                return duration1 > duration2
+            })
+        case .durationShortest:
+            sortedEntries = entries.sorted(by: { 
+                let duration1 = $0.audioRecording?.duration ?? 0
+                let duration2 = $1.audioRecording?.duration ?? 0
+                if duration1 == duration2 {
+                    // Secondary sort by date if durations are equal
+                    return ($0.createdAt ?? Date.distantPast) > ($1.createdAt ?? Date.distantPast)
+                }
+                return duration1 < duration2
+            })
+        case .titleAZ:
+            sortedEntries = entries.sorted(by: { 
+                let title1 = $0.title ?? ""
+                let title2 = $1.title ?? ""
+                if title1 == title2 {
+                    // Secondary sort by date if titles are equal
+                    return ($0.createdAt ?? Date.distantPast) > ($1.createdAt ?? Date.distantPast)
+                }
+                return title1 < title2
+            })
+        case .titleZA:
+            sortedEntries = entries.sorted(by: { 
+                let title1 = $0.title ?? ""
+                let title2 = $1.title ?? ""
+                if title1 == title2 {
+                    // Secondary sort by date if titles are equal
+                    return ($0.createdAt ?? Date.distantPast) > ($1.createdAt ?? Date.distantPast)
+                }
+                return title1 > title2
             })
         }
         
+        // Log the first few entries after sorting
+        if !sortedEntries.isEmpty {
+            print("📋 First few entries AFTER sorting:")
+            for (index, entry) in sortedEntries.prefix(min(3, sortedEntries.count)).enumerated() {
+                print("  \(index): Title: \(entry.title ?? "nil"), Date: \(entry.createdAt?.description ?? "nil"), Duration: \(entry.audioRecording?.duration ?? 0)")
+            }
+        }
+        
+        newEntriesByDate[globalDateKey] = sortedEntries
+        
+        print("✅ Finished processing entries with sort order: \(sortOrder.rawValue)")
+        
         DispatchQueue.main.async {
+            print("🔄 Updating UI with sorted entries")
             self.entriesByDate = newEntriesByDate
             self.sortedDates = newSortedDates
             self.isLoading = false
@@ -340,4 +516,23 @@ enum DateRange: String, CaseIterable, Identifiable {
         case .allTime: return "All Time"
         }
     }
+}
+
+/// Tag filter mode options
+enum TagFilterMode {
+    case all    // Entries must have ALL selected tags
+    case any    // Entries must have ANY selected tag
+    case exclude // Entries must NOT have selected tags
+}
+
+/// Sort order options for journal entries
+enum SortOrder: String, CaseIterable, Identifiable {
+    case newestFirst = "Newest First"
+    case oldestFirst = "Oldest First"
+    case durationLongest = "Longest Duration"
+    case durationShortest = "Shortest Duration"
+    case titleAZ = "Title A-Z"
+    case titleZA = "Title Z-A"
+    
+    var id: String { self.rawValue }
 }

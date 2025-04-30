@@ -54,6 +54,10 @@ As of April 29, 2025, the Voice Journal iOS app is in active development with a 
 - ✅ Added date range filtering options
 - ✅ Implemented visual indicators for entries based on tags
 - ✅ Integrated views into a tab-based navigation system
+- ✅ Added search filter to timeline view for finding entries by title or content
+- ✅ Implemented tag filtering in timeline with three modes: all, any, and exclude
+- ✅ Added sort order options to timeline (newest/oldest first, duration, alphabetical)
+- ✅ Enhanced empty state views with context-aware messages and actions
 
 ## Next Steps
 

@@ -26,6 +26,9 @@ struct TimelineView: View {
     @State private var showDeleteConfirmation = false
     @State private var showLockConfirmation = false
     @State private var selectedEntryToToggleLock: JournalEntry? = nil
+    @State private var searchText: String = ""
+    @State private var showingTagFilter = false
+    @State private var showingSortOptions = false
     
     // MARK: - Initialization
     
@@ -123,6 +126,13 @@ struct TimelineView: View {
             EntryCreationView(isPresented: $showingEntryCreation)
                 .environment(\.managedObjectContext, viewContext)
         }
+        .sheet(isPresented: $showingTagFilter) {
+            TagFilterView(
+                selectedTags: $viewModel.selectedTags,
+                filterMode: $viewModel.tagFilterMode
+            )
+            .environment(\.managedObjectContext, viewContext)
+        }
     }
     
     // MARK: - Subviews
@@ -130,7 +140,7 @@ struct TimelineView: View {
     /// Timeline header with date range selection
     private var timelineHeader: some View {
         VStack(spacing: 8) {
-            // Combined header with all controls in one row
+            // Top row with title and date controls
             HStack {
                 Text("Timeline")
                     .font(.headline)
@@ -168,48 +178,121 @@ struct TimelineView: View {
             }
             .padding(.horizontal)
             
+            // Search bar and filter controls
+            HStack(spacing: 8) {
+                // Search bar
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.secondary)
+                    
+                    TextField("Search entries...", text: $searchText)
+                        .textFieldStyle(PlainTextFieldStyle())
+                        .onChange(of: searchText) { _, newValue in
+                            viewModel.searchText = newValue
+                        }
+                    
+                    if !searchText.isEmpty {
+                        Button(action: {
+                            searchText = ""
+                            viewModel.searchText = ""
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .padding(8)
+                .background(Color(.secondarySystemBackground))
+                .cornerRadius(10)
+                
+                // Tag filter button
+                Button(action: {
+                    showingTagFilter = true
+                }) {
+                    HStack {
+                        Image(systemName: "tag")
+                        Text(viewModel.selectedTags.isEmpty ? "Tags" : "\(viewModel.selectedTags.count)")
+                            .font(.subheadline)
+                    }
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 12)
+                    .background(viewModel.selectedTags.isEmpty ? Color(.secondarySystemBackground) : Color.blue.opacity(0.1))
+                    .foregroundColor(viewModel.selectedTags.isEmpty ? .primary : .blue)
+                    .cornerRadius(10)
+                }
+                
+                // Sort order menu
+                Menu {
+                    ForEach(SortOrder.allCases) { order in
+                        Button(action: {
+                            print("🔄 Sort order selected: \(order.rawValue)")
+                            // Use the direct method to apply sort order and force immediate fetch
+                            viewModel.applySortOrder(order)
+                        }) {
+                            HStack {
+                                Text(order.rawValue)
+                                if viewModel.sortOrder == order {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "arrow.up.arrow.down")
+                        Text("Sort")
+                            .font(.subheadline)
+                    }
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 12)
+                    .background(Color(.secondarySystemBackground))
+                    .foregroundColor(.primary)
+                    .cornerRadius(10)
+                }
+            }
+            .padding(.horizontal)
+            
             Divider()
         }
         .padding(.vertical, 8)
         .background(Color(.systemBackground))
     }
     
-    /// Timeline content with entries grouped by date
+    /// Timeline content with entries in a flat list
     private var timelineContent: some View {
         List {
             ForEach(viewModel.sortedDates, id: \.self) { date in
                 if let entries = viewModel.entriesByDate[date], !entries.isEmpty {
-                    Section(header: dateHeader(for: date)) {
-                        ForEach(entries) { entry in
-                            TimelineEntryRow(entry: entry, onToggleLock: { toggledEntry in
-                                selectedEntryToToggleLock = toggledEntry
-                                showLockConfirmation = true
-                            })
-                            .swipeActions(edge: .trailing) {
-                                // Only show delete action for unlocked entries
-                                if !entry.isLocked {
-                                    Button(role: .destructive) {
-                                        selectedEntryToDelete = entry
-                                        showDeleteConfirmation = true
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
-                                }
-                            }
-                            .swipeActions(edge: .leading) {
-                                Button {
-                                    selectedEntryToToggleLock = entry
-                                    showLockConfirmation = true
+                    // Display all entries without section headers
+                    ForEach(entries) { entry in
+                        TimelineEntryRow(entry: entry, onToggleLock: { toggledEntry in
+                            selectedEntryToToggleLock = toggledEntry
+                            showLockConfirmation = true
+                        })
+                        .swipeActions(edge: .trailing) {
+                            // Only show delete action for unlocked entries
+                            if !entry.isLocked {
+                                Button(role: .destructive) {
+                                    selectedEntryToDelete = entry
+                                    showDeleteConfirmation = true
                                 } label: {
-                                    Label(entry.isLocked ? "Unlock" : "Lock", 
-                                          systemImage: entry.isLocked ? "lock.open" : "lock")
+                                    Label("Delete", systemImage: "trash")
                                 }
-                                .tint(entry.isLocked ? .green : .blue)
                             }
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                selectedEntry = entry
+                        }
+                        .swipeActions(edge: .leading) {
+                            Button {
+                                selectedEntryToToggleLock = entry
+                                showLockConfirmation = true
+                            } label: {
+                                Label(entry.isLocked ? "Unlock" : "Lock", 
+                                      systemImage: entry.isLocked ? "lock.open" : "lock")
                             }
+                            .tint(entry.isLocked ? .green : .blue)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            selectedEntry = entry
                         }
                     }
                 }
@@ -289,23 +372,60 @@ struct TimelineView: View {
                 .font(.title2)
                 .fontWeight(.semibold)
             
-            Text("No entries found for the selected date range.")
-                .font(.body)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
-            
-            Button(action: {
-                viewModel.setDateRange(.allTime)
-            }) {
-                Text("Show All Entries")
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(8)
+            if !viewModel.searchText.isEmpty {
+                Text("No entries match your search for \"\(viewModel.searchText)\".")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+                
+                Button(action: {
+                    searchText = ""
+                    viewModel.searchText = ""
+                }) {
+                    Text("Clear Search")
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                }
+            } else if !viewModel.selectedTags.isEmpty {
+                Text("No entries match the selected tag filters.")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+                
+                Button(action: {
+                    viewModel.selectedTags.removeAll()
+                }) {
+                    Text("Clear Tag Filters")
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                }
+            } else {
+                Text("No entries found for the selected date range.")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+                
+                Button(action: {
+                    viewModel.setDateRange(.allTime)
+                }) {
+                    Text("Show All Entries")
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                }
             }
-            .padding(.top, 8)
+            // .padding(.top, 8)
             
             Spacer()
         }

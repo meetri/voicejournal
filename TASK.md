@@ -108,6 +108,9 @@
 - [x] Create timeline view for chronological browsing (Completed: 4/29/2025)
 - [x] Add date filtering options (Completed: 4/29/2025)
 - [x] Design visual indicators for entry types/moods on calendar (Completed: 4/29/2025)
+- [x] Add search filter to timeline view (Completed: 4/29/2025)
+- [x] Add tag filtering to timeline view (Completed: 4/29/2025)
+- [x] Add sort order options to timeline view (Completed: 4/29/2025)
 
 ## Phase 4: AI Integration
 
