@@ -83,6 +83,7 @@ class CalendarViewModel: ObservableObject {
     
     /// Move to today's date
     func moveToToday() {
+        print("Move to today")
         displayDate = Date()
         selectedDate = Date()
     }

@@ -311,12 +311,12 @@ struct MonthCalendarView: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
         }
-        .onAppear {
-            // Ensure today's date is selected by default
-            if Calendar.current.isDateInToday(viewModel.selectedDate) == false {
-                viewModel.moveToToday()
-            }
-        }
+//        .onAppear {
+//            // Ensure today's date is selected by default
+//            if Calendar.current.isDateInToday(viewModel.selectedDate) == false {
+//                viewModel.moveToToday()
+//            }
+//        }
     }
     
     /// A cell representing a day in the month view
@@ -340,7 +340,7 @@ struct MonthCalendarView: View {
                         .frame(height: 16)
                 }
             }
-            .frame(height: 60)
+            .frame(width: 50, height: 60)
             .background(
                 RoundedRectangle(cornerRadius: 4)
                     .fill(cellBackgroundColor())
@@ -384,9 +384,9 @@ struct MonthCalendarView: View {
         
         /// Determine the text color for the day number
         private func textColor() -> Color {
-            if viewModel.isSelected(date) {
+            if viewModel.isToday(date) {
                 return .white
-            } else if viewModel.isToday(date) {
+            } else if viewModel.isSelected(date) {
                 return .blue
             } else {
                 return .primary
@@ -395,9 +395,9 @@ struct MonthCalendarView: View {
         
         /// Determine the background color for the cell
         private func cellBackgroundColor() -> Color {
-            if viewModel.isSelected(date) {
+            if viewModel.isToday(date) {
                 return .blue
-            } else if viewModel.isToday(date) {
+            } else if viewModel.isSelected(date) {
                 return Color.purple.opacity(0.3)
             } else {
                 return Color.clear
@@ -472,12 +472,12 @@ struct WeekCalendarView: View {
                 .frame(maxWidth: .infinity, minHeight: 200)
             }
         }
-        .onAppear {
-            // Ensure today's date is selected by default
-            if Calendar.current.isDateInToday(viewModel.selectedDate) == false {
-                viewModel.moveToToday()
-            }
-        }
+//        .onAppear {
+//            // Ensure today's date is selected by default
+//            if Calendar.current.isDateInToday(viewModel.selectedDate) == false {
+//                viewModel.moveToToday()
+//            }
+//        }
     }
     
     /// A cell representing a day in the week view
@@ -556,9 +556,9 @@ struct WeekCalendarView: View {
         
         /// Determine the text color for the day number
         private func textColor() -> Color {
-            if viewModel.isSelected(date) {
+            if viewModel.isToday(date) {
                 return .white
-            } else if viewModel.isToday(date) {
+            } else if viewModel.isSelected(date) {
                 return .blue
             } else {
                 return .primary
@@ -567,9 +567,9 @@ struct WeekCalendarView: View {
         
         /// Determine the background color for the cell
         private func cellBackgroundColor() -> Color {
-            if viewModel.isSelected(date) {
+            if viewModel.isToday(date) {
                 return .blue
-            } else if viewModel.isToday(date) {
+            } else if viewModel.isSelected(date) {
                 return Color.purple.opacity(0.3)
             } else {
                 return Color.clear
