@@ -26,6 +26,9 @@ class AudioRecordingViewModel: ObservableObject {
     /// Current audio level (0.0 to 1.0)
     @Published private(set) var audioLevel: Float = 0.0
     
+    /// Whether to show language selection sheet
+    @Published var showingLanguageSelection = false
+    
     /// Duration of the current recording in seconds
     @Published private(set) var duration: TimeInterval = 0.0
     
@@ -87,6 +90,9 @@ class AudioRecordingViewModel: ObservableObject {
         self.recordingService = recordingService
         self.speechRecognitionService = speechRecognitionService
         self.journalEntry = existingEntry
+        
+        // Set the speech recognition locale from settings
+        speechRecognitionService.setRecognitionLocale(LanguageSettings.shared.selectedLocale)
         
         // Set up publishers
         setupPublishers()
@@ -422,6 +428,12 @@ class AudioRecordingViewModel: ObservableObject {
             if let timingDataJSON = speechRecognitionService.getTimingDataJSON() {
                 transcription.timingData = timingDataJSON
             }
+            
+            // Store the locale
+            transcription.locale = LanguageSettings.shared.selectedLocale.identifier
+            
+            // Store the locale used for transcription
+            transcription.locale = LanguageSettings.shared.selectedLocale.identifier
         }
         
         // Save the context
@@ -445,6 +457,9 @@ class AudioRecordingViewModel: ObservableObject {
             if let timingDataJSON = speechRecognitionService.getTimingDataJSON() {
                 existingTranscription.timingData = timingDataJSON
             }
+            
+            // Update the locale
+            existingTranscription.locale = LanguageSettings.shared.selectedLocale.identifier
         } else {
             // Create new transcription
             let transcription = entry.createTranscription(text: text)

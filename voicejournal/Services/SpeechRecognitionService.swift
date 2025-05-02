@@ -100,7 +100,8 @@ class SpeechRecognitionService: ObservableObject {
     
     // MARK: - Private Properties
     
-    private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+    private var speechRecognizer: SFSpeechRecognizer?
+    private var currentLocale: Locale = Locale(identifier: "en-US")
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private var audioEngine: AVAudioEngine?
@@ -108,9 +109,11 @@ class SpeechRecognitionService: ObservableObject {
     
     // MARK: - Initialization
     
-    nonisolated init() {
+    nonisolated init(locale: Locale = Locale(identifier: "en-US")) {
         // Move any main actor work to a separate method
-        Task {
+        Task { @MainActor in
+            self.currentLocale = locale
+            self.speechRecognizer = SFSpeechRecognizer(locale: locale)
             await self.checkAvailability()
         }
     }
@@ -119,10 +122,31 @@ class SpeechRecognitionService: ObservableObject {
     
     /// Check if speech recognition is available on this device
     func checkAvailability() {
+        // Make sure the recognizer is initialized with the current locale
+        if speechRecognizer == nil {
+            speechRecognizer = SFSpeechRecognizer(locale: currentLocale)
+        }
+        
         isAvailable = speechRecognizer?.isAvailable ?? false
         
         if !isAvailable {
             state = .unavailable
+        }
+    }
+    
+    /// Set the locale for speech recognition
+    func setRecognitionLocale(_ locale: Locale) {
+        currentLocale = locale
+        // Update the speech recognizer with the new locale
+        speechRecognizer = SFSpeechRecognizer(locale: locale)
+        checkAvailability()
+    }
+    
+    /// Get available locales for speech recognition
+    static func getAvailableLocales() -> [Locale] {
+        return SFSpeechRecognizer.supportedLocales().sorted { 
+            $0.localizedString(forIdentifier: $0.identifier) ?? "" < 
+            $1.localizedString(forIdentifier: $1.identifier) ?? "" 
         }
     }
     
@@ -177,6 +201,11 @@ class SpeechRecognitionService: ObservableObject {
         let permission = checkAuthorization()
         guard permission == .granted else {
             throw SpeechRecognitionError.authorizationFailed
+        }
+        
+        // Ensure recognizer is using the current locale
+        if speechRecognizer == nil || speechRecognizer?.locale != currentLocale {
+            speechRecognizer = SFSpeechRecognizer(locale: currentLocale)
         }
         
         // Check availability
@@ -266,6 +295,11 @@ class SpeechRecognitionService: ObservableObject {
         let permission = checkAuthorization()
         guard permission == .granted else {
             throw SpeechRecognitionError.authorizationFailed
+        }
+        
+        // Ensure recognizer is using the current locale
+        if speechRecognizer == nil || speechRecognizer?.locale != currentLocale {
+            speechRecognizer = SFSpeechRecognizer(locale: currentLocale)
         }
         
         // Check availability
