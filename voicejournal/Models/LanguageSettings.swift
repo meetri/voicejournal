@@ -53,6 +53,7 @@ class LanguageSettings: ObservableObject {
     
     func localizedName(for locale: Locale) -> String {
         // Get the display name in the current locale
-        return (Locale.current.localizedString(forIdentifier: locale.identifier) ?? locale.identifier)
+        let current = Locale.current
+        return current.localizedString(forLanguageCode: locale.languageCode ?? "") ?? locale.identifier
     }
 }
