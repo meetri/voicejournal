@@ -438,12 +438,13 @@ class SpeechRecognitionService: ObservableObject {
         for i in 0..<transcription.segments.count {
             let segment = transcription.segments[i]
             
-            // Create a segment with timing information
+            // Create a segment with timing information and locale
             let transcriptionSegment = TranscriptionSegment(
                 text: segment.substring,
                 startTime: segment.timestamp,
                 endTime: segment.timestamp + segment.duration,
-                range: segment.substringRange
+                range: segment.substringRange,
+                locale: currentLocale.identifier
             )
             
             segments.append(transcriptionSegment)

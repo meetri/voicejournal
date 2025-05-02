@@ -18,6 +18,9 @@ struct TranscriptionSegment: Codable {
     /// The end time of this segment in seconds
     let endTime: TimeInterval
     
+    /// The locale used for this segment
+    var locale: String?
+    
     /// The range of this segment in the full transcription text
     var textRange: NSRange {
         get {
@@ -37,13 +40,15 @@ struct TranscriptionSegment: Codable {
         case endTime
         case location
         case length
+        case locale
     }
     
-    init(text: String, startTime: TimeInterval, endTime: TimeInterval, range: NSRange) {
+    init(text: String, startTime: TimeInterval, endTime: TimeInterval, range: NSRange, locale: String? = nil) {
         self.text = text
         self.startTime = startTime
         self.endTime = endTime
         self._textRange = range
+        self.locale = locale
     }
     
     // Custom encoding to handle NSRange
@@ -54,6 +59,7 @@ struct TranscriptionSegment: Codable {
         try container.encode(endTime, forKey: .endTime)
         try container.encode(_textRange?.location ?? 0, forKey: .location)
         try container.encode(_textRange?.length ?? 0, forKey: .length)
+        try container.encodeIfPresent(locale, forKey: .locale)
     }
     
     // Custom decoding to handle NSRange
@@ -66,5 +72,7 @@ struct TranscriptionSegment: Codable {
         let location = try container.decode(Int.self, forKey: .location)
         let length = try container.decode(Int.self, forKey: .length)
         _textRange = NSRange(location: location, length: length)
+        
+        locale = try container.decodeIfPresent(String.self, forKey: .locale)
     }
 }

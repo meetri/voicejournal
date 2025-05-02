@@ -29,6 +29,12 @@ class AudioRecordingViewModel: ObservableObject {
     /// Whether to show language selection sheet
     @Published var showingLanguageSelection = false
     
+    /// Select a language for transcription
+    func selectLanguage(_ locale: Locale) {
+        speechRecognitionService.setRecognitionLocale(locale)
+        showingLanguageSelection = false
+    }
+    
     /// Duration of the current recording in seconds
     @Published private(set) var duration: TimeInterval = 0.0
     
