@@ -247,7 +247,6 @@ class AudioRecordingViewModel: ObservableObject {
     }
     
     /// Process audio file for transcription after recording
-    @MainActor
     private func processAudioFileForTranscription(_ url: URL) async {
         do {
             isTranscribing = true
@@ -327,7 +326,6 @@ class AudioRecordingViewModel: ObservableObject {
     
     // MARK: - Private Methods
     
-    @MainActor
     private func setupPublishers() {
         // Subscribe to audio level changes
         recordingService.$audioLevel
@@ -379,14 +377,12 @@ class AudioRecordingViewModel: ObservableObject {
             .store(in: &cancellables)
     }
     
-    @MainActor
     private func formatDuration(_ duration: TimeInterval) -> String {
         let minutes = Int(duration) / 60
         let seconds = Int(duration) % 60
         return String(format: "%02d:%02d", minutes, seconds)
     }
     
-    @MainActor
     private func handleError(_ error: Error) {
         if let recordingError = error as? AudioRecordingError {
             errorMessage = recordingError.localizedDescription
@@ -411,7 +407,6 @@ class AudioRecordingViewModel: ObservableObject {
         }
     }
     
-    @MainActor
     private func createJournalEntry(recordingURL: URL) async {
         // Use existing entry or create a new one
         let entry: JournalEntry
@@ -455,7 +450,6 @@ class AudioRecordingViewModel: ObservableObject {
     }
     
     /// Update journal entry with transcription
-    @MainActor
     private func updateJournalEntryWithTranscription(_ entry: JournalEntry, text: String) async {
         // Check if entry already has a transcription
         if let existingTranscription = entry.transcription {
