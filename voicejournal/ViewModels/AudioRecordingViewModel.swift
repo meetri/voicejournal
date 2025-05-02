@@ -30,6 +30,7 @@ class AudioRecordingViewModel: ObservableObject {
     @Published var showingLanguageSelection = false
     
     /// Select a language for transcription
+    @MainActor
     func selectLanguage(_ locale: Locale) {
         speechRecognitionService.setRecognitionLocale(locale)
         showingLanguageSelection = false
