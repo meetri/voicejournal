@@ -32,7 +32,14 @@ class LanguageSettings: ObservableObject {
     private init() {
         // Load saved locale or use system default
         if let savedIdentifier = UserDefaults.standard.string(forKey: "selectedLocaleIdentifier") {
+            // Create locale from saved identifier
             selectedLocale = Locale(identifier: savedIdentifier)
+            
+            // Verify the locale is supported for speech recognition
+            if !SFSpeechRecognizer.supportedLocales().contains(where: { $0.identifier == selectedLocale.identifier }) {
+                // Fall back to current locale if saved locale is not supported
+                selectedLocale = Locale.current
+            }
         } else {
             selectedLocale = Locale.current
         }
