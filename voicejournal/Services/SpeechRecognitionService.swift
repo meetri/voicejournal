@@ -55,6 +55,8 @@ enum SpeechRecognitionError: Error {
     case audioFormatNotSupported
     case noRecognitionAvailable
     case fileNotFound
+    case languageNotSupported
+    case languageNotAvailable
     case unknown(Error)
     
     var localizedDescription: String {
@@ -69,6 +71,10 @@ enum SpeechRecognitionError: Error {
             return "Speech recognition is not available on this device"
         case .fileNotFound:
             return "Audio file not found"
+        case .languageNotSupported:
+            return "This language is not supported for transcription"
+        case .languageNotAvailable:
+            return "This language is not available on your device"
         case .unknown(let error):
             return "Unknown error: \(error.localizedDescription)"
         }
