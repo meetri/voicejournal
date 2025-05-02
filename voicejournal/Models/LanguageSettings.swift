@@ -53,7 +53,18 @@ class LanguageSettings: ObservableObject {
     
     func localizedName(for locale: Locale) -> String {
         // Get the display name in the current locale
-        let current = Locale.current
-        return current.localizedString(forLanguageCode: locale.languageCode ?? "") ?? locale.identifier
+        if let languageCode = locale.languageCode {
+            let displayName = Locale.current.localizedString(forLanguageCode: languageCode)
+            if let name = displayName, !name.isEmpty {
+                // If there's a region code, add it in parentheses
+                if let regionCode = locale.regionCode, let regionName = Locale.current.localizedString(forRegionCode: regionCode) {
+                    return "\(name) (\(regionName))"
+                }
+                return name
+            }
+        }
+        
+        // Fallback to identifier if we couldn't get a proper name
+        return locale.identifier
     }
 }
