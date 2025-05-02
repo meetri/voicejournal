@@ -36,7 +36,14 @@ class LanguageSettings: ObservableObject {
             selectedLocale = Locale(identifier: savedIdentifier)
             
             // Verify the locale is supported for speech recognition
-            if !SFSpeechRecognizer.supportedLocales().contains(where: { $0.identifier == selectedLocale.identifier }) {
+            // More flexible comparison using language and region codes
+            let isSupported = SFSpeechRecognizer.supportedLocales().contains(where: { supportedLocale in
+                return supportedLocale.languageCode == selectedLocale.languageCode &&
+                       (supportedLocale.regionCode == selectedLocale.regionCode || 
+                        selectedLocale.regionCode == nil)
+            })
+            
+            if !isSupported {
                 // Fall back to current locale if saved locale is not supported
                 selectedLocale = Locale.current
             }
@@ -48,12 +55,19 @@ class LanguageSettings: ObservableObject {
         loadAvailableLocales()
     }
     
+    // Cache for supported locales
+    private var cachedSupportedLocales: Set<Locale>?
+    
     func loadAvailableLocales() {
-        // Get supported locales for speech recognition
-        let supportedLocales = SFSpeechRecognizer.supportedLocales()
+        // Get supported locales for speech recognition (using cache if available)
+        if cachedSupportedLocales == nil {
+            cachedSupportedLocales = SFSpeechRecognizer.supportedLocales()
+        }
+        
+        guard let supportedLocales = cachedSupportedLocales else { return }
         
         // Sort locales by their localized names
-        availableLocales = supportedLocales.sorted { 
+        availableLocales = Array(supportedLocales).sorted { 
             localizedName(for: $0).lowercased() < localizedName(for: $1).lowercased()
         }
     }
