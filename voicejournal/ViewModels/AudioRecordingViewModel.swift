@@ -429,9 +429,6 @@ class AudioRecordingViewModel: ObservableObject {
                 transcription.timingData = timingDataJSON
             }
             
-            // Store the locale
-            transcription.locale = LanguageSettings.shared.selectedLocale.identifier
-            
             // Store the locale used for transcription
             transcription.locale = LanguageSettings.shared.selectedLocale.identifier
         }
@@ -468,6 +465,9 @@ class AudioRecordingViewModel: ObservableObject {
             if let timingDataJSON = speechRecognitionService.getTimingDataJSON() {
                 transcription.timingData = timingDataJSON
             }
+            
+            // Store the locale
+            transcription.locale = LanguageSettings.shared.selectedLocale.identifier
         }
         
         // Save the context
