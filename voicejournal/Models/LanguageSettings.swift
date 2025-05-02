@@ -59,25 +59,19 @@ class LanguageSettings: ObservableObject {
     }
     
     func localizedName(for locale: Locale) -> String {
-        // First try to get the display name for the locale
-        if #available(iOS 16.0, *) {
-            // Use newer API on iOS 16+
-            return locale.localizedLanguageName
-        } else {
-            // Fallback for older iOS versions
-            if let languageCode = locale.languageCode {
-                if let displayName = Locale.current.localizedString(forLanguageCode: languageCode), !displayName.isEmpty {
-                    // If there's a region code, add it in parentheses
-                    if let regionCode = locale.regionCode, 
-                       let regionName = Locale.current.localizedString(forRegionCode: regionCode) {
-                        return "\(displayName) (\(regionName))"
-                    }
-                    return displayName
+        // Fallback implementation for all iOS versions
+        if let languageCode = locale.languageCode {
+            if let displayName = Locale.current.localizedString(forLanguageCode: languageCode), !displayName.isEmpty {
+                // If there's a region code, add it in parentheses
+                if let regionCode = locale.regionCode, 
+                   let regionName = Locale.current.localizedString(forRegionCode: regionCode) {
+                    return "\(displayName) (\(regionName))"
                 }
+                return displayName
             }
-            
-            // Last resort fallback
-            return locale.identifier
         }
+        
+        // Last resort fallback
+        return locale.identifier
     }
 }
