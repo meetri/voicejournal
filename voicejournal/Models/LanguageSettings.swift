@@ -31,9 +31,8 @@ class LanguageSettings: ObservableObject {
     
     private init() {
         // Load saved locale or use system default
-        if let savedIdentifier = UserDefaults.standard.string(forKey: "selectedLocaleIdentifier"),
-           let savedLocale = Locale(identifier: savedIdentifier) {
-            selectedLocale = savedLocale
+        if let savedIdentifier = UserDefaults.standard.string(forKey: "selectedLocaleIdentifier") {
+            selectedLocale = Locale(identifier: savedIdentifier)
         } else {
             selectedLocale = Locale.current
         }
