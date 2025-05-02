@@ -355,7 +355,9 @@ class SpeechRecognitionService: ObservableObject {
                             self.transcription = result.bestTranscription.formattedString
                             
                             // Extract timing data from transcription segments
-                            self.extractTimingData(from: result.bestTranscription)
+                            Task { @MainActor in
+                                self.extractTimingData(from: result.bestTranscription)
+                            }
                             
                             self.state = .finished
                             continuation.resume(returning: result.bestTranscription.formattedString)
