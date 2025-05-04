@@ -187,8 +187,18 @@ struct EncryptedContentView: View {
             withAnimation {
                 isContentDecrypted = true
             }
+            // Success - dialog will close automatically
         } else {
-            showAlert(title: "Incorrect PIN", message: "The PIN you entered is incorrect.")
+            // PIN verification failed
+            // We need to show the alert after the dialog dismisses itself
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                showAlert(title: "Incorrect PIN", message: "The PIN you entered is incorrect.")
+                
+                // Show the PIN entry dialog again after showing the alert
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    showingPINEntryDialog = true
+                }
+            }
         }
     }
     
@@ -362,16 +372,29 @@ struct EncryptedTagSelectionView: View {
         
         // Verify the PIN
         if !tag.verifyPin(pin) {
-            showAlert(title: "Incorrect PIN", message: "The PIN you entered does not match the PIN for this tag.")
+            // PIN verification failed
+            // We need to show the alert after the dialog dismisses itself
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                self.showAlert(title: "Incorrect PIN", message: "The PIN you entered does not match the PIN for this tag.")
+                
+                // Show the PIN entry dialog again after showing the alert
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.showingPINEntryDialog = true
+                }
+            }
             return
         }
         
         // Apply the encrypted tag to the entry and immediately encrypt the content in one operation
         if journalEntry.applyEncryptedTagWithPin(tag, pin: pin) {
+            // Success! Close the sheet and notify parent
             dismiss()
             onComplete(true)
         } else {
-            showAlert(title: "Encryption Failed", message: "An error occurred while applying the encrypted tag or encrypting the content.")
+            // Show error but don't reshow PIN dialog since PIN was correct
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                self.showAlert(title: "Encryption Failed", message: "An error occurred while applying the encrypted tag or encrypting the content.")
+            }
         }
     }
     

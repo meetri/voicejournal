@@ -292,8 +292,18 @@ struct EncryptedTagManagementView: View {
         if tag.verifyPin(pin) {
             // PIN is valid, perform the action
             actionAfterPINVerification?(tag, pin)
+            // Dialog will close automatically
         } else {
-            showAlert(title: "Incorrect PIN", message: "The PIN you entered does not match the PIN for this tag.")
+            // PIN verification failed
+            // We need to show the alert after the dialog dismisses itself
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                self.showAlert(title: "Incorrect PIN", message: "The PIN you entered does not match the PIN for this tag.")
+                
+                // Show the PIN entry dialog again after showing the alert
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.showingPINEntryDialog = true
+                }
+            }
         }
     }
     
@@ -308,8 +318,18 @@ struct EncryptedTagManagementView: View {
             withAnimation {
                 showEnterNewPINDialog(tag: tag, currentPin: currentPin)
             }
+            // Dialog will close automatically
         } else {
-            showAlert(title: "Incorrect PIN", message: "The PIN you entered does not match the current PIN for this tag.")
+            // PIN verification failed
+            // We need to show the alert after the dialog dismisses itself
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                self.showAlert(title: "Incorrect PIN", message: "The PIN you entered does not match the current PIN for this tag.")
+                
+                // Show the PIN entry dialog again after showing the alert
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.showingChangePINDialog = true
+                }
+            }
         }
     }
     

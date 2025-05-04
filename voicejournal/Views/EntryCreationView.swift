@@ -746,13 +746,27 @@ struct TagSelectionView: View {
                     // Add to selected tags
                     selectedTags.insert(tag)
                     
-                    // Only needed if UI needs to update for success
-                    showAlert(title: "Encrypted Tag Applied", message: "The content has been encrypted with the tag \"\(tag.name ?? "")\".")
+                    // Show success alert after dialog dismisses
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        self.showAlert(title: "Encrypted Tag Applied", message: "The content has been encrypted with the tag \"\(tag.name ?? "")\".")
+                    }
                 } else {
-                    showAlert(title: "Error", message: "Failed to apply encrypted tag. Please try again.")
+                    // Show error but don't reshow PIN dialog since PIN was correct
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        self.showAlert(title: "Error", message: "Failed to apply encrypted tag. Please try again.")
+                    }
                 }
             } else {
-                showAlert(title: "Incorrect PIN", message: "The PIN you entered is incorrect for this tag.")
+                // PIN verification failed
+                // We need to show the alert after the dialog dismisses itself
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    self.showAlert(title: "Incorrect PIN", message: "The PIN you entered is incorrect for this tag.")
+                    
+                    // Show the PIN entry dialog again after showing the alert
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        self.showingPINEntryDialog = true
+                    }
+                }
             }
         } else {
             // If no entry exists yet, just add to selected tags and note that PIN verification succeeded
@@ -768,10 +782,21 @@ struct TagSelectionView: View {
                     print("ERROR: Cannot store PIN - tag has no name")
                 }
                 
-                // Show feedback that the PIN was correct and tag was selected
-                showAlert(title: "Encrypted Tag Selected", message: "The tag \"\(tag.name ?? "")\" will be applied and content will be encrypted after recording.")
+                // Show feedback that the PIN was correct and tag was selected after dialog dismisses
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    self.showAlert(title: "Encrypted Tag Selected", message: "The tag \"\(tag.name ?? "")\" will be applied and content will be encrypted after recording.")
+                }
             } else {
-                showAlert(title: "Incorrect PIN", message: "The PIN you entered is incorrect for this tag.")
+                // PIN verification failed
+                // We need to show the alert after the dialog dismisses itself
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    self.showAlert(title: "Incorrect PIN", message: "The PIN you entered is incorrect for this tag.")
+                    
+                    // Show the PIN entry dialog again after showing the alert
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        self.showingPINEntryDialog = true
+                    }
+                }
             }
         }
     }

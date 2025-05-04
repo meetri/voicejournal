@@ -68,9 +68,14 @@ struct JournalEntryView: View {
         // Try to decrypt the content with the provided PIN
         if journalEntry.decryptContent(withPin: pin) {
             isPINVerified = true
+            // Verification succeeded, dialog will close automatically
         } else {
-            // Show error (will happen automatically with pinEntryDialog)
-            showingPINEntryDialog = true
+            // PIN verification failed
+            // We need to manually show the dialog again after a short delay
+            // to avoid conflict with the automatic closing behavior
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                showingPINEntryDialog = true
+            }
         }
     }
 }

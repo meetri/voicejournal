@@ -212,7 +212,15 @@ struct PINEntryDialog: ViewModifier {
                     .transition(.opacity)
                 
                 PINEntryView(
-                    onSubmit: onSubmit,
+                    onSubmit: { pin in
+                        // First call the original onSubmit function
+                        onSubmit(pin)
+                        
+                        // Then dismiss the dialog
+                        withAnimation {
+                            isPresented = false
+                        }
+                    },
                     title: title,
                     message: message,
                     onCancel: {
