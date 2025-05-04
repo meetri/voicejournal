@@ -24,16 +24,11 @@ struct EnhancedJournalEntryView: View {
     
     @StateObject private var playbackViewModel: AudioPlaybackViewModel
     @State private var showDeleteConfirmation = false
-    @State private var isEditingTitle = false
     @State private var entryTitle: String
-    @State private var isEditingTranscription = false
-    @State private var transcriptionText: String = ""
     @State private var showingEditView = false
     @State private var showingShareSheet = false
     @State private var showingOptions = false
     @State private var scrollOffset: CGFloat = 0
-    @State private var showingTagSelection = false
-    @State private var selectedTags = Set<Tag>()
     
     // MARK: - Initialization
     
@@ -46,18 +41,6 @@ struct EnhancedJournalEntryView: View {
         
         // Initialize title state
         _entryTitle = State(initialValue: journalEntry.title ?? "Untitled Entry")
-        
-        // Initialize transcription text
-        if let transcription = journalEntry.transcription, let text = transcription.text {
-            _transcriptionText = State(initialValue: text)
-        }
-        
-        // Initialize selected tags
-        var tags = Set<Tag>()
-        if let entryTags = journalEntry.tags as? Set<Tag> {
-            tags = entryTags
-        }
-        _selectedTags = State(initialValue: tags)
     }
     
     // MARK: - Body
@@ -112,12 +95,6 @@ struct EnhancedJournalEntryView: View {
                     }
                     
                     Button(action: {
-                        isEditingTitle = true
-                    }) {
-                        Label("Edit Title", systemImage: "pencil.line")
-                    }
-                    
-                    Button(action: {
                         showingShareSheet = true
                     }) {
                         Label("Share", systemImage: "square.and.arrow.up")
@@ -139,13 +116,6 @@ struct EnhancedJournalEntryView: View {
             JournalEntryEditView(journalEntry: journalEntry)
                 .environment(\.managedObjectContext, viewContext)
         }
-        .alert("Edit Title", isPresented: $isEditingTitle) {
-            TextField("Title", text: $entryTitle)
-            Button("Cancel", role: .cancel) {}
-            Button("Save") {
-                updateEntryTitle()
-            }
-        }
         .alert("Delete Entry", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) {
@@ -153,13 +123,6 @@ struct EnhancedJournalEntryView: View {
             }
         } message: {
             Text("Are you sure you want to delete this journal entry? This action cannot be undone.")
-        }
-        .sheet(isPresented: $isEditingTranscription) {
-            TranscriptionEditView(
-                journalEntry: journalEntry,
-                transcriptionText: $transcriptionText,
-                onSave: saveTranscription
-            )
         }
         .sheet(isPresented: $showingShareSheet) {
             if let text = journalEntry.transcription?.text {
@@ -181,21 +144,13 @@ struct EnhancedJournalEntryView: View {
     /// Header section with title and date
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Title with edit button
+            // Title
             HStack {
                 Text(entryTitle)
                     .font(.largeTitle)
                     .fontWeight(.bold)
                 
                 Spacer()
-                
-                Button(action: {
-                    isEditingTitle = true
-                }) {
-                    Image(systemName: "pencil.circle")
-                        .font(.title2)
-                        .foregroundColor(.secondary)
-                }
             }
             .padding(.top, 16)
             
@@ -249,21 +204,12 @@ struct EnhancedJournalEntryView: View {
     /// Transcription section
     private func transcriptionSection(text: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Section header with edit button
+            // Section header
             HStack {
                 Label("Transcription", systemImage: "text.bubble")
                     .font(.headline)
                 
                 Spacer()
-                
-                Button(action: {
-                    transcriptionText = text
-                    isEditingTranscription = true
-                }) {
-                    Label("Edit", systemImage: "pencil")
-                        .font(.subheadline)
-                        .foregroundColor(.blue)
-                }
             }
             
             // Transcription text
@@ -301,20 +247,12 @@ struct EnhancedJournalEntryView: View {
     /// Tags section
     private func tagSection(tags: NSSet) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Section header with edit button
+            // Section header
             HStack {
                 Label("Tags", systemImage: "tag")
                     .font(.headline)
                 
                 Spacer()
-                
-                Button(action: {
-                    showingTagSelection = true
-                }) {
-                    Label("Edit", systemImage: "pencil")
-                        .font(.subheadline)
-                        .foregroundColor(.blue)
-                }
             }
             
             // Tags cloud
@@ -330,13 +268,6 @@ struct EnhancedJournalEntryView: View {
                 .fill(Color(.systemBackground))
                 .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 2)
         )
-        .sheet(isPresented: $showingTagSelection) {
-            TagSelectionView(selectedTags: $selectedTags)
-                .environment(\.managedObjectContext, viewContext)
-                .onDisappear {
-                    updateEntryTags()
-                }
-        }
     }
     
     /// Metadata section
@@ -519,32 +450,6 @@ struct EnhancedJournalEntryView: View {
         }
     }
     
-    /// Update the journal entry title
-    private func updateEntryTitle() {
-        journalEntry.title = entryTitle
-        journalEntry.modifiedAt = Date()
-        
-        do {
-            try viewContext.save()
-        } catch {
-            print("Error saving title: \(error.localizedDescription)")
-        }
-    }
-    
-    /// Save edited transcription
-    private func saveTranscription() {
-        guard let transcription = journalEntry.transcription else { return }
-        
-        transcription.text = transcriptionText
-        transcription.modifiedAt = Date()
-        journalEntry.modifiedAt = Date()
-        
-        do {
-            try viewContext.save()
-        } catch {
-            print("Error saving transcription: \(error.localizedDescription)")
-        }
-    }
     
     /// Delete the journal entry
     private func deleteEntry() {
@@ -589,41 +494,6 @@ struct EnhancedJournalEntryView: View {
         return byteCountFormatter.string(fromByteCount: size)
     }
     
-    /// Update the journal entry's tags based on the selected tags
-    private func updateEntryTags() {
-        // Get the current tags
-        let currentTags = journalEntry.tags as? Set<Tag> ?? Set<Tag>()
-        
-        // If nothing changed, return early
-        if currentTags == selectedTags {
-            return
-        }
-        
-        // Remove tags that are no longer selected
-        for tag in currentTags {
-            if !selectedTags.contains(tag) {
-                journalEntry.removeFromTags(tag)
-            }
-        }
-        
-        // Add new tags
-        for tag in selectedTags {
-            if !currentTags.contains(tag) {
-                journalEntry.addToTags(tag)
-            }
-        }
-        
-        // Update modified date
-        journalEntry.modifiedAt = Date()
-        
-        // Save changes
-        do {
-            try viewContext.save()
-            print("Tags updated successfully")
-        } catch {
-            print("Error updating tags: \(error.localizedDescription)")
-        }
-    }
 }
 
 // MARK: - Preview
