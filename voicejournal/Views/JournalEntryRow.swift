@@ -37,7 +37,7 @@ struct JournalEntryRow: View {
                 // Show encryption indicator if applicable
                 if entry.hasEncryptedContent, let tag = entry.encryptedTag {
                     HStack(spacing: 4) {
-                        Image(systemName: "lock.fill")
+                        Image(systemName: tag.hasGlobalAccess ? "lock.open.fill" : "lock.fill")
                             .font(.caption)
                             .foregroundColor(tag.swiftUIColor)
                             
@@ -68,32 +68,42 @@ struct JournalEntryRow: View {
                 .font(.headline)
                 .lineLimit(1)
             
-            // Tags
-            if let tags = entry.tags as? Set<Tag>, !tags.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 4) {
-                        ForEach(Array(tags), id: \.self) { tag in
-                            if let name = tag.name, let color = tag.color {
-                                HStack(spacing: 4) {
-                                    // Display icon if available, otherwise color circle
-                                    if let iconName = tag.iconName, !iconName.isEmpty {
-                                        Image(systemName: iconName)
+            // Tags (excluding the encrypted tag)
+            if let allTags = entry.tags as? Set<Tag>, !allTags.isEmpty {
+                // Filter out the encrypted tag from the regular tags display
+                let regularTags = allTags.filter { tag in 
+                    if let encryptedTag = entry.encryptedTag {
+                        return tag.objectID != encryptedTag.objectID
+                    }
+                    return true
+                }
+                
+                if !regularTags.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 4) {
+                            ForEach(Array(regularTags), id: \.self) { tag in
+                                if let name = tag.name, let color = tag.color {
+                                    HStack(spacing: 4) {
+                                        // Display icon if available, otherwise color circle
+                                        if let iconName = tag.iconName, !iconName.isEmpty {
+                                            Image(systemName: iconName)
+                                                .font(.caption2)
+                                                .foregroundColor(Color(hex: color))
+                                        } else {
+                                            Circle()
+                                                .fill(Color(hex: color))
+                                                .frame(width: 6, height: 6)
+                                        }
+                                        
+                                        Text(name)
                                             .font(.caption2)
-                                            .foregroundColor(Color(hex: color))
-                                    } else {
-                                        Circle()
-                                            .fill(Color(hex: color))
-                                            .frame(width: 6, height: 6)
                                     }
-                                    
-                                    Text(name)
-                                        .font(.caption2)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color(hex: color).opacity(0.2))
+                                    .foregroundColor(Color(hex: color))
+                                    .cornerRadius(4)
                                 }
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color(hex: color).opacity(0.2))
-                                .foregroundColor(Color(hex: color))
-                                .cornerRadius(4)
                             }
                         }
                     }
@@ -103,12 +113,36 @@ struct JournalEntryRow: View {
             // Preview of transcription
             if let transcription = entry.transcription {
                 if entry.hasEncryptedContent && !entry.isDecrypted {
-                    // Show encrypted content placeholder
-                    Text("Encrypted content")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .italic()
-                        .padding(.top, 2)
+                    // If there's global access, try to decrypt on the fly for preview
+                    if entry.hasGlobalAccess {
+                        // Attempt to decrypt with global access
+                        if entry.decryptWithGlobalAccess(), let text = transcription.text, !text.isEmpty {
+                            Text(text)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .lineLimit(3)
+                                .padding(.top, 2)
+                        } else {
+                            // Fallback if decryption fails
+                            HStack {
+                                Image(systemName: "lock.open")
+                                    .font(.caption)
+                                    .foregroundColor(.green)
+                                Text("Encrypted content (access granted)")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .italic()
+                            }
+                            .padding(.top, 2)
+                        }
+                    } else {
+                        // Show encrypted content placeholder
+                        Text("Encrypted content")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .italic()
+                            .padding(.top, 2)
+                    }
                 } else if let text = transcription.text, !text.isEmpty {
                     // Show actual transcription text
                     Text(text)

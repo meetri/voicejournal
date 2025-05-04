@@ -87,6 +87,11 @@ class TimelineViewModel: ObservableObject {
         // Register for Core Data change notifications
         registerForCoreDataNotifications()
         
+        // Debug print the database state before filtering
+        print("🔍 DEBUG: TimelineViewModel initialization")
+        debugPrintAllEntries()
+        debugPrintPredicates()
+        
         // Initial data fetch
         fetchEntriesForDateRange()
     }
@@ -402,7 +407,40 @@ class TimelineViewModel: ObservableObject {
             }
         }
         
-        return NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
+        // Create a predicate to exclude entries with encrypted tags that don't have global access
+        let accessManager = EncryptedTagsAccessManager.shared
+        let encryptedTagsWithoutAccess = fetchEncryptedTagsWithoutAccess()
+        
+        if !encryptedTagsWithoutAccess.isEmpty {
+            // Exclude entries that use any encrypted tag without global access
+            // The original predicate is incorrect because it will exclude ALL entries if there are any encrypted tags without access
+            // This fix allows entries with no encrypted tag (encryptedTag == nil) and entries with encrypted tags that have access
+            let excludePredicate = NSCompoundPredicate(orPredicateWithSubpredicates: [
+                NSPredicate(format: "encryptedTag == nil"),
+                NSPredicate(format: "NOT (encryptedTag IN %@)", encryptedTagsWithoutAccess)
+            ])
+            predicates.append(excludePredicate)
+        }
+        
+        let finalPredicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
+        print("🔍 DEBUG: Final predicate: \(finalPredicate)")
+        
+        return finalPredicate
+    }
+    
+    /// Fetch all encrypted tags that don't have global access
+    private func fetchEncryptedTagsWithoutAccess() -> [Tag] {
+        let accessManager = EncryptedTagsAccessManager.shared
+        let request: NSFetchRequest<Tag> = Tag.fetchRequest()
+        request.predicate = NSPredicate(format: "isEncrypted == YES")
+        
+        do {
+            let encryptedTags = try viewContext.fetch(request)
+            return encryptedTags.filter { !accessManager.hasAccess(to: $0) }
+        } catch {
+            print("Error fetching encrypted tags: \(error)")
+            return []
+        }
     }
     
     /// Get sort descriptors based on the current sort order
@@ -447,6 +485,14 @@ class TimelineViewModel: ObservableObject {
         // Use a single date key for all entries to avoid grouping by day
         let globalDateKey = Date.distantPast
         newSortedDates = [globalDateKey]
+        
+        // First, attempt to decrypt any entries with global access
+        for entry in entries {
+            if entry.hasEncryptedContent && entry.hasGlobalAccess && !entry.isDecrypted {
+                // Try to decrypt with global access
+                _ = entry.decryptWithGlobalAccess()
+            }
+        }
         
         // Sort all entries according to the selected sort order
         // Note: Entries should already be sorted by Core Data, but we sort again to ensure consistency

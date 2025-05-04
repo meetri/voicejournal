@@ -45,9 +45,20 @@ struct JournalEntryView: View {
             }
         }
         .onAppear {
-            // If entry has encrypted content and is not decrypted, show PIN entry
+            // If entry has encrypted content and is not decrypted
             if journalEntry.hasEncryptedContent && !journalEntry.isDecrypted {
-                showingPINEntryDialog = true
+                if journalEntry.hasGlobalAccess {
+                    // Try to decrypt with global access
+                    if journalEntry.decryptWithGlobalAccess() {
+                        isPINVerified = true
+                    } else {
+                        // If global access decryption fails, fall back to PIN entry
+                        showingPINEntryDialog = true
+                    }
+                } else {
+                    // No global access, require PIN entry
+                    showingPINEntryDialog = true
+                }
             } else {
                 isPINVerified = true
             }
@@ -110,32 +121,65 @@ struct EncryptedEntryPlaceholderView: View {
                 Text("This entry is encrypted")
                     .font(.headline)
                 
-                Text("Enter your PIN to view the content")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                
-                if let tag = journalEntry.encryptedTag {
+                if let tag = journalEntry.encryptedTag, tag.hasGlobalAccess {
+                    Text("This tag has been granted global access")
+                        .font(.subheadline)
+                        .foregroundColor(.green)
+                        .multilineTextAlignment(.center)
+                    
                     Spacer().frame(height: 8)
                     
                     EnhancedEncryptedTagView(tag: tag)
                         .padding(.vertical, 8)
-                }
-                
-                Button {
-                    onUnlockTapped()
-                } label: {
-                    HStack {
-                        Image(systemName: "key.fill")
-                        Text("Enter PIN")
+                    
+                    Button {
+                        // Try to decrypt with global access
+                        if journalEntry.decryptWithGlobalAccess() {
+                            // This will be handled by the parent view
+                        } else {
+                            // If global access fails, fall back to PIN
+                            onUnlockTapped()
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "lock.open.fill")
+                            Text("Decrypt with Global Access")
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(Color.green)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
-                    .background(Color.accentColor)
-                    .foregroundColor(.white)
-                    .cornerRadius(10)
+                    .padding(.top, 8)
+                } else {
+                    Text("Enter your PIN to view the content")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                    
+                    if let tag = journalEntry.encryptedTag {
+                        Spacer().frame(height: 8)
+                        
+                        EnhancedEncryptedTagView(tag: tag)
+                            .padding(.vertical, 8)
+                    }
+                    
+                    Button {
+                        onUnlockTapped()
+                    } label: {
+                        HStack {
+                            Image(systemName: "key.fill")
+                            Text("Enter PIN")
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(Color.accentColor)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                    }
+                    .padding(.top, 8)
                 }
-                .padding(.top, 8)
             }
             .padding()
             .background(
