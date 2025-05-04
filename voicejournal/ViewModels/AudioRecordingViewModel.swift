@@ -29,10 +29,13 @@ class AudioRecordingViewModel: ObservableObject {
     /// Whether to show language selection sheet
     @Published var showingLanguageSelection = false
     
+    /// Current language being used for transcription
+    @Published private(set) var currentTranscriptionLanguage: String = ""
+    
     /// Select a language for transcription
-    @MainActor
     func selectLanguage(_ locale: Locale) {
         speechRecognitionService.setRecognitionLocale(locale)
+        currentTranscriptionLanguage = locale.localizedLanguageName ?? locale.identifier
         showingLanguageSelection = false
     }
     
@@ -89,6 +92,7 @@ class AudioRecordingViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var managedObjectContext: NSManagedObjectContext
     private var processingTask: Task<Void, Never>?
+    private var timingDataFromLiveRecognition: String?
     
     // MARK: - Initialization
     
@@ -99,7 +103,9 @@ class AudioRecordingViewModel: ObservableObject {
         self.journalEntry = existingEntry
         
         // Set the speech recognition locale from settings
-        speechRecognitionService.setRecognitionLocale(LanguageSettings.shared.selectedLocale)
+        let locale = LanguageSettings.shared.selectedLocale
+        speechRecognitionService.setRecognitionLocale(locale)
+        currentTranscriptionLanguage = locale.localizedLanguageName ?? locale.identifier
         
         // Set up publishers
         setupPublishers()
@@ -157,7 +163,12 @@ class AudioRecordingViewModel: ObservableObject {
         
             // Start speech recognition if permission is granted
             if checkSpeechRecognitionPermission() {
-                try await startSpeechRecognition()
+                do {
+                    try await startSpeechRecognition()
+                } catch {
+                    // Handle speech recognition errors but continue recording
+                    print("Speech recognition failed to start: \(error.localizedDescription)")
+                }
             } else {
                 // Request permission for future recordings
                 await requestSpeechRecognitionPermission()
@@ -171,14 +182,58 @@ class AudioRecordingViewModel: ObservableObject {
     /// Start speech recognition
     private func startSpeechRecognition() async throws {
         do {
+            // Check language status before starting
+            speechRecognitionService.updateLanguageStatus()
+            let status = speechRecognitionService.languageStatus
+            
+            // Update the language display based on status
+            let locale = speechRecognitionService.currentLocale
+            
+            // Set the language name with status if not available
+            if status == .downloading {
+                currentTranscriptionLanguage = "\(locale.localizedLanguageName ?? locale.identifier) (Downloading...)"
+            } else if status == .unavailable {
+                currentTranscriptionLanguage = "\(locale.localizedLanguageName ?? locale.identifier) (Unavailable)"
+            } else {
+                currentTranscriptionLanguage = locale.localizedLanguageName ?? locale.identifier
+            }
+            
+            // Log the language being used for debugging
+            print("DEBUG: Speech recognition starting with language: \(currentTranscriptionLanguage)")
+            print("DEBUG: Locale identifier: \(locale.identifier)")
+            print("DEBUG: Locale language code: \(locale.languageCode ?? "unknown")")
+            print("DEBUG: Language status: \(status.description)")
+            
             // Start live recognition
             try await speechRecognitionService.startLiveRecognition()
             isTranscribing = true
             transcriptionText = ""
             transcriptionProgress = 0.0
-        } catch {
+            
+        } catch let error as SpeechRecognitionError {
             // Don't stop recording if speech recognition fails
             isTranscribing = false
+            
+            // Update the language display based on the error
+            switch error {
+            case .languageModelDownloadRequired:
+                currentTranscriptionLanguage = "\(speechRecognitionService.currentLocale.localizedLanguageName ?? speechRecognitionService.currentLocale.identifier) (Downloading...)"
+            case .languageNotAvailable, .languageNotSupported:
+                currentTranscriptionLanguage = "\(speechRecognitionService.currentLocale.localizedLanguageName ?? speechRecognitionService.currentLocale.identifier) (Unavailable)"
+            default:
+                // Keep the current language name but show error
+                print("DEBUG: Speech recognition error: \(error.localizedDescription)")
+            }
+            
+            // Show error message
+            errorMessage = error.localizedDescription
+            showErrorAlert = true
+            
+            print("DEBUG: Speech recognition failed to start: \(error.localizedDescription)")
+        } catch {
+            // Handle other errors
+            isTranscribing = false
+            print("DEBUG: Unknown speech recognition error: \(error.localizedDescription)")
         }
     }
     
@@ -215,31 +270,37 @@ class AudioRecordingViewModel: ObservableObject {
     /// Stop recording
     func stopRecording() async {
         do {
-            if let recordingURL = try await recordingService.stopRecording() {
-                isRecording = false
-                isPaused = false
+            guard let recordingURL = try await recordingService.stopRecording() else {
+                return
+            }
+            
+            isRecording = false
+            isPaused = false
+            
+            // Stop speech recognition if active
+            if isTranscribing {
+                speechRecognitionService.stopRecognition()
+                isTranscribing = false
                 
-                // Stop speech recognition if active
-                if isTranscribing {
-                    speechRecognitionService.stopRecognition()
-                    isTranscribing = false
-                    
-                    // Get final transcription and timing data
-                    let finalTranscription = speechRecognitionService.transcription
-                    transcriptionText = finalTranscription
-                    
-                    // Get timing data if available
-                    let timingDataJSON = speechRecognitionService.getTimingDataJSON()
+                // Get final transcription and timing data
+                let finalTranscription = speechRecognitionService.transcription
+                transcriptionText = finalTranscription
+                
+                // Get timing data if available
+                if let timingDataJSON = speechRecognitionService.getTimingDataJSON() {
+                    // Store timing data for later use when creating the journal entry
+                    self.timingDataFromLiveRecognition = timingDataJSON
                 }
-                
-                // Create a journal entry with the recording and transcription
-                await createJournalEntry(recordingURL: recordingURL)
-                
-                // If no live transcription was done, process the audio file for transcription
-                if transcriptionText.isEmpty && checkSpeechRecognitionPermission() {
-                    processingTask = Task {
-                        await processAudioFileForTranscription(recordingURL)
-                    }
+            }
+            
+            // Create a journal entry with the recording and transcription
+            await createJournalEntry(recordingURL: recordingURL)
+            
+            // If no live transcription was done, process the audio file for transcription
+            if transcriptionText.isEmpty && checkSpeechRecognitionPermission() {
+                processingTask?.cancel()
+                processingTask = Task {
+                    await processAudioFileForTranscription(recordingURL)
                 }
             }
         } catch {
@@ -271,6 +332,9 @@ class AudioRecordingViewModel: ObservableObject {
         } catch {
             isTranscribing = false
             transcriptionProgress = 0.0
+            // Don't show error alert for transcription failures
+            // This is a background task and shouldn't interrupt the user
+            print("Transcription failed: \(error.localizedDescription)")
         }
     }
     
@@ -317,12 +381,19 @@ class AudioRecordingViewModel: ObservableObject {
         isTranscribing = false
         transcriptionProgress = 0.0
         
+        // Update the current language display
+        let locale = speechRecognitionService.currentLocale
+        currentTranscriptionLanguage = locale.localizedLanguageName ?? locale.identifier
+        
         // Cancel any background processing
         processingTask?.cancel()
         processingTask = nil
         
         // Reset speech recognition service
         speechRecognitionService.reset()
+            
+        // Reset timing data
+        timingDataFromLiveRecognition = nil
     }
     
     // MARK: - Private Methods
@@ -409,42 +480,48 @@ class AudioRecordingViewModel: ObservableObject {
     }
     
     private func createJournalEntry(recordingURL: URL) async {
-        // Use existing entry or create a new one
-        let entry: JournalEntry
-        
-        if let existingEntry = journalEntry {
-            entry = existingEntry
-        } else {
-            entry = JournalEntry.create(in: managedObjectContext)
-            entry.title = "Voice Journal - \(Date().formatted(date: .abbreviated, time: .shortened))"
-        }
-        
-        // Convert absolute path to relative path before storing
-        let relativePath = FilePathUtility.toRelativePath(from: recordingURL.path)
-        
-        // Create audio recording with relative path
-        let recording = entry.createAudioRecording(filePath: relativePath)
-        recording.duration = duration
-        recording.fileSize = recordingService.fileSize ?? 0
-        
-        // Add transcription if available
-        if !transcriptionText.isEmpty {
-            let transcription = entry.createTranscription(text: transcriptionText)
+        do {
+            // Use existing entry or create a new one
+            let entry: JournalEntry
             
-            // Store timing data if available
-            if let timingDataJSON = speechRecognitionService.getTimingDataJSON() {
-                transcription.timingData = timingDataJSON
+            if let existingEntry = journalEntry {
+                entry = existingEntry
+            } else {
+                entry = JournalEntry.create(in: managedObjectContext)
+                entry.title = "Voice Journal - \(Date().formatted(date: .abbreviated, time: .shortened))"
             }
             
-            // Store the locale used for transcription
-            transcription.locale = LanguageSettings.shared.selectedLocale.identifier
-        }
-        
-        // Save the context
-        do {
-            try managedObjectContext.save()
-            journalEntry = entry
-            hasRecordingSaved = true
+            // Convert absolute path to relative path before storing
+            let relativePath = FilePathUtility.toRelativePath(from: recordingURL.path)
+            
+            // Create audio recording with relative path
+            let recording = entry.createAudioRecording(filePath: relativePath)
+            recording.duration = duration
+            recording.fileSize = recordingService.fileSize ?? 0
+            
+            // Add transcription if available
+            if !transcriptionText.isEmpty {
+                let transcription = entry.createTranscription(text: transcriptionText)
+                
+                // Store timing data if available - first try from live recognition, then from file processing
+                let timingData = timingDataFromLiveRecognition ?? speechRecognitionService.getTimingDataJSON()
+                if let timingDataJSON = timingData {
+                    transcription.timingData = timingDataJSON
+                }
+                
+                // Store the locale used for transcription in the journal entry
+                // Note: Transcription model doesn't have a locale property
+            }
+            
+            // Save the context
+            do {
+                try managedObjectContext.save()
+                journalEntry = entry
+                hasRecordingSaved = true
+            } catch {
+                print("Failed to save managed object context: \(error.localizedDescription)")
+                throw error
+            }
         } catch {
             handleError(error)
         }
@@ -452,36 +529,35 @@ class AudioRecordingViewModel: ObservableObject {
     
     /// Update journal entry with transcription
     private func updateJournalEntryWithTranscription(_ entry: JournalEntry, text: String) async {
-        // Check if entry already has a transcription
-        if let existingTranscription = entry.transcription {
-            existingTranscription.text = text
-            existingTranscription.modifiedAt = Date()
-            
-            // Update timing data if available
-            if let timingDataJSON = speechRecognitionService.getTimingDataJSON() {
-                existingTranscription.timingData = timingDataJSON
-            }
-            
-            // Update the locale
-            existingTranscription.locale = LanguageSettings.shared.selectedLocale.identifier
-        } else {
-            // Create new transcription
-            let transcription = entry.createTranscription(text: text)
-            
-            // Store timing data if available
-            if let timingDataJSON = speechRecognitionService.getTimingDataJSON() {
-                transcription.timingData = timingDataJSON
-            }
-            
-            // Store the locale
-            transcription.locale = LanguageSettings.shared.selectedLocale.identifier
-        }
-        
-        // Save the context
         do {
+            // Check if entry already has a transcription
+            if let existingTranscription = entry.transcription {
+                existingTranscription.text = text
+                existingTranscription.modifiedAt = Date()
+                
+                // Update timing data if available
+                if let timingDataJSON = speechRecognitionService.getTimingDataJSON() {
+                    existingTranscription.timingData = timingDataJSON
+                }
+                
+                // Update the modified date (locale is not available on Transcription)
+            } else {
+                // Create new transcription
+                let transcription = entry.createTranscription(text: text)
+                
+                // Store timing data if available
+                if let timingDataJSON = speechRecognitionService.getTimingDataJSON() {
+                    transcription.timingData = timingDataJSON
+                }
+                
+                // Note: Transcription model doesn't have a locale property
+            }
+            
+            // Save the context
             try managedObjectContext.save()
         } catch {
-            // Error handling without debug logs
+            print("Failed to update journal entry with transcription: \(error.localizedDescription)")
+            // Don't throw the error up to the caller as this is a background operation
         }
     }
 }
@@ -502,5 +578,12 @@ extension AudioRecordingViewModel {
     /// Check if the recording is in progress (either recording or paused)
     var isRecordingInProgress: Bool {
         return isRecording
+    }
+}
+
+extension Locale {
+    /// Returns the localized display name of the language for this locale
+    var localizedLanguageName: String? {
+        return (Locale.current).localizedString(forIdentifier: identifier)
     }
 }

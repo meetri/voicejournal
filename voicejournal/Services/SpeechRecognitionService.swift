@@ -57,6 +57,9 @@ enum SpeechRecognitionError: Error {
     case fileNotFound
     case languageNotSupported
     case languageNotAvailable
+    case languageModelDownloadRequired
+    case languageModelDownloadFailed
+    case resourceLimitReached
     case unknown(Error)
     
     var localizedDescription: String {
@@ -75,8 +78,57 @@ enum SpeechRecognitionError: Error {
             return "This language is not supported for transcription"
         case .languageNotAvailable:
             return "This language is not available on your device"
+        case .languageModelDownloadRequired:
+            return "Language model needs to be downloaded. Please connect to Wi-Fi and try again"
+        case .languageModelDownloadFailed:
+            return "Failed to download language model. Please check your connection and try again"
+        case .resourceLimitReached:
+            return "System resource limit reached. Please try again later"
         case .unknown(let error):
             return "Unknown error: \(error.localizedDescription)"
+        }
+    }
+    
+    /// Create a SpeechRecognitionError from a system error
+    static func fromSystemError(_ error: Error) -> SpeechRecognitionError {
+        let nsError = error as NSError
+        
+        // Check for specific error domains and codes
+        if nsError.domain == "kAFAssistantErrorDomain" {
+            switch nsError.code {
+            case 1101:
+                // This typically means the language model isn't available or needs to be downloaded
+                return .languageModelDownloadRequired
+            case 1102:
+                return .languageModelDownloadFailed
+            case 1103, 1104:
+                return .resourceLimitReached
+            default:
+                break
+            }
+        }
+        
+        return .unknown(error)
+    }
+}
+
+/// Enum representing the status of a language for speech recognition
+enum LanguageStatus {
+    case unknown
+    case unavailable
+    case downloading
+    case available
+    
+    var description: String {
+        switch self {
+        case .unknown:
+            return "Unknown"
+        case .unavailable:
+            return "Unavailable"
+        case .downloading:
+            return "Downloading..."
+        case .available:
+            return "Available"
         }
     }
 }
@@ -104,10 +156,20 @@ class SpeechRecognitionService: ObservableObject {
     /// Whether speech recognition is available on this device
     @Published private(set) var isAvailable: Bool = false
     
+    /// Current status of the selected language
+    @Published private(set) var languageStatus: LanguageStatus = .unknown
+    
+    /// Error message if there's an issue with speech recognition
+    @Published private(set) var errorMessage: String = ""
+    
+    // MARK: - Properties
+    
+    /// The current locale used for speech recognition
+    private(set) var currentLocale: Locale = Locale(identifier: "en-US")
+    
     // MARK: - Private Properties
     
     private var speechRecognizer: SFSpeechRecognizer?
-    private var currentLocale: Locale = Locale(identifier: "en-US")
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private var audioEngine: AVAudioEngine?
@@ -201,11 +263,42 @@ class SpeechRecognitionService: ObservableObject {
         }
     }
     
+    /// Check the status of a language for speech recognition
+    func checkLanguageStatus(locale: Locale) -> LanguageStatus {
+        // Create a speech recognizer for the locale
+        let recognizer = SFSpeechRecognizer(locale: locale)
+        
+        // Check if the recognizer is available
+        if let recognizer = recognizer {
+            if recognizer.isAvailable {
+                return .available
+            } else {
+                // If the recognizer exists but isn't available, it might be downloading
+                return .downloading
+            }
+        } else {
+            // If the recognizer is nil, the language might not be supported
+            return .unavailable
+        }
+    }
+    
+    /// Update the language status for the current locale
+    func updateLanguageStatus() {
+        languageStatus = checkLanguageStatus(locale: currentLocale)
+        
+        // Log the language status for debugging
+        print("DEBUG: Language status for \(currentLocale.identifier): \(languageStatus.description)")
+    }
+    
     /// Start real-time speech recognition from the microphone
     func startLiveRecognition() async throws {
+        // Reset error message
+        errorMessage = ""
+        
         // Check authorization
         let permission = checkAuthorization()
         guard permission == .granted else {
+            errorMessage = SpeechRecognitionError.authorizationFailed.localizedDescription
             throw SpeechRecognitionError.authorizationFailed
         }
         
@@ -214,9 +307,18 @@ class SpeechRecognitionService: ObservableObject {
             speechRecognizer = SFSpeechRecognizer(locale: currentLocale)
         }
         
+        // Update and check language status
+        updateLanguageStatus()
+        
         // Check availability
         guard speechRecognizer?.isAvailable == true else {
-            throw SpeechRecognitionError.noRecognitionAvailable
+            if languageStatus == .downloading {
+                errorMessage = "Language model is downloading. Please try again in a moment."
+                throw SpeechRecognitionError.languageModelDownloadRequired
+            } else {
+                errorMessage = SpeechRecognitionError.noRecognitionAvailable.localizedDescription
+                throw SpeechRecognitionError.noRecognitionAvailable
+            }
         }
         
         // Stop any ongoing recognition
@@ -233,6 +335,7 @@ class SpeechRecognitionService: ObservableObject {
         }
         
         guard let audioEngine = audioEngine else {
+            errorMessage = SpeechRecognitionError.recognitionFailed.localizedDescription
             throw SpeechRecognitionError.recognitionFailed
         }
         
@@ -240,6 +343,7 @@ class SpeechRecognitionService: ObservableObject {
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         
         guard let recognitionRequest = recognitionRequest else {
+            errorMessage = SpeechRecognitionError.recognitionFailed.localizedDescription
             throw SpeechRecognitionError.recognitionFailed
         }
         
@@ -268,7 +372,19 @@ class SpeechRecognitionService: ObservableObject {
             
             if let error = error {
                 Task { @MainActor in
-                    self.state = .error(error)
+                    // Convert the error to a more specific SpeechRecognitionError
+                    let specificError = SpeechRecognitionError.fromSystemError(error)
+                    self.errorMessage = specificError.localizedDescription
+                    self.state = .error(specificError)
+                    
+                    // Log the error for debugging
+                    print("DEBUG: Speech recognition error: \(error.localizedDescription)")
+                    print("DEBUG: Converted to: \(specificError.localizedDescription)")
+                    
+                    // If it's a language model issue, update the language status
+                    if case .languageModelDownloadRequired = specificError {
+                        self.languageStatus = .downloading
+                    }
                 }
                 return
             }

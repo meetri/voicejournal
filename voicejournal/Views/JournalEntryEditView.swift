@@ -273,9 +273,13 @@ struct JournalEntryEditView: View {
                 )
             }
             .sheet(isPresented: $showingRecordingView) {
-                EntryRecordingView(journalEntry: journalEntry, onComplete: {
-                    showingRecordingView = false
-                })
+                RecordingView(
+                    context: viewContext,
+                    existingEntry: journalEntry,
+                    onComplete: {
+                        showingRecordingView = false
+                    }
+                )
             }
             .alert("Discard Changes?", isPresented: $showingDiscardAlert) {
                 Button("Cancel", role: .cancel) {}

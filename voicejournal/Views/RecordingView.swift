@@ -14,10 +14,24 @@ struct RecordingView: View {
     // MARK: - Environment
     
     @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.dismiss) private var dismiss
     
     // MARK: - View Model
     
     @StateObject private var viewModel: AudioRecordingViewModel
+    
+    // MARK: - Properties
+    
+    /// The journal entry being edited (if in edit mode)
+    private var existingEntry: JournalEntry?
+    
+    /// Called when recording is complete (if in edit mode)
+    private var onComplete: (() -> Void)?
+    
+    /// Whether the view is in edit mode (modifying an existing entry)
+    private var isEditMode: Bool {
+        existingEntry != nil
+    }
     
     // MARK: - State
     
@@ -27,28 +41,48 @@ struct RecordingView: View {
     
     // MARK: - Initialization
     
-    init(context: NSManagedObjectContext? = nil) {
+    /// Initialize the recording view
+    /// - Parameters:
+    ///   - context: The managed object context to use
+    ///   - existingEntry: An optional existing journal entry to edit
+    ///   - onComplete: An optional callback when recording is complete (for edit mode)
+    init(context: NSManagedObjectContext? = nil, existingEntry: JournalEntry? = nil, onComplete: (() -> Void)? = nil) {
+        self.existingEntry = existingEntry
+        self.onComplete = onComplete
+        
         let ctx = context ?? PersistenceController.shared.container.viewContext
         // Create the AudioRecordingService on the main actor
         let recordingService = AudioRecordingService()
-        _viewModel = StateObject(wrappedValue: AudioRecordingViewModel(context: ctx, recordingService: recordingService))
+        
+        // Initialize the view model with the existing entry if in edit mode
+        _viewModel = StateObject(wrappedValue: AudioRecordingViewModel(
+            context: ctx,
+            recordingService: recordingService,
+            existingEntry: existingEntry
+        ))
     }
     
     // MARK: - Body
     
     var body: some View {
-        VStack(spacing: 20) {
-            // Title
-            Text("Voice Journal")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .padding(.top)
+        let content = VStack(spacing: 20) {
+            // Title (different based on mode)
+            if let entry = existingEntry, let title = entry.title {
+                Text(title)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .padding(.top)
+            } else {
+                Text("Voice Journal")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .padding(.top)
+            }
             
             Spacer()
             
             // Waveform visualization
             let level = viewModel.visualizationLevel
-            // 'buildExpression' is unavailable: this expression does not conform to 'View' - print("DEBUG: RecordingView passing audio level to WaveformView: \(level)")
             
             // Use a stable WaveformView without forcing recreation
             WaveformView(
@@ -56,7 +90,6 @@ struct RecordingView: View {
                 color: recordingColor,
                 isActive: viewModel.isRecording && !viewModel.isPaused
             )
-            // Removed .id(level) to prevent excessive view recreation
             .frame(height: 120)
             .padding()
             .background(Color(.systemGray6))
@@ -107,7 +140,8 @@ struct RecordingView: View {
         .sheet(isPresented: $showingSpeechPermissionSettings) {
             SettingsView(title: "Speech Recognition Settings", message: "To enable speech recognition, please go to your device settings.")
         }
-        .sheet(isPresented: viewModel.hasRecordingSavedBinding) {
+        // Only show the RecordingSavedView sheet if not in edit mode
+        .sheet(isPresented: isEditMode ? .constant(false) : viewModel.hasRecordingSavedBinding) {
             if let entry = viewModel.journalEntry {
                 RecordingSavedView(journalEntry: entry)
             }
@@ -115,7 +149,35 @@ struct RecordingView: View {
         .onAppear {
             Task {
                 await checkPermissions()
+                
+                // Auto-start recording if in edit mode
+                if isEditMode {
+                    await viewModel.startRecording()
+                }
             }
+        }
+        
+        // Wrap in NavigationView if in edit mode
+        if isEditMode {
+            NavigationView {
+                content
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            if !viewModel.isRecording {
+                                Button("Done") {
+                                    if let completion = onComplete {
+                                        completion()
+                                    } else {
+                                        dismiss()
+                                    }
+                                }
+                            }
+                        }
+                    }
+            }
+        } else {
+            content
         }
     }
     
@@ -129,6 +191,10 @@ struct RecordingView: View {
                 Button(action: {
                     Task {
                         await viewModel.cancelRecording()
+                        // If in edit mode, call the completion handler after canceling
+                        if isEditMode, let completion = onComplete {
+                            completion()
+                        }
                     }
                 }) {
                     Image(systemName: "xmark.circle.fill")
@@ -143,6 +209,10 @@ struct RecordingView: View {
                 if viewModel.isRecording {
                     Task {
                         await viewModel.stopRecording()
+                        // If in edit mode, call the completion handler after stopping
+                        if isEditMode, let completion = onComplete {
+                            completion()
+                        }
                     }
                 } else {
                     Task {
@@ -210,6 +280,28 @@ struct RecordingView: View {
                 HStack {
                     Text("Transcription")
                         .font(.headline)
+                    
+                    // Language indicator
+                    if !viewModel.currentTranscriptionLanguage.isEmpty {
+                        // Log the language being displayed
+                        let _ = print("DEBUG: Displaying language in UI: \(viewModel.currentTranscriptionLanguage)")
+                        
+                        // Determine color based on language status
+                        let (displayText, textColor, bgColor) = getLanguageDisplayInfo(viewModel.currentTranscriptionLanguage)
+                        
+                        Text(displayText)
+                            .font(.subheadline.bold())
+                            .foregroundColor(textColor)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(bgColor)
+                            .cornerRadius(4)
+                            .onAppear {
+                                print("DEBUG: Language indicator appeared with: \(viewModel.currentTranscriptionLanguage)")
+                            }
+                    } else {
+                        let _ = print("DEBUG: Language is empty, not displaying indicator")
+                    }
                     
                     Spacer()
                     
@@ -346,6 +438,31 @@ struct RecordingSavedView: View {
                                 Text("Transcription")
                                     .font(.headline)
                                 
+                                // Display language if available
+                                if let timingData = transcription.timingData,
+                                   let data = timingData.data(using: .utf8),
+                                   let segments = try? JSONDecoder().decode([TranscriptionSegment].self, from: data),
+                                   let firstSegment = segments.first,
+                                   let locale = firstSegment.locale,
+                                   !locale.isEmpty {
+                                    // Log the language being displayed in saved view
+                                    let _ = print("DEBUG: Displaying language in saved view: \(locale)")
+                                    
+                                    // Get the language name
+                                    let languageName = Locale(identifier: locale).localizedLanguageName ?? locale
+                                    
+                                    // Determine color based on language status
+                                    let (displayText, textColor, bgColor) = getLanguageDisplayInfo("(\(languageName))")
+                                    
+                                    Text(displayText)
+                                        .font(.subheadline.bold())
+                                        .foregroundColor(textColor)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(bgColor)
+                                        .cornerRadius(4)
+                                }
+                                
                                 Spacer()
                                 
                                 Button(action: {
@@ -442,6 +559,29 @@ struct RecordingSavedView: View {
         
         return byteCountFormatter.string(fromByteCount: size)
     }
+}
+
+// MARK: - Helper Functions
+
+/// Get display information for the language indicator based on the language status
+func getLanguageDisplayInfo(_ languageText: String) -> (String, Color, Color) {
+    // Default values
+    var displayText = languageText
+    var textColor = Color.blue
+    var bgColor = Color.blue.opacity(0.1)
+    
+    // Check for status indicators in the language text
+    if languageText.contains("(Downloading...)") {
+        displayText = languageText
+        textColor = Color.orange
+        bgColor = Color.orange.opacity(0.1)
+    } else if languageText.contains("(Unavailable)") {
+        displayText = languageText
+        textColor = Color.red
+        bgColor = Color.red.opacity(0.1)
+    }
+    
+    return (displayText, textColor, bgColor)
 }
 
 // MARK: - Preview

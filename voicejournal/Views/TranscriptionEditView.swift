@@ -7,6 +7,7 @@
 
 import SwiftUI
 import CoreData
+import Combine
 
 /// A view for editing transcription text
 struct TranscriptionEditView: View {
@@ -24,6 +25,11 @@ struct TranscriptionEditView: View {
     
     @State private var editedText: String
     @State private var showDiscardAlert = false
+    @State private var errorMessage: String?
+    @State private var showErrorAlert = false
+    
+    // Focus state for the text editor
+    @FocusState private var isTextEditorFocused: Bool
     
     // MARK: - Initialization
     
@@ -39,17 +45,26 @@ struct TranscriptionEditView: View {
     var body: some View {
         NavigationView {
             VStack {
-                // Text editor
+                // Text editor with focus state
                 TextEditor(text: $editedText)
                     .font(.body)
                     .padding()
                     .background(Color(.systemGray6))
                     .cornerRadius(8)
                     .padding()
+                    .focused($isTextEditorFocused)
+                    // Add a tap gesture to dismiss keyboard when tapping outside
+                    .onTapGesture {
+                        // This is intentionally empty as TextEditor handles the tap
+                    }
                 
                 // Formatting tools
                 formattingToolbar
                     .padding(.horizontal)
+                    // Dismiss keyboard when tapping formatting tools
+                    .onTapGesture {
+                        isTextEditorFocused = false
+                    }
                 
                 Spacer()
             }
@@ -58,6 +73,9 @@ struct TranscriptionEditView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
+                        // Dismiss keyboard first
+                        isTextEditorFocused = false
+                        
                         if editedText != transcriptionText {
                             showDiscardAlert = true
                         } else {
@@ -68,7 +86,17 @@ struct TranscriptionEditView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
+                        // Dismiss keyboard before saving
+                        isTextEditorFocused = false
                         saveTranscription()
+                    }
+                }
+                
+                // Add keyboard toolbar with done button
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        isTextEditorFocused = false
                     }
                 }
             }
@@ -79,6 +107,36 @@ struct TranscriptionEditView: View {
                 }
             } message: {
                 Text("Are you sure you want to discard your changes?")
+            }
+            .alert("Error", isPresented: $showErrorAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(errorMessage ?? "An unknown error occurred")
+            }
+            // Add a tap gesture to dismiss keyboard when tapping outside the text editor
+            .contentShape(Rectangle())
+            .gesture(
+                TapGesture()
+                    .onEnded { _ in
+                        isTextEditorFocused = false
+                    }
+            )
+            // Handle view lifecycle events
+            .onAppear {
+                // Delay focusing to avoid keyboard issues
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    isTextEditorFocused = true
+                }
+                
+                // Log for debugging
+                print("DEBUG: TranscriptionEditView appeared")
+            }
+            .onDisappear {
+                // Ensure keyboard is dismissed when view disappears
+                isTextEditorFocused = false
+                
+                // Log for debugging
+                print("DEBUG: TranscriptionEditView disappeared")
             }
         }
     }
@@ -91,7 +149,17 @@ struct TranscriptionEditView: View {
             HStack(spacing: 16) {
                 // Capitalize first letter of each sentence
                 Button(action: {
-                    editedText = capitalizeFirstLetterOfSentences(editedText)
+                    // Dismiss keyboard before text operation
+                    isTextEditorFocused = false
+                    
+                    // Use try-catch to handle potential errors
+                    do {
+                        editedText = capitalizeFirstLetterOfSentences(editedText)
+                    } catch {
+                        errorMessage = "Error capitalizing text: \(error.localizedDescription)"
+                        showErrorAlert = true
+                        print("Error capitalizing text: \(error.localizedDescription)")
+                    }
                 }) {
                     VStack {
                         Image(systemName: "textformat.abc.dottedunderline")
@@ -103,7 +171,17 @@ struct TranscriptionEditView: View {
                 
                 // Add periods at the end of sentences
                 Button(action: {
-                    editedText = addPeriodsToSentences(editedText)
+                    // Dismiss keyboard before text operation
+                    isTextEditorFocused = false
+                    
+                    // Use try-catch to handle potential errors
+                    do {
+                        editedText = addPeriodsToSentences(editedText)
+                    } catch {
+                        errorMessage = "Error adding periods: \(error.localizedDescription)"
+                        showErrorAlert = true
+                        print("Error adding periods: \(error.localizedDescription)")
+                    }
                 }) {
                     VStack {
                         Image(systemName: "text.append")
@@ -115,7 +193,17 @@ struct TranscriptionEditView: View {
                 
                 // Fix common speech recognition errors
                 Button(action: {
-                    editedText = fixCommonErrors(editedText)
+                    // Dismiss keyboard before text operation
+                    isTextEditorFocused = false
+                    
+                    // Use try-catch to handle potential errors
+                    do {
+                        editedText = fixCommonErrors(editedText)
+                    } catch {
+                        errorMessage = "Error fixing text: \(error.localizedDescription)"
+                        showErrorAlert = true
+                        print("Error fixing text: \(error.localizedDescription)")
+                    }
                 }) {
                     VStack {
                         Image(systemName: "checkmark.circle")
@@ -127,7 +215,17 @@ struct TranscriptionEditView: View {
                 
                 // Clear formatting
                 Button(action: {
-                    editedText = editedText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    // Dismiss keyboard before text operation
+                    isTextEditorFocused = false
+                    
+                    // Use try-catch to handle potential errors
+                    do {
+                        editedText = editedText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    } catch {
+                        errorMessage = "Error cleaning text: \(error.localizedDescription)"
+                        showErrorAlert = true
+                        print("Error cleaning text: \(error.localizedDescription)")
+                    }
                 }) {
                     VStack {
                         Image(systemName: "text.badge.xmark")
@@ -139,6 +237,10 @@ struct TranscriptionEditView: View {
                 
                 // Clear all text
                 Button(action: {
+                    // Dismiss keyboard before text operation
+                    isTextEditorFocused = false
+                    
+                    // Confirm before clearing all text
                     editedText = ""
                 }) {
                     VStack {
@@ -157,9 +259,24 @@ struct TranscriptionEditView: View {
     
     /// Save the edited transcription
     private func saveTranscription() {
-        transcriptionText = editedText
-        onSave()
-        dismiss()
+        // Make sure keyboard is dismissed
+        isTextEditorFocused = false
+        
+        do {
+            // Update the binding
+            transcriptionText = editedText
+            
+            // Call the save callback
+            onSave()
+            
+            // Dismiss the view
+            dismiss()
+        } catch {
+            // Handle any errors during save
+            errorMessage = "Error saving transcription: \(error.localizedDescription)"
+            showErrorAlert = true
+            print("Error saving transcription: \(error.localizedDescription)")
+        }
     }
     
     /// Capitalize the first letter of each sentence
