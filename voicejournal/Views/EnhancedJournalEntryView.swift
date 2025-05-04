@@ -59,12 +59,13 @@ struct EnhancedJournalEntryView: View {
                         audioSection
                     }
                     
-                    // Transcription or encrypted content
-                    if journalEntry.hasEncryptedContent {
-                        // Show encrypted content view
-                        EncryptedContentView(journalEntry: journalEntry)
-                    } else if let transcription = journalEntry.transcription, let text = transcription.text {
+                    // Always show transcription section
+                    // EncryptedContentView will handle decryption internally when needed
+                    if let transcription = journalEntry.transcription, let text = transcription.text {
                         transcriptionSection(text: text)
+                    } else if journalEntry.transcription != nil {
+                        // Transcription exists but needs decryption
+                        EncryptedContentView(journalEntry: journalEntry)
                     }
                     
                     // Tags - always show the tag section, even if there are no tags yet
@@ -426,8 +427,7 @@ struct EnhancedJournalEntryView: View {
     
     /// Load the audio file for playback
     private func loadAudio() {
-        guard let recording = journalEntry.audioRecording,
-              let filePath = recording.filePath else {
+        guard let recording = journalEntry.audioRecording else {
             return
         }
         
