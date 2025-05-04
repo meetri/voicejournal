@@ -18,6 +18,7 @@ extension JournalEntry {
         entry.createdAt = Date()
         entry.modifiedAt = Date()
         entry.isLocked = false
+        entry.isBaseEncrypted = true // All entries are base encrypted by default
         return entry
     }
     
@@ -25,26 +26,44 @@ extension JournalEntry {
     
     // Property to track if encrypted content is currently decrypted (not persisted)
     private static var decryptedEntries = Set<NSManagedObjectID>()
+    private static var baseDecryptedEntries = Set<NSManagedObjectID>()
     
-    /// Returns true if the content is currently decrypted and accessible
+    /// Returns true if the tag-encrypted content is currently decrypted and accessible
     var isDecrypted: Bool {
         guard self.hasEncryptedContent else { return false }
         return JournalEntry.decryptedEntries.contains(self.objectID)
     }
     
-    /// Mark this entry as decrypted
+    /// Returns true if the base-encrypted content is currently decrypted and accessible
+    var isBaseDecrypted: Bool {
+        guard self.isBaseEncrypted else { return true } // If not base encrypted, consider it "decrypted"
+        return JournalEntry.baseDecryptedEntries.contains(self.objectID)
+    }
+    
+    /// Mark this entry as tag-decrypted
     func markAsDecrypted() {
         JournalEntry.decryptedEntries.insert(self.objectID)
     }
     
-    /// Mark this entry as encrypted (clears decrypted status)
+    /// Mark this entry as base-decrypted
+    func markAsBaseDecrypted() {
+        JournalEntry.baseDecryptedEntries.insert(self.objectID)
+    }
+    
+    /// Mark this entry as tag-encrypted (clears decrypted status)
     func markAsEncrypted() {
         JournalEntry.decryptedEntries.remove(self.objectID)
+    }
+    
+    /// Mark this entry as base-encrypted (clears base-decrypted status)
+    func markAsBaseEncrypted() {
+        JournalEntry.baseDecryptedEntries.remove(self.objectID)
     }
     
     /// Clear all decrypted entries (for app lock or session end)
     static func clearAllDecryptedEntries() {
         JournalEntry.decryptedEntries.removeAll()
+        JournalEntry.baseDecryptedEntries.removeAll()
     }
     
     /// Save changes to the journal entry
@@ -62,6 +81,12 @@ extension JournalEntry {
         recording.recordedAt = Date()
         recording.journalEntry = self
         self.audioRecording = recording
+        
+        // Auto-encrypt if base encryption is enabled
+        if self.isBaseEncrypted {
+            _ = applyBaseEncryption()
+        }
+        
         return recording
     }
     
@@ -73,6 +98,12 @@ extension JournalEntry {
         transcription.modifiedAt = Date()
         transcription.journalEntry = self
         self.transcription = transcription
+        
+        // Auto-encrypt if base encryption is enabled
+        if self.isBaseEncrypted {
+            _ = applyBaseEncryption()
+        }
+        
         return transcription
     }
     
@@ -121,9 +152,19 @@ extension JournalEntry {
     
     // MARK: - Encryption & Security
     
-    /// Check if this entry has encrypted content
+    /// Check if this entry has tag-encrypted content
     var hasEncryptedContent: Bool {
         return self.encryptedTag != nil
+    }
+    
+    /// Check if this entry has any form of encryption (base or tag)
+    var hasAnyEncryption: Bool {
+        return self.isBaseEncrypted || self.hasEncryptedContent
+    }
+    
+    /// Check if this entry needs both base-level and tag-level decryption
+    var needsDualDecryption: Bool {
+        return self.isBaseEncrypted && self.hasEncryptedContent
     }
     
     /// Apply an encrypted tag to this entry with PIN (deprecated - use applyEncryptedTagWithPin instead)
@@ -350,6 +391,155 @@ extension JournalEntry {
         self.isLocked = false
         try? save()
     }
+    
+    // MARK: - Base Encryption
+    
+    /// Apply base encryption to this entry
+    func applyBaseEncryption() -> Bool {
+        guard !self.isBaseEncrypted else { return true } // Already base encrypted
+        
+        let key = EncryptionManager.getEncryptionKey()
+        guard let rootKey = key else { return false }
+        
+        var encryptionSuccess = true
+        
+        // Encrypt the audio recording if it exists
+        if let audioRecording = self.audioRecording,
+           let filePath = audioRecording.filePath,
+           !audioRecording.isEncrypted { // Don't double-encrypt
+            
+            do {
+                // Create a directory for base encrypted files if it doesn't exist
+                let fileManager = FileManager.default
+                let documentsDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                let baseEncryptedDirectory = documentsDirectory.appendingPathComponent("BaseEncrypted", isDirectory: true)
+                
+                if !fileManager.fileExists(atPath: baseEncryptedDirectory.path) {
+                    try fileManager.createDirectory(at: baseEncryptedDirectory, withIntermediateDirectories: true)
+                }
+                
+                // Construct encrypted file path
+                let originalURL = URL(fileURLWithPath: filePath)
+                let fileName = originalURL.lastPathComponent
+                let encryptedFilePath = baseEncryptedDirectory.appendingPathComponent("\(fileName).baseenc").path
+                
+                // Read the audio file data
+                let audioData = try Data(contentsOf: originalURL)
+                
+                // Encrypt the data
+                if let encryptedData = EncryptionManager.encrypt(audioData, using: rootKey) {
+                    // Write encrypted data to the encrypted file path
+                    try encryptedData.write(to: URL(fileURLWithPath: encryptedFilePath))
+                    
+                    // Store original path and encrypted path
+                    if audioRecording.originalFilePath == nil {
+                        audioRecording.originalFilePath = filePath
+                    }
+                    self.baseEncryptedAudioPath = encryptedFilePath
+                    
+                    // Update file path to point to encrypted file
+                    audioRecording.filePath = encryptedFilePath
+                } else {
+                    encryptionSuccess = false
+                }
+            } catch {
+                print("Error base encrypting audio file: \(error)")
+                encryptionSuccess = false
+            }
+        }
+        
+        // Encrypt the transcription if it exists
+        if let transcription = self.transcription,
+           let text = transcription.text,
+           transcription.encryptedText == nil {
+            
+            if let encryptedData = EncryptionManager.encrypt(text, using: rootKey) {
+                // Store encrypted data and clear plaintext
+                transcription.encryptedText = encryptedData
+                transcription.text = nil
+                transcription.modifiedAt = Date()
+            } else {
+                encryptionSuccess = false
+            }
+        }
+        
+        // Mark as base encrypted
+        if encryptionSuccess {
+            self.isBaseEncrypted = true
+            markAsBaseEncrypted()
+        }
+        
+        self.modifiedAt = Date()
+        try? self.managedObjectContext?.save()
+        
+        return encryptionSuccess
+    }
+    
+    /// Decrypt base-encrypted content with app's root key
+    func decryptBaseContent() -> Bool {
+        guard self.isBaseEncrypted else { return true } // Not base encrypted
+        
+        let key = EncryptionManager.getEncryptionKey()
+        guard let rootKey = key else { return false }
+        
+        var decryptionSuccess = true
+        
+        // Decrypt the audio recording if it exists and encrypted path is stored
+        if let audioRecording = self.audioRecording,
+           let encryptedFilePath = self.baseEncryptedAudioPath {
+            
+            do {
+                // Read the encrypted file
+                let encryptedData = try Data(contentsOf: URL(fileURLWithPath: encryptedFilePath))
+                
+                // Create a directory for temporary decrypted files
+                let fileManager = FileManager.default
+                let documentsDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                let tempDirectory = documentsDirectory.appendingPathComponent("BaseTempDecrypted", isDirectory: true)
+                
+                if !fileManager.fileExists(atPath: tempDirectory.path) {
+                    try fileManager.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+                }
+                
+                // Generate a unique temporary file path
+                let tempFilePath = tempDirectory.appendingPathComponent(UUID().uuidString + ".m4a").path
+                
+                // Decrypt the data
+                if let decryptedData = EncryptionManager.decrypt(encryptedData, using: rootKey) {
+                    // Write decrypted data to temporary file
+                    try decryptedData.write(to: URL(fileURLWithPath: tempFilePath))
+                    
+                    // Store temporary path in memory (not persisted)
+                    audioRecording.tempDecryptedPath = tempFilePath
+                } else {
+                    decryptionSuccess = false
+                }
+            } catch {
+                print("Error decrypting base encrypted audio file: \(error)")
+                decryptionSuccess = false
+            }
+        }
+        
+        // Decrypt the transcription if it exists and is encrypted
+        if let transcription = self.transcription,
+           let encryptedData = transcription.encryptedText,
+           transcription.text == nil {
+            
+            if let decryptedText = EncryptionManager.decryptToString(encryptedData, using: rootKey) {
+                // Store decrypted text temporarily (in memory)
+                transcription.text = decryptedText
+            } else {
+                decryptionSuccess = false
+            }
+        }
+        
+        if decryptionSuccess {
+            // Mark as base decrypted for access control
+            markAsBaseDecrypted()
+        }
+        
+        return decryptionSuccess
+    }
 }
 
 // MARK: - Additional Property Extensions
@@ -423,7 +613,7 @@ extension JournalEntry {
         }
     }
     
-    // Fetch journal entries with encrypted content
+    // Fetch journal entries with tag-based encrypted content
     static func fetchEncrypted(in context: NSManagedObjectContext) -> [JournalEntry] {
         let request: NSFetchRequest<JournalEntry> = JournalEntry.fetchRequest()
         request.predicate = NSPredicate(format: "encryptedTag != nil")
@@ -433,6 +623,34 @@ extension JournalEntry {
             return try context.fetch(request)
         } catch {
             print("Error fetching encrypted journal entries: \(error)")
+            return []
+        }
+    }
+    
+    // Fetch journal entries with base encryption
+    static func fetchBaseEncrypted(in context: NSManagedObjectContext) -> [JournalEntry] {
+        let request: NSFetchRequest<JournalEntry> = JournalEntry.fetchRequest()
+        request.predicate = NSPredicate(format: "isBaseEncrypted == YES")
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \JournalEntry.createdAt, ascending: false)]
+        
+        do {
+            return try context.fetch(request)
+        } catch {
+            print("Error fetching base encrypted journal entries: \(error)")
+            return []
+        }
+    }
+    
+    // Fetch journal entries with any type of encryption (base or tag)
+    static func fetchAnyEncrypted(in context: NSManagedObjectContext) -> [JournalEntry] {
+        let request: NSFetchRequest<JournalEntry> = JournalEntry.fetchRequest()
+        request.predicate = NSPredicate(format: "encryptedTag != nil OR isBaseEncrypted == YES")
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \JournalEntry.createdAt, ascending: false)]
+        
+        do {
+            return try context.fetch(request)
+        } catch {
+            print("Error fetching any encrypted journal entries: \(error)")
             return []
         }
     }

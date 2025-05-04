@@ -67,12 +67,62 @@ class PersistenceController {
         // Create recordings directory if needed
         FilePathUtility.createRecordingsDirectoryIfNeeded()
         
+        // Initialize the root encryption key
+        _ = EncryptionManager.getRootEncryptionKey()
+        
         // Migrate audio file paths from absolute to relative paths
         Task {
             let migratedCount = MigrationUtility.migrateAudioFilePaths(in: container.viewContext)
             if migratedCount > 0 {
                 print("Successfully migrated \(migratedCount) audio file paths")
             }
+            
+            // Migrate existing entries to base encryption if needed
+            await migrateToBaseEncryption()
+        }
+    }
+    
+    /// Migrate existing journal entries to use base encryption
+    @MainActor
+    private func migrateToBaseEncryption() async {
+        // Check if migration has already been done
+        if UserDefaults.standard.bool(forKey: "baseEncryptionMigrationComplete") {
+            return
+        }
+        
+        let context = container.viewContext
+        let fetchRequest: NSFetchRequest<JournalEntry> = JournalEntry.fetchRequest()
+        
+        do {
+            // Fetch all entries that aren't already base encrypted
+            fetchRequest.predicate = NSPredicate(format: "isBaseEncrypted != YES")
+            let entries = try context.fetch(fetchRequest)
+            
+            if entries.isEmpty {
+                // No entries need migration
+                UserDefaults.standard.set(true, forKey: "baseEncryptionMigrationComplete")
+                return
+            }
+            
+            print("Migrating \(entries.count) journal entries to base encryption...")
+            
+            // Apply base encryption to each entry
+            var encryptedCount = 0
+            for entry in entries {
+                if entry.applyBaseEncryption() {
+                    encryptedCount += 1
+                }
+            }
+            
+            // Save the context
+            try context.save()
+            
+            print("Successfully migrated \(encryptedCount)/\(entries.count) journal entries to base encryption")
+            
+            // Mark migration as complete
+            UserDefaults.standard.set(true, forKey: "baseEncryptionMigrationComplete")
+        } catch {
+            print("Error migrating to base encryption: \(error)")
         }
     }
 }

@@ -22,95 +22,161 @@ struct EncryptedContentView: View {
     
     @State private var showingPINEntryDialog = false
     @State private var isContentDecrypted = false
+    @State private var isBaseContentDecrypted = false
     @State private var showEncryptedTagSheet = false
     @State private var showAlert = false
     @State private var alertTitle = ""
     @State private var alertMessage = ""
+    @State private var isAuthenticating = false
     
     // MARK: - Body
     
     var body: some View {
         VStack {
-            if journalEntry.hasEncryptedContent {
-                if isContentDecrypted {
-                    // Show decrypted content
-                    VStack(spacing: 16) {
-                        HStack {
-                            Text("Decrypted Content")
-                                .font(.headline)
-                            
-                            Spacer()
-                            
-                            Button {
-                                reEncryptContent()
-                            } label: {
-                                Label("Lock", systemImage: "lock")
-                                    .font(.footnote)
-                            }
-                            .buttonStyle(.bordered)
-                        }
-                        
-                        if let transcription = journalEntry.transcription, let text = transcription.text {
-                            Text(text)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding()
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(Color(.systemGray6))
-                                )
-                        } else {
-                            Text("No transcription available")
-                                .italic()
-                                .foregroundColor(.secondary)
-                        }
+            // Base Encryption Layer - Handle first
+            if journalEntry.isBaseEncrypted && !isBaseContentDecrypted {
+                VStack(spacing: 16) {
+                    Image(systemName: "lock.shield.fill")
+                        .font(.system(size: 40))
+                        .foregroundColor(.secondary)
+                    
+                    Text("Journal Entry Encrypted")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                    
+                    Text("This journal entry is encrypted with the app's master key")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                    
+                    Button {
+                        authenticateAndDecryptBase()
+                    } label: {
+                        Label("Unlock with Face ID/Touch ID", systemImage: "faceid")
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color.blue)
+                            )
+                            .foregroundColor(.white)
                     }
-                    .padding()
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color(.systemBackground))
-                            .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 2)
-                    )
-                } else {
-                    // Show locked content message
-                    VStack(spacing: 16) {
-                        Image(systemName: "lock.fill")
-                            .font(.system(size: 40))
-                            .foregroundColor(.secondary)
-                        
-                        if let encryptedTag = journalEntry.encryptedTag {
-                            Text("Content encrypted with tag")
-                                .font(.headline)
-                                .foregroundColor(.secondary)
-                            
-                            EnhancedEncryptedTagView(tag: encryptedTag)
-                                .padding(.vertical, 8)
-                            
-                            if encryptedTag.hasGlobalAccess {
-                                // If tag has global access, show a button to auto-decrypt
-                                Text("This tag has been granted global access")
-                                    .font(.subheadline)
-                                    .foregroundColor(.green)
+                    .disabled(isAuthenticating)
+                    .padding(.top, 8)
+                }
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color(.systemBackground))
+                        .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 2)
+                )
+            } else {
+                // Tag Encryption Layer - Handle second (after base decryption or if not base encrypted)
+                if journalEntry.hasEncryptedContent {
+                    if isContentDecrypted {
+                        // Show decrypted content
+                        VStack(spacing: 16) {
+                            HStack {
+                                Text("Decrypted Content")
+                                    .font(.headline)
+                                
+                                Spacer()
                                 
                                 Button {
-                                    if journalEntry.decryptWithGlobalAccess() {
-                                        withAnimation {
-                                            isContentDecrypted = true
-                                        }
-                                    } else {
-                                        showAlert(title: "Decryption Failed", message: "Failed to decrypt the content with global access.")
-                                    }
+                                    reEncryptContent()
                                 } label: {
-                                    Label("Decrypt with Global Access", systemImage: "lock.open")
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 8)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 10)
-                                                .fill(Color.green)
-                                        )
-                                        .foregroundColor(.white)
+                                    Label("Lock", systemImage: "lock")
+                                        .font(.footnote)
                                 }
-                                .padding(.top, 8)
+                                .buttonStyle(.bordered)
+                            }
+                            
+                            if let transcription = journalEntry.transcription, let text = transcription.text {
+                                Text(text)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding()
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .fill(Color(.systemGray6))
+                                    )
                             } else {
+                                Text("No transcription available")
+                                    .italic()
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(.systemBackground))
+                                .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 2)
+                        )
+                    } else {
+                        // Show locked content message
+                        VStack(spacing: 16) {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 40))
+                                .foregroundColor(.secondary)
+                            
+                            if let encryptedTag = journalEntry.encryptedTag {
+                                Text("Content encrypted with tag")
+                                    .font(.headline)
+                                    .foregroundColor(.secondary)
+                                
+                                EnhancedEncryptedTagView(tag: encryptedTag)
+                                    .padding(.vertical, 8)
+                                
+                                if encryptedTag.hasGlobalAccess {
+                                    // If tag has global access, show a button to auto-decrypt
+                                    Text("This tag has been granted global access")
+                                        .font(.subheadline)
+                                        .foregroundColor(.green)
+                                    
+                                    Button {
+                                        if journalEntry.decryptWithGlobalAccess() {
+                                            withAnimation {
+                                                isContentDecrypted = true
+                                            }
+                                        } else {
+                                            showAlert(title: "Decryption Failed", message: "Failed to decrypt the content with global access.")
+                                        }
+                                    } label: {
+                                        Label("Decrypt with Global Access", systemImage: "lock.open")
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 8)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 10)
+                                                    .fill(Color.green)
+                                            )
+                                            .foregroundColor(.white)
+                                    }
+                                    .padding(.top, 8)
+                                } else {
+                                    Text("This content is protected with a PIN")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                        .multilineTextAlignment(.center)
+                                    
+                                    Button {
+                                        showingPINEntryDialog = true
+                                    } label: {
+                                        Label("Enter PIN", systemImage: "key")
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 8)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 10)
+                                                    .fill(Color.accentColor)
+                                            )
+                                            .foregroundColor(.white)
+                                    }
+                                    .padding(.top, 8)
+                                }
+                            } else {
+                                Text("Encrypted Content")
+                                    .font(.headline)
+                                    .foregroundColor(.secondary)
+                                
                                 Text("This content is encrypted and requires a PIN to access")
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
@@ -130,76 +196,120 @@ struct EncryptedContentView: View {
                                 }
                                 .padding(.top, 8)
                             }
-                        } else {
-                            Text("Encrypted Content")
-                                .font(.headline)
-                                .foregroundColor(.secondary)
-                            
-                            Text("This content is encrypted and requires a PIN to access")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
-                            
-                            Button {
-                                showingPINEntryDialog = true
-                            } label: {
-                                Label("Enter PIN", systemImage: "key")
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 8)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .fill(Color.accentColor)
-                                    )
-                                    .foregroundColor(.white)
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(.systemBackground))
+                                .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 2)
+                        )
+                    }
+                } else {
+                    // No tag encryption - Show content or option to encrypt with tag
+                    if let transcription = journalEntry.transcription, let text = transcription.text {
+                        VStack(spacing: 16) {
+                            if journalEntry.isBaseEncrypted {
+                                HStack {
+                                    Text("Base Encryption Active")
+                                        .font(.footnote)
+                                        .foregroundColor(.secondary)
+                                    
+                                    Image(systemName: "checkmark.shield.fill")
+                                        .font(.footnote)
+                                        .foregroundColor(.green)
+                                    
+                                    Spacer()
+                                    
+                                    Button {
+                                        showEncryptedTagSheet = true
+                                    } label: {
+                                        Label("Add Tag Encryption", systemImage: "lock")
+                                            .font(.footnote)
+                                    }
+                                    .buttonStyle(.bordered)
+                                }
+                            } else {
+                                HStack {
+                                    Text("Encryption")
+                                        .font(.headline)
+                                    
+                                    Spacer()
+                                
+                                    Button {
+                                        showEncryptedTagSheet = true
+                                    } label: {
+                                        Label("Encrypt with Tag", systemImage: "lock")
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 6)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .fill(Color.blue)
+                                            )
+                                            .foregroundColor(.white)
+                                    }
+                                }
                             }
-                            .padding(.top, 8)
-                        }
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color(.systemBackground))
-                            .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 2)
-                    )
-                }
-            } else {
-                // Show option to encrypt with tag
-                VStack(spacing: 16) {
-                    HStack {
-                        Text("Encryption")
-                            .font(.headline)
-                        
-                        Spacer()
-                    }
-                    
-                    HStack {
-                        Text("This content is not encrypted")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        
-                        Spacer()
-                        
-                        Button {
-                            showEncryptedTagSheet = true
-                        } label: {
-                            Label("Encrypt", systemImage: "lock")
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
+                            
+                            Text(text)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding()
                                 .background(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(Color.blue)
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color(.systemGray6))
                                 )
-                                .foregroundColor(.white)
                         }
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(.systemBackground))
+                                .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 2)
+                        )
+                    } else {
+                        // No transcription available
+                        VStack(spacing: 16) {
+                            HStack {
+                                Text("Encryption")
+                                    .font(.headline)
+                                
+                                Spacer()
+                            }
+                            
+                            HStack {
+                                if journalEntry.isBaseEncrypted {
+                                    Text("Base encryption active")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                } else {
+                                    Text("This content is not encrypted")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                Button {
+                                    showEncryptedTagSheet = true
+                                } label: {
+                                    Label("Encrypt with Tag", systemImage: "lock")
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .fill(Color.blue)
+                                        )
+                                        .foregroundColor(.white)
+                                }
+                            }
+                        }
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(.systemBackground))
+                                .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 2)
+                        )
                     }
                 }
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(Color(.systemBackground))
-                        .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 2)
-                )
             }
         }
         .pinEntryDialog(
@@ -226,6 +336,29 @@ struct EncryptedContentView: View {
     }
     
     // MARK: - Methods
+    
+    /// Authenticate with biometrics and decrypt base content
+    private func authenticateAndDecryptBase() {
+        isAuthenticating = true
+        
+        EncryptionManager.getRootEncryptionKeyWithBiometrics { key in
+            isAuthenticating = false
+            
+            if key != nil {
+                // Success - authentication passed
+                if self.journalEntry.decryptBaseContent() {
+                    withAnimation {
+                        self.isBaseContentDecrypted = true
+                    }
+                } else {
+                    self.showAlert(title: "Decryption Failed", message: "Failed to decrypt the content with the root key.")
+                }
+            } else {
+                // Authentication failed
+                self.showAlert(title: "Authentication Failed", message: "Biometric authentication failed or was cancelled.")
+            }
+        }
+    }
     
     /// Decrypt the content with the provided PIN
     private func decryptContent(with pin: String) {
@@ -254,6 +387,15 @@ struct EncryptedContentView: View {
         withAnimation {
             isContentDecrypted = false
         }
+    }
+    
+    /// Re-encrypt base content
+    private func reEncryptBaseContent() {
+        // Simply set the state to show the locked view
+        withAnimation {
+            isBaseContentDecrypted = false
+        }
+        journalEntry.markAsBaseEncrypted()
     }
     
     /// Show an alert with the given title and message

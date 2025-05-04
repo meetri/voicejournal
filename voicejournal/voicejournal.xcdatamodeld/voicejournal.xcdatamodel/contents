@@ -18,7 +18,9 @@
         <relationship name="audioRecording" maxCount="1" deletionRule="Nullify" destinationEntity="AudioRecording" inverseName="bookmarks" inverseEntity="AudioRecording"/>
     </entity>
     <entity name="JournalEntry" representedClassName="JournalEntry" syncable="YES" codeGenerationType="class">
+        <attribute name="baseEncryptedAudioPath" optional="YES" attributeType="String"/>
         <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="isBaseEncrypted" optional="YES" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
         <attribute name="isLocked" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="modifiedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="title" optional="YES" attributeType="String"/>

@@ -15,6 +15,7 @@ class EncryptionManager {
     
     private static let keychainService = "com.voicejournal.encryption"
     private static let keychainAccount = "encryptionKey"
+    private static let rootKeyAccount = "rootEncryptionKey"
     private static let tagKeychainPrefix = "tagEncryptionKey_"
     
     // MARK: - Default Encryption Key Methods
@@ -24,14 +25,24 @@ class EncryptionManager {
         return SymmetricKey(size: .bits256)
     }
     
-    /// Save the app's default encryption key to keychain
+    /// Save the app's default encryption key to keychain (legacy - use saveRootEncryptionKey instead)
     static func saveEncryptionKey(_ key: SymmetricKey) -> Bool {
+        return saveRootEncryptionKey(key)
+    }
+    
+    /// Get the app's default encryption key from keychain (legacy - use getRootEncryptionKey instead)
+    static func getEncryptionKey() -> SymmetricKey? {
+        return getRootEncryptionKey()
+    }
+    
+    /// Save the app's root encryption key to keychain
+    static func saveRootEncryptionKey(_ key: SymmetricKey) -> Bool {
         let keyData = key.withUnsafeBytes { Data($0) }
         
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: keychainAccount,
+            kSecAttrAccount as String: rootKeyAccount,
             kSecValueData as String: keyData
         ]
         
@@ -43,12 +54,12 @@ class EncryptionManager {
         return status == errSecSuccess
     }
     
-    /// Get the app's default encryption key from keychain
-    static func getEncryptionKey() -> SymmetricKey? {
+    /// Get the app's root encryption key from keychain
+    static func getRootEncryptionKey() -> SymmetricKey? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: keychainAccount,
+            kSecAttrAccount as String: rootKeyAccount,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
@@ -62,11 +73,39 @@ class EncryptionManager {
         
         // If no key exists, generate and save a new one
         let newKey = generateEncryptionKey()
-        if saveEncryptionKey(newKey) {
+        if saveRootEncryptionKey(newKey) {
             return newKey
         }
         
         return nil
+    }
+    
+    /// Get the app's root encryption key with biometric authentication
+    static func getRootEncryptionKeyWithBiometrics(completion: @escaping (SymmetricKey?) -> Void) {
+        let context = LAContext()
+        var error: NSError?
+        
+        // Check if biometric authentication is available
+        if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
+            let reason = "Unlock your journal entries"
+            
+            // Request biometric authentication
+            context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, authError in
+                DispatchQueue.main.async {
+                    if success {
+                        // Return the root key on successful authentication
+                        completion(getRootEncryptionKey())
+                    } else {
+                        print("Biometric authentication failed: \(String(describing: authError))")
+                        completion(nil)
+                    }
+                }
+            }
+        } else {
+            print("Biometric authentication not available: \(String(describing: error))")
+            // Fall back to getting the key without biometrics
+            completion(getRootEncryptionKey())
+        }
     }
     
     // MARK: - Tag-specific Encryption Key Methods
