@@ -1,1 +1,1 @@
-use git to commit the latest changes setting the description to the summary of all updates.
+commit all staged, unstaged and untracked files to git setting the description as the summary of all changes
