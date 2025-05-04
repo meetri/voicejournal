@@ -134,7 +134,8 @@ class AudioPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegate {
         
         // Set up audio session
         do {
-            try audioSession.setCategory(.playback, mode: .default)
+            // Use playAndRecord category with defaultToSpeaker option to route audio to speaker
+            try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
             try audioSession.setActive(true)
         } catch {
             throw AudioPlaybackError.audioSessionSetupFailed

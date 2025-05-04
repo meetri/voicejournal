@@ -117,7 +117,7 @@ class SpectrumAnalyzerService {
         // Check if the audio session is active and configured properly
         let audioSession = AVAudioSession.sharedInstance()
         if audioSession.category != .playAndRecord {
-            try audioSession.setCategory(.playAndRecord, mode: .default)
+            try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
             try audioSession.setActive(true)
         }
         
