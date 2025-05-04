@@ -147,19 +147,7 @@ struct TimelineView: View {
                     .font(.headline)
                 
                 Spacer()
-                
-                Button(action: {
-                    showingDatePicker = true
-                }) {
-                    Image(systemName: "calendar")
-                        .font(.caption)
-                        .padding(.vertical, 4)
-                        .padding(.horizontal, 8)
-                        .background(Color(.secondarySystemBackground))
-                        .foregroundColor(.primary)
-                        .cornerRadius(8)
-                }
-                
+                                
                 Button(action: {
                     showingRangePicker = true
                 }) {
