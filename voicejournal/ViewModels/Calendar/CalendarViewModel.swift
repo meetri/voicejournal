@@ -9,6 +9,7 @@ import Foundation
 import CoreData
 import Combine
 import SwiftUI
+import CryptoKit
 
 /// View model for the calendar view that manages date selection and entry data
 class CalendarViewModel: ObservableObject {
@@ -44,6 +45,14 @@ class CalendarViewModel: ObservableObject {
             .combineLatest($zoomLevel)
             .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
             .sink { [weak self] (_, _) in
+                self?.fetchEntriesForVisibleRange()
+            }
+            .store(in: &cancellables)
+            
+        // Subscribe to EncryptedTagsAccessManager changes
+        EncryptedTagsAccessManager.shared.objectWillChange
+            .sink { [weak self] _ in
+                // Refresh entries when encrypted tag access changes
                 self?.fetchEntriesForVisibleRange()
             }
             .store(in: &cancellables)
@@ -90,14 +99,13 @@ class CalendarViewModel: ObservableObject {
     
     /// Select a specific date
     func selectDate(_ date: Date) {
-        let normalizedDate = normalizeDate(date)
-        
         selectedDate = date
         displayDate = date  // Add this line to sync the display date
         
         // Log the week that contains this date
         let weekStart = startOfWeek(for: date)
-        let weekDays = (0..<7).compactMap { day in
+        // No need to store weekDays if not used
+        _ = (0..<7).compactMap { day in
             calendar.date(byAdding: .day, value: day, to: weekStart)
         }
     }
@@ -116,7 +124,7 @@ class CalendarViewModel: ObservableObject {
         
         // Log the days that will be shown in the week view
         if level == .week {
-            let weekDays = daysInWeek()
+            _ = daysInWeek()
         }
     }
     
@@ -271,13 +279,8 @@ class CalendarViewModel: ObservableObject {
     
     /// Check if a date is the selected date
     func isSelected(_ date: Date) -> Bool {
-        // Normalize both dates to start of day for comparison
-        let normalizedDate = normalizeDate(date)
-        let normalizedSelectedDate = normalizeDate(selectedDate)
-        
-        let result = calendar.isDate(date, equalTo: selectedDate, toGranularity: .day)
-        
-        return result
+        // Compare dates to day granularity
+        return calendar.isDate(date, equalTo: selectedDate, toGranularity: .day)
     }
     
     /// Delete a journal entry
@@ -373,11 +376,34 @@ class CalendarViewModel: ObservableObject {
     /// Fetch entries between two dates
     private func fetchEntries(from startDate: Date, to endDate: Date) {
         let request: NSFetchRequest<JournalEntry> = JournalEntry.fetchRequest()
-        request.predicate = NSPredicate(
+        
+        // Create the date range predicate
+        let dateRangePredicate = NSPredicate(
             format: "createdAt >= %@ AND createdAt < %@",
             startDate as NSDate,
             endDate as NSDate
         )
+        
+        // Get encrypted tags without access to filter them out
+        let encryptedTagsWithoutAccess = fetchEncryptedTagsWithoutAccess()
+        
+        // Create the final combined predicate
+        var predicates: [NSPredicate] = [dateRangePredicate]
+        
+        if !encryptedTagsWithoutAccess.isEmpty {
+            // Exclude entries that use any encrypted tag without global access
+            // This allows entries with no encrypted tag (encryptedTag == nil) and entries with encrypted tags that have access
+            let excludePredicate = NSCompoundPredicate(orPredicateWithSubpredicates: [
+                NSPredicate(format: "encryptedTag == nil"),
+                NSPredicate(format: "NOT (encryptedTag IN %@)", encryptedTagsWithoutAccess)
+            ])
+            predicates.append(excludePredicate)
+        }
+        
+        // Combine all predicates
+        let finalPredicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
+        request.predicate = finalPredicate
+        
         request.sortDescriptors = [NSSortDescriptor(keyPath: \JournalEntry.createdAt, ascending: true)]
         
         do {
@@ -388,10 +414,32 @@ class CalendarViewModel: ObservableObject {
         }
     }
     
+    /// Fetch all encrypted tags that don't have global access
+    private func fetchEncryptedTagsWithoutAccess() -> [Tag] {
+        let request: NSFetchRequest<Tag> = Tag.fetchRequest()
+        request.predicate = NSPredicate(format: "isEncrypted == YES")
+        
+        do {
+            let encryptedTags = try viewContext.fetch(request)
+            return encryptedTags.filter { !EncryptedTagsAccessManager.shared.hasAccess(to: $0) }
+        } catch {
+            print("Error fetching encrypted tags: \(error)")
+            return []
+        }
+    }
+    
     /// Process fetched entries to organize by date and extract tag information
     private func processEntries(_ entries: [JournalEntry]) {
         var newEntriesByDate: [Date: [JournalEntry]] = [:]
         var newTagsByDate: [Date: [TagInfo]] = [:]
+        
+        // First, attempt to decrypt any entries with global access
+        for entry in entries {
+            if entry.hasEncryptedContent && entry.hasGlobalAccess && !entry.isDecrypted {
+                // Try to decrypt with global access
+                _ = entry.decryptWithGlobalAccess()
+            }
+        }
         
         for entry in entries {
             guard let createdAt = entry.createdAt else { continue }
