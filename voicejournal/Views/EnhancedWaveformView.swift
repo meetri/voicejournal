@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AVFoundation
 
 /// An enhanced view that displays an audio waveform visualization with animations and effects
 struct EnhancedWaveformView: View {
@@ -36,6 +37,9 @@ struct EnhancedWaveformView: View {
     
     /// The view model for managing waveform state
     @StateObject private var viewModel: WaveformViewModel
+    
+    /// The view model for spectrum analysis
+    @StateObject private var spectrumViewModel = SpectrumViewModel()
     
     // MARK: - State
     
@@ -89,6 +93,16 @@ struct EnhancedWaveformView: View {
                     curveWaveform
                 case .circles:
                     circlesWaveform
+                case .spectrum:
+                    // Use the new SpectrumAnalyzerView for spectrum visualization
+                    GeometryReader { geometry in
+                        SpectrumAnalyzerView(
+                            viewModel: spectrumViewModel,
+                            height: geometry.size.height,
+                            style: .bars,
+                            useHardwareAcceleration: true
+                        )
+                    }
                 }
             }
             .padding(8)
@@ -109,10 +123,50 @@ struct EnhancedWaveformView: View {
         .onChange(of: audioLevel) { oldValue, newValue in
             // Update the view model with the new audio level
             viewModel.update(audioLevel: newValue, isActive: isActive)
+            
+            // Handle spectrum analyzer updates
+            if style == .spectrum {
+                // Only attempt to start the spectrum analyzer when needed
+                if isActive && audioLevel > 0.01 {
+                    // Start the analyzer if it's not already active
+                    if !spectrumViewModel.isActive {
+                        spectrumViewModel.start()
+                    }
+                    
+                    // Provide minimal visual feedback in case audio engine fails
+                    // This uses the audio level but doesn't try to simulate spectral data
+                    spectrumViewModel.updateWithMinimalVisualization(level: Float(audioLevel))
+                } else {
+                    // If we're not active, stop the analyzer to save resources
+                    spectrumViewModel.stop()
+                }
+            } else {
+                // If we're not in spectrum mode, ensure the analyzer is stopped
+                spectrumViewModel.stop()
+            }
         }
         .onChange(of: isActive) { oldValue, newValue in
             // Update the view model with the new active state
             viewModel.update(audioLevel: audioLevel, isActive: newValue)
+            
+            // Handle spectrum analyzer when activity state changes
+            if style == .spectrum {
+                if newValue && audioLevel > 0.01 {
+                    spectrumViewModel.start()
+                } else {
+                    spectrumViewModel.stop()
+                }
+            }
+        }
+        .onChange(of: style) { oldValue, newValue in
+            // When changing to spectrum style, start the analyzer if active
+            if newValue == .spectrum && isActive && audioLevel > 0.01 {
+                spectrumViewModel.start()
+            } 
+            // When changing away from spectrum style, stop the analyzer
+            else if oldValue == .spectrum {
+                spectrumViewModel.stop()
+            }
         }
         // Add an efficient animation timer that only updates the visual state
         // without creating new arrays or doing heavy processing
@@ -126,6 +180,9 @@ struct EnhancedWaveformView: View {
         .onDisappear {
             // Ensure we clean up resources when the view disappears
             viewModel.stopTimer()
+            
+            // Always stop the spectrum analyzer when the view disappears
+            spectrumViewModel.stop()
         }
     }
     
@@ -269,6 +326,9 @@ enum WaveformStyle {
     
     /// Circles visualization
     case circles
+    
+    /// Spectrum analyzer visualization
+    case spectrum
 }
 
 // MARK: - Preview
@@ -306,6 +366,17 @@ enum WaveformStyle {
             style: .circles
         )
         .frame(height: 60)
+        .padding()
+        
+        // Spectrum analyzer waveform
+        EnhancedWaveformView(
+            audioLevel: 0.8,
+            primaryColor: .blue,
+            secondaryColor: .purple,
+            isActive: true,
+            style: .spectrum
+        )
+        .frame(height: 80)
         .padding()
         
         // Inactive waveform

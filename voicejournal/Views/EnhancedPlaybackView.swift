@@ -379,6 +379,31 @@ struct EnhancedPlaybackView: View {
                             .stroke(waveformStyle == .circles ? playbackColor : Color.clear, lineWidth: 2)
                     )
                 }
+                
+                Button(action: {
+                    waveformStyle = .spectrum
+                    showingStylePicker = false
+                }) {
+                    VStack {
+                        EnhancedWaveformView(
+                            audioLevel: 0.5,
+                            primaryColor: playbackColor,
+                            secondaryColor: playbackSecondaryColor,
+                            isActive: true,
+                            style: .spectrum
+                        )
+                        .frame(width: 200, height: 40)
+                        
+                        Text("Spectrum")
+                            .font(.subheadline)
+                            .foregroundColor(waveformStyle == .spectrum ? playbackColor : .primary)
+                    }
+                    .padding(8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(waveformStyle == .spectrum ? playbackColor : Color.clear, lineWidth: 2)
+                    )
+                }
             }
             .padding()
         }
