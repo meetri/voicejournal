@@ -1,0 +1,2 @@
+1. when revoking encrypted tag access in the settings view the button doesn't refresh to the new status.
+2. when updating encrypted tag access make sure to refresh the timeline view to include the granted journal entries.

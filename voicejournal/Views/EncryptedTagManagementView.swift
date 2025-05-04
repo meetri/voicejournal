@@ -37,6 +37,9 @@ struct EncryptedTagManagementView: View {
     @State private var alertTitle = ""
     @State private var alertMessage = ""
     
+    // Observe changes to the encrypted tags access manager
+    @ObservedObject private var accessManager = EncryptedTagsAccessManager.shared
+    
     // MARK: - Body
     
     var body: some View {
@@ -248,10 +251,7 @@ struct EncryptedTagManagementView: View {
                         setupActionAfterPIN { tag, pin in
                             // Grant global access to this tag
                             let success = EncryptedTagsAccessManager.shared.grantAccess(to: tag, with: pin)
-                            if success {
-                                // This will automatically notify observers
-                                showAlert(title: "Access Granted", message: "You now have access to all entries with the \"\(tag.name ?? "")\" tag. This access will be reset when the app is closed or locked.")
-                            } else {
+                            if !success {                                
                                 showAlert(title: "Error", message: "Failed to grant access to the tag.")
                             }
                         }

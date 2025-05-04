@@ -84,6 +84,14 @@ class TimelineViewModel: ObservableObject {
             }
             .store(in: &cancellables)
         
+        // Subscribe to EncryptedTagsAccessManager changes
+        EncryptedTagsAccessManager.shared.objectWillChange
+            .sink { [weak self] _ in
+                // Refresh entries when encrypted tag access changes
+                self?.fetchEntriesForDateRange()
+            }
+            .store(in: &cancellables)
+        
         // Register for Core Data change notifications
         registerForCoreDataNotifications()
         
@@ -408,7 +416,6 @@ class TimelineViewModel: ObservableObject {
         }
         
         // Create a predicate to exclude entries with encrypted tags that don't have global access
-        let accessManager = EncryptedTagsAccessManager.shared
         let encryptedTagsWithoutAccess = fetchEncryptedTagsWithoutAccess()
         
         if !encryptedTagsWithoutAccess.isEmpty {
@@ -430,13 +437,12 @@ class TimelineViewModel: ObservableObject {
     
     /// Fetch all encrypted tags that don't have global access
     private func fetchEncryptedTagsWithoutAccess() -> [Tag] {
-        let accessManager = EncryptedTagsAccessManager.shared
         let request: NSFetchRequest<Tag> = Tag.fetchRequest()
         request.predicate = NSPredicate(format: "isEncrypted == YES")
         
         do {
             let encryptedTags = try viewContext.fetch(request)
-            return encryptedTags.filter { !accessManager.hasAccess(to: $0) }
+            return encryptedTags.filter { !EncryptedTagsAccessManager.shared.hasAccess(to: $0) }
         } catch {
             print("Error fetching encrypted tags: \(error)")
             return []
