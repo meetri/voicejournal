@@ -8,13 +8,190 @@
 import Foundation
 import CoreData
 import SwiftUI // For Color
+import CryptoKit
 
 extension Tag {
+    // MARK: - Relationship Properties
+    
+    // Get count of entries encrypted with this tag
+    var encryptedEntriesCount: Int {
+        if let entries = self.encryptedEntries {
+            return entries.count
+        }
+        return 0
+    }
+    
     // MARK: - Convenience Properties
     
     /// Returns the tag's color as a SwiftUI Color, defaulting to blue if nil or invalid.
     var swiftUIColor: Color {
         Color(hex: self.color ?? "#007AFF")
+    }
+    
+    /// Data property to store salt data for PIN hashing
+    var saltData: Data? {
+        get {
+            if let base64Salt = self.pinSalt {
+                return Data(base64Encoded: base64Salt)
+            }
+            return nil
+        }
+        set {
+            self.pinSalt = newValue?.base64EncodedString()
+        }
+    }
+    
+    // MARK: - Encryption Related Properties & Methods
+    
+    // Note: 'pinSalt' property is defined in the Core Data model
+    // and will be generated automatically in Tag+CoreDataProperties.swift
+    // /// Additional property to store PIN salt for hashing
+    // @NSManaged var pinSalt: String?
+    
+    /// Set a PIN for this tag, making it an encrypted tag
+    func setEncryptionPin(_ pin: String) -> Bool {
+        guard pin.count >= 4 else { return false }
+        
+        // Generate a new salt
+        let salt = EncryptionManager.generateSalt()
+        self.saltData = salt
+        
+        // Hash the PIN with the salt
+        guard let hashedPin = EncryptionManager.hashPin(pin, salt: salt) else {
+            return false
+        }
+        
+        // Create a unique key identifier based on objectID
+        let keyIdentifier = EncryptionManager.generateKeyIdentifier(for: self.objectID.uriRepresentation().absoluteString)
+        
+        // Generate an encryption key from the PIN and salt
+        let encryptionKey = EncryptionManager.generateEncryptionKey(from: pin, salt: salt)
+        
+        // Save the encryption key to the keychain
+        let keySaved = EncryptionManager.saveTagEncryptionKey(encryptionKey, for: keyIdentifier)
+        
+        if keySaved {
+            // Set encrypted tag properties
+            self.pinHash = hashedPin
+            self.isEncrypted = true
+            self.encryptionKeyIdentifier = keyIdentifier
+            
+            // Save the context
+            try? self.managedObjectContext?.save()
+            return true
+        }
+        
+        return false
+    }
+    
+    /// Verify a PIN against this tag's stored hash
+    func verifyPin(_ pin: String) -> Bool {
+        guard self.isEncrypted, 
+              let hashedPin = self.pinHash,
+              let salt = self.saltData else {
+            return false
+        }
+        
+        return EncryptionManager.verifyPin(pin, against: hashedPin, salt: salt)
+    }
+    
+    /// Get this tag's encryption key (requires PIN verification)
+    func getEncryptionKey(with pin: String) -> SymmetricKey? {
+        guard self.isEncrypted,
+              let keyIdentifier = self.encryptionKeyIdentifier,
+              verifyPin(pin) else {
+            return nil
+        }
+        
+        // Try to get from keychain first
+        if let key = EncryptionManager.getTagEncryptionKey(for: keyIdentifier) {
+            return key
+        }
+        
+        // If not found in keychain, regenerate from the PIN
+        guard let salt = self.saltData else {
+            return nil
+        }
+        
+        // Regenerate the key from the PIN and salt
+        let regeneratedKey = EncryptionManager.generateEncryptionKey(from: pin, salt: salt)
+        
+        // Save it back to keychain
+        if EncryptionManager.saveTagEncryptionKey(regeneratedKey, for: keyIdentifier) {
+            return regeneratedKey
+        }
+        
+        return nil
+    }
+    
+    /// Remove encryption from this tag
+    func removeEncryption(with pin: String) -> Bool {
+        guard self.isEncrypted, verifyPin(pin) else {
+            return false
+        }
+        
+        // Delete the encryption key from keychain
+        if let keyIdentifier = self.encryptionKeyIdentifier {
+            _ = EncryptionManager.deleteTagEncryptionKey(for: keyIdentifier)
+        }
+        
+        // Reset encryption-related properties
+        self.isEncrypted = false
+        self.pinHash = nil
+        self.encryptionKeyIdentifier = nil
+        self.pinSalt = nil
+        
+        // Save the context
+        do {
+            try self.managedObjectContext?.save()
+            return true
+        } catch {
+            print("Error removing encryption: \(error)")
+            return false
+        }
+    }
+    
+    /// Change the PIN for an encrypted tag
+    func changePin(currentPin: String, newPin: String) -> Bool {
+        guard self.isEncrypted, verifyPin(currentPin), newPin.count >= 4 else {
+            return false
+        }
+        
+        // Get the current encryption key
+        guard let currentKey = getEncryptionKey(with: currentPin) else {
+            return false
+        }
+        
+        // Generate a new salt
+        let newSalt = EncryptionManager.generateSalt()
+        
+        // Hash the new PIN with the new salt
+        guard let newHashedPin = EncryptionManager.hashPin(newPin, salt: newSalt) else {
+            return false
+        }
+        
+        // Generate a new encryption key from the new PIN and salt
+        let newKey = EncryptionManager.generateEncryptionKey(from: newPin, salt: newSalt)
+        
+        // Update the keychain with the new key
+        if let keyIdentifier = self.encryptionKeyIdentifier,
+           EncryptionManager.saveTagEncryptionKey(newKey, for: keyIdentifier) {
+            
+            // Update the tag properties
+            self.pinHash = newHashedPin
+            self.saltData = newSalt
+            
+            // Save the context
+            do {
+                try self.managedObjectContext?.save()
+                return true
+            } catch {
+                print("Error changing PIN: \(error)")
+                return false
+            }
+        }
+        
+        return false
     }
     
     // MARK: - Static Methods
@@ -28,6 +205,20 @@ extension Tag {
             return try context.fetch(request)
         } catch {
             print("Error fetching all tags: \(error)")
+            return []
+        }
+    }
+    
+    /// Fetches all encrypted tags.
+    static func fetchAllEncrypted(in context: NSManagedObjectContext) -> [Tag] {
+        let request: NSFetchRequest<Tag> = Tag.fetchRequest()
+        request.predicate = NSPredicate(format: "isEncrypted == YES")
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \Tag.name, ascending: true)]
+        
+        do {
+            return try context.fetch(request)
+        } catch {
+            print("Error fetching encrypted tags: \(error)")
             return []
         }
     }
@@ -53,9 +244,23 @@ extension Tag {
         newTag.name = name.trimmingCharacters(in: .whitespacesAndNewlines) // Ensure name is trimmed
         newTag.createdAt = Date()
         newTag.color = colorHex ?? generateRandomHexColor() // Assign provided or random color
+        newTag.isEncrypted = false // Default to not encrypted
         
         print("Created new tag: \(newTag.name ?? "Unnamed")")
         return newTag
+    }
+    
+    /// Create a new encrypted tag with a PIN
+    static func createEncrypted(name: String, pin: String, colorHex: String? = nil, in context: NSManagedObjectContext) -> Tag? {
+        guard pin.count >= 4 else { return nil }
+        
+        let tag = findOrCreate(name: name, colorHex: colorHex, in: context)
+        
+        if tag.setEncryptionPin(pin) {
+            return tag
+        }
+        
+        return nil
     }
     
     /// Fetches tags whose names contain the given query string (case-insensitive).
@@ -96,6 +301,11 @@ extension Tag {
     
     /// Deletes the tag from the context.
     func delete(in context: NSManagedObjectContext) {
+        // If this is an encrypted tag, delete its encryption key
+        if self.isEncrypted, let keyIdentifier = self.encryptionKeyIdentifier {
+            _ = EncryptionManager.deleteTagEncryptionKey(for: keyIdentifier)
+        }
+        
         print("Deleting tag: \(self.name ?? "Unnamed")")
         context.delete(self)
         // Note: Saving the context should happen after deletion, typically higher up in the call stack.

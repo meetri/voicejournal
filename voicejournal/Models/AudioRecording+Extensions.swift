@@ -9,6 +9,97 @@ import Foundation
 import CoreData
 
 extension AudioRecording {
+    // MARK: - Encryption Properties
+    
+    // Temporary path for decrypted file (not persisted)
+    private static var decryptedPaths = [String: String]()
+    
+    var tempDecryptedPath: String? {
+        get {
+            guard let filePath = self.filePath else { return nil }
+            return AudioRecording.decryptedPaths[filePath]
+        }
+        set {
+            guard let filePath = self.filePath else { return }
+            if let newValue = newValue {
+                AudioRecording.decryptedPaths[filePath] = newValue
+            } else {
+                AudioRecording.decryptedPaths.removeValue(forKey: filePath)
+            }
+        }
+    }
+    
+    // Clear all temporary decrypted files
+    static func clearAllTempDecryptedFiles() {
+        // Remove all temporary decrypted files
+        for path in decryptedPaths.values {
+            do {
+                let fileManager = FileManager.default
+                if fileManager.fileExists(atPath: path) {
+                    try fileManager.removeItem(atPath: path)
+                }
+            } catch {
+                print("Error removing temporary decrypted file: \(error)")
+            }
+        }
+        
+        // Clear the temporary paths dictionary
+        decryptedPaths.removeAll()
+    }
+    
+    // Get the effective file path (either encrypted or decrypted if available)
+    var effectiveFilePath: String? {
+        if let tempPath = tempDecryptedPath {
+            return tempPath
+        }
+        return filePath
+    }
+    
+    // MARK: - File Management
+    
+    /// Deletes the audio file from disk
+    func deleteAudioFile() {
+        // Delete encrypted file if exists
+        if let filePath = self.filePath {
+            do {
+                let fileManager = FileManager.default
+                if fileManager.fileExists(atPath: filePath) {
+                    try fileManager.removeItem(atPath: filePath)
+                    print("Successfully deleted audio file at \(filePath)")
+                }
+            } catch {
+                print("Error deleting audio file: \(error.localizedDescription)")
+            }
+        }
+        
+        // Delete original file if exists and is different
+        if let originalPath = self.originalFilePath, originalPath != self.filePath {
+            do {
+                let fileManager = FileManager.default
+                if fileManager.fileExists(atPath: originalPath) {
+                    try fileManager.removeItem(atPath: originalPath)
+                    print("Successfully deleted original audio file at \(originalPath)")
+                }
+            } catch {
+                print("Error deleting original audio file: \(error.localizedDescription)")
+            }
+        }
+        
+        // Delete temporary decrypted file if exists
+        if let tempPath = self.tempDecryptedPath {
+            do {
+                let fileManager = FileManager.default
+                if fileManager.fileExists(atPath: tempPath) {
+                    try fileManager.removeItem(atPath: tempPath)
+                    print("Successfully deleted temporary decrypted file at \(tempPath)")
+                }
+                self.tempDecryptedPath = nil
+            } catch {
+                print("Error deleting temporary decrypted file: \(error.localizedDescription)")
+            }
+        }
+    }
+    
     // MARK: - Bookmark Management
     
     /// Create a new bookmark at the specified timestamp

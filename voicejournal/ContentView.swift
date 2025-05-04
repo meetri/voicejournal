@@ -185,13 +185,35 @@ struct JournalEntryDetailView: View {
 /// Settings tab view
 struct SettingsTabView: View {
     @EnvironmentObject private var authService: AuthenticationService
+    @Environment(\.managedObjectContext) private var viewContext
+    
+    @State private var showTagManagement = false
+    @State private var showEncryptedTagManagement = false
     
     var body: some View {
         NavigationView {
             List {
+                Section(header: Text("Organization")) {
+                    NavigationLink {
+                        TagManagementView()
+                            .environment(\.managedObjectContext, viewContext)
+                    } label: {
+                        Label("Manage Tags", systemImage: "tag")
+                    }
+                }
+                
                 Section(header: Text("Security")) {
-                    Button("Lock App") {
+                    Button {
                         authService.lock()
+                    } label: {
+                        Label("Lock App", systemImage: "lock")
+                    }
+                    
+                    NavigationLink {
+                        EncryptedTagManagementView()
+                            .environment(\.managedObjectContext, viewContext)
+                    } label: {
+                        Label("Encrypted Tags", systemImage: "lock.shield")
                     }
                 }
                 

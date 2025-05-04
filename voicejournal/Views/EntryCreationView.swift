@@ -15,6 +15,12 @@ struct EntryCreationView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
     
+    // MARK: - Static Properties
+    
+    /// Dictionary to temporarily store PIN values for encrypted tags before entry creation
+    /// Uses tag name as key since object IDs can change after saving context
+    static var encryptedTagPINs: [String: String] = [:]
+    
     // MARK: - Bindings
     
     @Binding var isPresented: Bool
@@ -29,6 +35,7 @@ struct EntryCreationView: View {
     @State private var isEditingTranscription = false
     @State private var transcriptionText = ""
     @State private var showingDiscardAlert = false
+    @State private var encryptedTag: Tag? = nil
     
     // MARK: - Body
     
@@ -195,7 +202,7 @@ struct EntryCreationView: View {
                 }
             }
             .sheet(isPresented: $showingTagSelection) {
-                TagSelectionView(selectedTags: $selectedTags)
+                TagSelectionView(journalEntry: journalEntry, selectedTags: $selectedTags)
                     .environment(\.managedObjectContext, viewContext)
             }
             .sheet(isPresented: $showingRecordingView) {
@@ -237,8 +244,30 @@ struct EntryCreationView: View {
         let entry = JournalEntry.create(in: viewContext)
         entry.title = entryTitle.isEmpty ? "Untitled Entry" : entryTitle
         
-        // Add selected tags
+        // Process selected tags
+        print("DEBUG: Processing \(selectedTags.count) selected tags")
+        
+        // Find and process encrypted tags first
         for tag in selectedTags {
+            if tag.isEncrypted, let tagName = tag.name {
+                print("DEBUG: Found encrypted tag: '\(tagName)'")
+                
+                if let pin = EntryCreationView.encryptedTagPINs[tagName] {
+                    print("DEBUG: Found PIN for encrypted tag '\(tagName)'")
+                    // Store this encrypted tag for later application (after recording is saved)
+                    encryptedTag = tag
+                    
+                    // We'll apply the encrypted tag after recording to ensure content exists
+                    // So we don't add it to tags here
+                    continue
+                } else {
+                    print("DEBUG: No PIN found for encrypted tag '\(tagName)'")
+                    print("DEBUG: Available tag names in dictionary: \(EntryCreationView.encryptedTagPINs.keys)")
+                }
+            }
+            
+            // Add regular tag
+            print("DEBUG: Adding regular tag: \(tag.name ?? "unnamed")")
             entry.addToTags(tag)
         }
         
@@ -263,25 +292,48 @@ struct EntryCreationView: View {
             entry.title = entryTitle
         }
         
-        // Update tags
+        // Apply encrypted tag if one was selected
+        if let tag = encryptedTag, let tagName = tag.name {
+            print("DEBUG: Attempting to apply encrypted tag: '\(tagName)'")
+            print("DEBUG: All stored tag names with PINs: \(EntryCreationView.encryptedTagPINs.keys)")
+            
+            if let pin = EntryCreationView.encryptedTagPINs[tagName] {
+                print("DEBUG: Found PIN for '\(tagName)', applying encrypted tag")
+                // Apply tag with PIN to encrypt content
+                if entry.applyEncryptedTagWithPin(tag, pin: pin) {
+                    print("DEBUG: Successfully applied encrypted tag and encrypted content")
+                } else {
+                    print("ERROR: Failed to apply encrypted tag")
+                }
+                
+                // Remove from local storage after use
+                EntryCreationView.encryptedTagPINs.removeValue(forKey: tagName)
+            } else {
+                print("ERROR: No PIN found for encrypted tag: '\(tagName)'")
+            }
+        }
+        
+        // Update regular tags
         if let currentTags = entry.tags as? Set<Tag> {
             // Remove tags that are no longer selected
             for tag in currentTags {
-                if !selectedTags.contains(tag) {
+                if !selectedTags.contains(tag) && !tag.isEncrypted {
                     entry.removeFromTags(tag)
                 }
             }
             
             // Add new tags
             for tag in selectedTags {
-                if !currentTags.contains(tag) {
+                if !currentTags.contains(tag) && !tag.isEncrypted {
                     entry.addToTags(tag)
                 }
             }
         } else {
-            // Add all selected tags
+            // Add all selected tags that aren't encrypted
             for tag in selectedTags {
-                entry.addToTags(tag)
+                if !tag.isEncrypted {
+                    entry.addToTags(tag)
+                }
             }
         }
         
@@ -353,6 +405,11 @@ struct TagSelectionView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
     
+    // MARK: - Properties
+    
+    /// The journal entry if editing an existing entry
+    var journalEntry: JournalEntry?
+    
     // MARK: - Bindings
     
     @Binding var selectedTags: Set<Tag>
@@ -363,13 +420,26 @@ struct TagSelectionView: View {
     @State private var newTagColor = "#007AFF" // Default blue color
     @State private var showingColorPicker = false
     @State private var selectedColorIndex = 0
+    @State private var showingPINEntryDialog = false
+    @State private var selectedEncryptedTag: Tag? = nil
+    @State private var showCreateEncryptedTagSheet = false
+    @State private var showAlert = false
+    @State private var alertTitle = ""
+    @State private var alertMessage = ""
     
-    // MARK: - Fetch Request
+    // MARK: - Fetch Requests
     
     @FetchRequest(
         entity: Tag.entity(),
-        sortDescriptors: [NSSortDescriptor(keyPath: \Tag.name, ascending: true)]
-    ) private var tags: FetchedResults<Tag>
+        sortDescriptors: [NSSortDescriptor(keyPath: \Tag.name, ascending: true)],
+        predicate: NSPredicate(format: "isEncrypted == NO")
+    ) private var regularTags: FetchedResults<Tag>
+    
+    @FetchRequest(
+        entity: Tag.entity(),
+        sortDescriptors: [NSSortDescriptor(keyPath: \Tag.name, ascending: true)],
+        predicate: NSPredicate(format: "isEncrypted == YES")
+    ) private var encryptedTags: FetchedResults<Tag>
     
     // MARK: - Constants
     
@@ -388,106 +458,235 @@ struct TagSelectionView: View {
     
     var body: some View {
         NavigationView {
-            List {
-                // Create new tag section
-                Section(header: Text("Create New Tag")) {
-                    HStack {
-                        TextField("Tag Name", text: $newTagName)
-                        
-                        Button(action: {
-                            showingColorPicker = true
-                        }) {
-                            Circle()
-                                .fill(Color(hex: newTagColor))
-                                .frame(width: 24, height: 24)
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
-                                )
-                        }
-                        .buttonStyle(BorderlessButtonStyle())
-                        
-                        Button(action: {
-                            createNewTag()
-                        }) {
-                            Image(systemName: "plus.circle.fill")
-                                .foregroundColor(.blue)
-                        }
-                        .buttonStyle(BorderlessButtonStyle())
-                        .disabled(newTagName.isEmpty)
-                    }
-                    
-                    if showingColorPicker {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 12) {
-                                ForEach(0..<tagColors.count, id: \.self) { index in
-                                    let color = tagColors[index]
-                                    Circle()
-                                        .fill(Color(hex: color))
-                                        .frame(width: 30, height: 30)
-                                        .overlay(
-                                            Circle()
-                                                .stroke(Color.primary, lineWidth: selectedColorIndex == index ? 2 : 0)
-                                        )
-                                        .onTapGesture {
-                                            selectedColorIndex = index
-                                            newTagColor = color
-                                        }
-                                }
-                            }
-                            .padding(.vertical, 8)
+            tagSelectionListView
+                .listStyle(InsetGroupedListStyle())
+                .navigationTitle("Tags")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Done") {
+                            dismiss()
                         }
                     }
                 }
-                
-                // Existing tags section
-                Section(header: Text("Select Tags")) {
-                    if tags.isEmpty {
-                        Text("No tags available")
-                            .foregroundColor(.secondary)
-                            .italic()
-                    } else {
-                        ForEach(tags, id: \.self) { tag in
-                            if let name = tag.name, let color = tag.color {
-                                Button(action: {
-                                    toggleTag(tag)
-                                }) {
-                                    HStack {
-                                        Circle()
-                                            .fill(Color(hex: color))
-                                            .frame(width: 12, height: 12)
-                                        
-                                        Text(name)
-                                        
-                                        Spacer()
-                                        
-                                        if selectedTags.contains(tag) {
-                                            Image(systemName: "checkmark")
-                                                .foregroundColor(.blue)
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                .sheet(isPresented: $showCreateEncryptedTagSheet) {
+                    CreateEncryptedTagView()
+                        .environment(\.managedObjectContext, viewContext)
+                }
+                .pinEntryDialog(
+                    isPresented: $showingPINEntryDialog,
+                    title: "Enter PIN",
+                    message: "Enter PIN for \"\(selectedEncryptedTag?.name ?? "")\" to apply this encrypted tag",
+                    onSubmit: { pin in
+                        verifyPINAndApplyTag(pin)
                     }
+                )
+                .alert(alertTitle, isPresented: $showAlert) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text(alertMessage)
+                }
+        }
+    }
+    
+    // MARK: - Subviews
+    
+    /// The main list view containing all sections
+    private var tagSelectionListView: some View {
+        List {
+            createNewTagSection
+            regularTagsSection
+            encryptedTagsSection
+        }
+    }
+    
+    /// Section for creating a new tag
+    private var createNewTagSection: some View {
+        Section(header: Text("Create New Tag")) {
+            HStack {
+                TextField("Tag Name", text: $newTagName)
+                
+                Button(action: {
+                    showingColorPicker = true
+                }) {
+                    Circle()
+                        .fill(Color(hex: newTagColor))
+                        .frame(width: 24, height: 24)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(BorderlessButtonStyle())
+                
+                Button(action: {
+                    createNewTag()
+                }) {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundColor(.blue)
+                }
+                .buttonStyle(BorderlessButtonStyle())
+                .disabled(newTagName.isEmpty)
+            }
+            
+            if showingColorPicker {
+                colorPickerView
+            }
+        }
+    }
+    
+    /// Color picker view for selecting tag colors
+    private var colorPickerView: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(0..<tagColors.count, id: \.self) { index in
+                    let color = tagColors[index]
+                    Circle()
+                        .fill(Color(hex: color))
+                        .frame(width: 30, height: 30)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.primary, lineWidth: selectedColorIndex == index ? 2 : 0)
+                        )
+                        .onTapGesture {
+                            selectedColorIndex = index
+                            newTagColor = color
+                        }
                 }
             }
-            .listStyle(InsetGroupedListStyle())
-            .navigationTitle("Tags")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
+            .padding(.vertical, 8)
+        }
+    }
+    
+    /// Section for regular (non-encrypted) tags
+    private var regularTagsSection: some View {
+        Section(header: Text("Regular Tags")) {
+            if regularTags.isEmpty {
+                Text("No regular tags available")
+                    .foregroundColor(.secondary)
+                    .italic()
+            } else {
+                ForEach(regularTags, id: \.self) { tag in
+                    regularTagRow(tag)
                 }
             }
         }
     }
     
+    /// Row view for a regular tag
+    @ViewBuilder
+    private func regularTagRow(_ tag: Tag) -> some View {
+        if let name = tag.name, let color = tag.color {
+            Button(action: {
+                toggleTag(tag)
+            }) {
+                HStack {
+                    Circle()
+                        .fill(Color(hex: color))
+                        .frame(width: 12, height: 12)
+                    
+                    Text(name)
+                    
+                    Spacer()
+                    
+                    if selectedTags.contains(tag) {
+                        Image(systemName: "checkmark")
+                            .foregroundColor(.blue)
+                    }
+                }
+            }
+        } else {
+            Button(action: {}) {
+                Text("Invalid Tag")
+                    .foregroundColor(.secondary)
+            }
+            .disabled(true)
+        }
+    }
+    
+    /// Section for encrypted tags
+    private var encryptedTagsSection: some View {
+        Section(
+            header: encryptedTagsHeader,
+            footer: Text("Encrypted tags require a PIN to access content.")
+        ) {
+            if encryptedTags.isEmpty {
+                Text("No encrypted tags available")
+                    .foregroundColor(.secondary)
+                    .italic()
+            } else {
+                ForEach(encryptedTags, id: \.self) { tag in
+                    encryptedTagRow(tag)
+                }
+            }
+        }
+    }
+    
+    /// Header view for encrypted tags section
+    private var encryptedTagsHeader: some View {
+        HStack {
+            Text("Encrypted Tags")
+            Spacer()
+            Button(action: {
+                showCreateEncryptedTagSheet = true
+            }) {
+                Text("Create New")
+                    .font(.caption)
+                    .foregroundColor(.blue)
+            }
+        }
+    }
+    
+    /// Row view for an encrypted tag
+    @ViewBuilder
+    private func encryptedTagRow(_ tag: Tag) -> some View {
+        if let name = tag.name, let color = tag.color {
+            Button(action: {
+                selectedEncryptedTag = tag
+                showingPINEntryDialog = true
+            }) {
+                HStack {
+                    // Tag color with lock icon overlay
+                    ZStack {
+                        Circle()
+                            .fill(Color(hex: color))
+                            .frame(width: 16, height: 16)
+                        
+                        // Lock icon overlay
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 8))
+                            .foregroundColor(.white)
+                    }
+                    
+                    Text(name)
+                    
+                    Spacer()
+                    
+                    // If this is the currently set encrypted tag
+                    if let entry = journalEntry, entry.encryptedTag == tag {
+                        Image(systemName: "checkmark.shield.fill")
+                            .foregroundColor(.blue)
+                            .font(.caption)
+                    }
+                    // If it's in the selected tags but not the encrypted tag
+                    else if selectedTags.contains(tag) {
+                        Image(systemName: "checkmark")
+                            .foregroundColor(.blue)
+                    }
+                }
+            }
+        } else {
+            Button(action: {}) {
+                Text("Invalid Tag")
+                    .foregroundColor(.secondary)
+            }
+            .disabled(true)
+        }
+    }
+    
     // MARK: - Methods
     
-    /// Create a new tag
+    /// Create a new regular tag
     private func createNewTag() {
         guard !newTagName.isEmpty else { return }
         
@@ -507,6 +706,7 @@ struct TagSelectionView: View {
                 newTag.name = newTagName
                 newTag.color = newTagColor
                 newTag.createdAt = Date()
+                newTag.isEncrypted = false // Ensure it's not encrypted
                 
                 try viewContext.save()
                 
@@ -522,13 +722,65 @@ struct TagSelectionView: View {
         }
     }
     
-    /// Toggle selection of a tag
+    /// Toggle selection of a regular tag
     private func toggleTag(_ tag: Tag) {
         if selectedTags.contains(tag) {
             selectedTags.remove(tag)
         } else {
             selectedTags.insert(tag)
         }
+    }
+    
+    /// Verify PIN and apply encrypted tag
+    private func verifyPINAndApplyTag(_ pin: String) {
+        guard let tag = selectedEncryptedTag else {
+            return
+        }
+        
+        // Only attempt to apply encrypted tag if we have a journal entry
+        if let entry = journalEntry {
+            // First verify the PIN
+            if tag.verifyPin(pin) {
+                // Apply tag with PIN and encrypt content
+                if entry.applyEncryptedTagWithPin(tag, pin: pin) {
+                    // Add to selected tags
+                    selectedTags.insert(tag)
+                    
+                    // Only needed if UI needs to update for success
+                    showAlert(title: "Encrypted Tag Applied", message: "The content has been encrypted with the tag \"\(tag.name ?? "")\".")
+                } else {
+                    showAlert(title: "Error", message: "Failed to apply encrypted tag. Please try again.")
+                }
+            } else {
+                showAlert(title: "Incorrect PIN", message: "The PIN you entered is incorrect for this tag.")
+            }
+        } else {
+            // If no entry exists yet, just add to selected tags and note that PIN verification succeeded
+            if tag.verifyPin(pin) {
+                // Add to selected tags, will be applied when entry is created
+                selectedTags.insert(tag)
+                
+                // Save the pin in temporary storage for later application
+                if let tagName = tag.name {
+                    EntryCreationView.encryptedTagPINs[tagName] = pin
+                    print("DEBUG: Stored PIN for tag '\(tagName)' using name as key")
+                } else {
+                    print("ERROR: Cannot store PIN - tag has no name")
+                }
+                
+                // Show feedback that the PIN was correct and tag was selected
+                showAlert(title: "Encrypted Tag Selected", message: "The tag \"\(tag.name ?? "")\" will be applied and content will be encrypted after recording.")
+            } else {
+                showAlert(title: "Incorrect PIN", message: "The PIN you entered is incorrect for this tag.")
+            }
+        }
+    }
+    
+    /// Show an alert with the given title and message
+    private func showAlert(title: String, message: String) {
+        alertTitle = title
+        alertMessage = message
+        showAlert = true
     }
 }
 

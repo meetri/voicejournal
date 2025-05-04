@@ -3,12 +3,15 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Build/Test Commands
-- Check syntax using xcodebuild command, example: xcodebuild -scheme voicejournal -destination 'platform=iOS Simulator,name=iPhone 16' -quiet
-- Build & run: Use Xcode's ⌘+R (Product > Run)
-- Run all tests: ⌘+U (Product > Test)
-- Run single test: Select test method in test file and use ⌘+U
+- Check syntax using `xcodebuild` command, example: xcodebuild -scheme voicejournal -destination 'platform=iOS Simulator,name=iPhone 16' -quiet
+- install app to iphone (physical device) using `xcrun` example: xcrun devicectl device process launch --device 00008140-001270893C6A801C com.ztwoi.voicejournal
 
-## Syntax Checking using xcode build command line
+## Important Instructions
+
+### Issue Handling
+- ALWAYS report issues like typos, incorrect attributes, or inconsistencies directly to the user without implementing workarounds
+- When you notice issues (like mismatched property names), explain the problem and recommend a proper fix rather than creating code to work around it
+- Only implement changes that directly address the user's request, not changes that address underlying issues unless specifically asked
 
 ## Code Style Guidelines
 - **Imports**: Standard libraries first, then frameworks alphabetically, custom modules last

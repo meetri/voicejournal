@@ -218,6 +218,11 @@ class AuthenticationService: ObservableObject {
     
     // Lock the app
     func lock() {
+        // Clear all decrypted content for security
+        JournalEntry.clearAllDecryptedEntries()
+        AudioRecording.clearAllTempDecryptedFiles()
+        
+        // Set app to locked state
         isAuthenticated = false
     }
     

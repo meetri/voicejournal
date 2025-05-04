@@ -34,6 +34,25 @@ struct JournalEntryRow: View {
                 
                 Spacer()
                 
+                // Show encryption indicator if applicable
+                if entry.hasEncryptedContent, let tag = entry.encryptedTag {
+                    HStack(spacing: 4) {
+                        Image(systemName: "lock.fill")
+                            .font(.caption)
+                            .foregroundColor(tag.swiftUIColor)
+                            
+                        Text(tag.name ?? "")
+                            .font(.caption)
+                            .foregroundColor(tag.swiftUIColor)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        Capsule()
+                            .fill(tag.swiftUIColor.opacity(0.15))
+                    )
+                }
+                
                 Button(action: {
                     onToggleLock?(entry)
                 }) {
@@ -82,12 +101,22 @@ struct JournalEntryRow: View {
             }
             
             // Preview of transcription
-            if let transcription = entry.transcription, let text = transcription.text, !text.isEmpty {
-                Text(text)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .lineLimit(3)
-                    .padding(.top, 2)
+            if let transcription = entry.transcription {
+                if entry.hasEncryptedContent && !entry.isDecrypted {
+                    // Show encrypted content placeholder
+                    Text("Encrypted content")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .italic()
+                        .padding(.top, 2)
+                } else if let text = transcription.text, !text.isEmpty {
+                    // Show actual transcription text
+                    Text(text)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(3)
+                        .padding(.top, 2)
+                }
             }
         }
         .padding(.vertical, 8)

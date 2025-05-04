@@ -4,6 +4,8 @@
         <attribute name="duration" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="filePath" attributeType="String"/>
         <attribute name="fileSize" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="isEncrypted" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="originalFilePath" optional="YES" attributeType="String"/>
         <attribute name="recordedAt" attributeType="Date" usesScalarValueType="NO"/>
         <relationship name="bookmarks" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Bookmark" inverseName="audioRecording" inverseEntity="Bookmark"/>
         <relationship name="journalEntry" maxCount="1" deletionRule="Nullify" destinationEntity="JournalEntry" inverseName="audioRecording" inverseEntity="JournalEntry"/>
@@ -21,18 +23,25 @@
         <attribute name="modifiedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="title" optional="YES" attributeType="String"/>
         <relationship name="audioRecording" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="AudioRecording" inverseName="journalEntry" inverseEntity="AudioRecording"/>
+        <relationship name="encryptedTag" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Tag" inverseName="encryptedEntries" inverseEntity="Tag"/>
         <relationship name="tags" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Tag" inverseName="entries" inverseEntity="Tag"/>
         <relationship name="transcription" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="Transcription" inverseName="journalEntry" inverseEntity="Transcription"/>
     </entity>
     <entity name="Tag" representedClassName="Tag" syncable="YES" codeGenerationType="class">
         <attribute name="color" optional="YES" attributeType="String"/>
         <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="encryptionKeyIdentifier" optional="YES" attributeType="String"/>
         <attribute name="iconName" optional="YES" attributeType="String"/>
+        <attribute name="isEncrypted" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="name" attributeType="String"/>
+        <attribute name="pinHash" optional="YES" attributeType="String"/>
+        <attribute name="pinSalt" optional="YES" attributeType="String"/>
+        <relationship name="encryptedEntries" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="JournalEntry" inverseName="encryptedTag" inverseEntity="JournalEntry"/>
         <relationship name="entries" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="JournalEntry" inverseName="tags" inverseEntity="JournalEntry"/>
     </entity>
     <entity name="Transcription" representedClassName="Transcription" syncable="YES" codeGenerationType="class">
         <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="encryptedText" optional="YES" attributeType="Binary"/>
         <attribute name="modifiedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="text" optional="YES" attributeType="String"/>
         <attribute name="timingData" optional="YES" attributeType="String"/>

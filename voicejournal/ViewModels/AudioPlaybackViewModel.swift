@@ -108,7 +108,8 @@ class AudioPlaybackViewModel: ObservableObject {
     
     /// Load an audio file from an AudioRecording entity
     func loadAudio(from recording: AudioRecording) async {
-        guard let filePath = recording.filePath else {
+        // Use effectiveFilePath which will return decrypted path if available
+        guard let filePath = recording.effectiveFilePath else {
             handleError(AudioPlaybackError.fileNotFound)
             return
         }

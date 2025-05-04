@@ -1,3 +1,6 @@
 .aider*
 
+errors.log
+backup/*
+
 **/.claude/settings.local.json

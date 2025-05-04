@@ -59,8 +59,11 @@ struct EnhancedJournalEntryView: View {
                         audioSection
                     }
                     
-                    // Transcription
-                    if let transcription = journalEntry.transcription, let text = transcription.text {
+                    // Transcription or encrypted content
+                    if journalEntry.hasEncryptedContent {
+                        // Show encrypted content view
+                        EncryptedContentView(journalEntry: journalEntry)
+                    } else if let transcription = journalEntry.transcription, let text = transcription.text {
                         transcriptionSection(text: text)
                     }
                     
@@ -253,12 +256,30 @@ struct EnhancedJournalEntryView: View {
                     .font(.headline)
                 
                 Spacer()
+                
+                // Show encrypted tag indicator if applicable
+                if journalEntry.hasEncryptedContent, let encryptedTag = journalEntry.encryptedTag {
+                    HStack(spacing: 4) {
+                        Image(systemName: "lock.fill")
+                            .font(.caption)
+                        
+                        Text(encryptedTag.name ?? "")
+                            .font(.caption)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(encryptedTag.swiftUIColor.opacity(0.2))
+                    )
+                    .foregroundColor(encryptedTag.swiftUIColor)
+                }
             }
             
             // Tags cloud
             FlowLayout(spacing: 8) {
                 ForEach(Array(tags) as? [Tag] ?? [], id: \.self) { tag in
-                    EnhancedTagView(tag: tag)
+                    EnhancedEncryptedTagView(tag: tag)
                 }
             }
         }
@@ -331,40 +352,6 @@ struct EnhancedJournalEntryView: View {
     }
     
     // MARK: - Helper Views
-    
-    /// An enhanced tag view, now with icon support
-    struct EnhancedTagView: View {
-        let tag: Tag
-        
-        var body: some View {
-            HStack(spacing: 6) {
-                // Display icon if available, otherwise color circle
-                if let iconName = tag.iconName, !iconName.isEmpty {
-                    Image(systemName: iconName)
-                        .font(.caption) // Adjust size as needed
-                        .foregroundColor(Color(hex: tag.color ?? "#007AFF"))
-                } else {
-                    Circle()
-                        .fill(Color(hex: tag.color ?? "#007AFF"))
-                        .frame(width: 8, height: 8)
-                }
-                
-                Text(tag.name ?? "")
-                    .font(.subheadline)
-                    .lineLimit(1)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(Color(hex: tag.color ?? "#007AFF").opacity(0.15))
-            )
-            .overlay(
-                Capsule()
-                    .strokeBorder(Color(hex: tag.color ?? "#007AFF").opacity(0.3), lineWidth: 1)
-            )
-        }
-    }
     
     /// A flow layout for tags
     struct FlowLayout: Layout {
