@@ -15,6 +15,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Only implement changes that directly address the user's request, not changes that address underlying issues unless specifically asked
 
 ## Code Style Guidelines
+- use 4 spaces for indentation
+- keep lines under 80 character length
+- **Never create a file longer than 500 lines of code.** If a file approaches this limit, refactor by splitting it into modules or helper files.
+- **Organize code into clearly separated modules**, grouped by feature or responsibility.
 - **Imports**: Standard libraries first, then frameworks alphabetically, custom modules last
 - **Types**: PascalCase for types/classes/enums, camelCase for methods/properties/variables
 - **Organization**: Use `MARK: - Section Name` comments to organize code sections
