@@ -296,12 +296,6 @@ struct TimelineView: View {
                     }
                 }
             }
-            
-            // Bottom padding
-            Section {
-                Color.clear.frame(height: 40)
-                    .listRowBackground(Color.clear)
-            }
         }
         .listStyle(PlainListStyle())
         .onChange(of: scrollToDate) { oldValue, newValue in
