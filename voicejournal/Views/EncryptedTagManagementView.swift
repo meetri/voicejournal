@@ -224,21 +224,50 @@ struct EncryptedTagManagementView: View {
             
             // Access button
             if tag.encryptedEntriesCount > 0 {
-                Button {
-                    selectedTag = tag
-                    setupActionAfterPIN { tag, pin in
-                        // This would navigate to a list of encrypted entries
-                        showAlert(title: "PIN Verified", message: "You have access to \(tag.encryptedEntriesCount) encrypted entries.")
+                if tag.hasGlobalAccess {
+                    // Show a button to revoke access
+                    Button {
+                        EncryptedTagsAccessManager.shared.revokeAccess(from: tag)
+                        // This will automatically notify observers
+                    } label: {
+                        HStack {
+                            Image(systemName: "lock.open.fill")
+                            Text("Revoke")
+                        }
+                        .font(.footnote)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.green)
+                        .cornerRadius(16)
                     }
-                    showingPINEntryDialog = true
-                } label: {
-                    Text("Access")
+                } else {
+                    // Show a button to grant access
+                    Button {
+                        selectedTag = tag
+                        setupActionAfterPIN { tag, pin in
+                            // Grant global access to this tag
+                            let success = EncryptedTagsAccessManager.shared.grantAccess(to: tag, with: pin)
+                            if success {
+                                // This will automatically notify observers
+                                showAlert(title: "Access Granted", message: "You now have access to all entries with the \"\(tag.name ?? "")\" tag. This access will be reset when the app is closed or locked.")
+                            } else {
+                                showAlert(title: "Error", message: "Failed to grant access to the tag.")
+                            }
+                        }
+                        showingPINEntryDialog = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "lock.fill")
+                            Text("Grant Access")
+                        }
                         .font(.footnote)
                         .foregroundColor(.white)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(tag.swiftUIColor)
                         .cornerRadius(16)
+                    }
                 }
             }
         }

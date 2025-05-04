@@ -84,30 +84,76 @@ struct EncryptedContentView: View {
                             
                             EnhancedEncryptedTagView(tag: encryptedTag)
                                 .padding(.vertical, 8)
+                            
+                            if encryptedTag.hasGlobalAccess {
+                                // If tag has global access, show a button to auto-decrypt
+                                Text("This tag has been granted global access")
+                                    .font(.subheadline)
+                                    .foregroundColor(.green)
+                                
+                                Button {
+                                    if journalEntry.decryptWithGlobalAccess() {
+                                        withAnimation {
+                                            isContentDecrypted = true
+                                        }
+                                    } else {
+                                        showAlert(title: "Decryption Failed", message: "Failed to decrypt the content with global access.")
+                                    }
+                                } label: {
+                                    Label("Decrypt with Global Access", systemImage: "lock.open")
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 8)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 10)
+                                                .fill(Color.green)
+                                        )
+                                        .foregroundColor(.white)
+                                }
+                                .padding(.top, 8)
+                            } else {
+                                Text("This content is encrypted and requires a PIN to access")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                                
+                                Button {
+                                    showingPINEntryDialog = true
+                                } label: {
+                                    Label("Enter PIN", systemImage: "key")
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 8)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 10)
+                                                .fill(Color.accentColor)
+                                        )
+                                        .foregroundColor(.white)
+                                }
+                                .padding(.top, 8)
+                            }
                         } else {
                             Text("Encrypted Content")
                                 .font(.headline)
                                 .foregroundColor(.secondary)
+                            
+                            Text("This content is encrypted and requires a PIN to access")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                            
+                            Button {
+                                showingPINEntryDialog = true
+                            } label: {
+                                Label("Enter PIN", systemImage: "key")
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .fill(Color.accentColor)
+                                    )
+                                    .foregroundColor(.white)
+                            }
+                            .padding(.top, 8)
                         }
-                        
-                        Text("This content is encrypted and requires a PIN to access")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                        
-                        Button {
-                            showingPINEntryDialog = true
-                        } label: {
-                            Label("Enter PIN", systemImage: "key")
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .fill(Color.accentColor)
-                                )
-                                .foregroundColor(.white)
-                        }
-                        .padding(.top, 8)
                     }
                     .padding()
                     .frame(maxWidth: .infinity)

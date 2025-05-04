@@ -15,19 +15,29 @@ struct EncryptedTagModifier: ViewModifier {
     /// The color of the tag
     let tagColor: Color
     
+    /// The tag object, used to check for global access
+    let tag: Tag?
+    
+    init(isEncrypted: Bool, tagColor: Color, tag: Tag? = nil) {
+        self.isEncrypted = isEncrypted
+        self.tagColor = tagColor
+        self.tag = tag
+    }
+    
     func body(content: Content) -> some View {
         if isEncrypted {
             ZStack(alignment: .topTrailing) {
                 content
                 
-                // Lock indicator
-                Image(systemName: "lock.fill")
+                // Lock indicator - show open lock if tag has global access
+                let hasAccess = tag?.hasGlobalAccess ?? false
+                Image(systemName: hasAccess ? "lock.open.fill" : "lock.fill")
                     .font(.system(size: 10))
                     .foregroundColor(.white)
                     .padding(4)
                     .background(
                         Circle()
-                            .fill(tagColor)
+                            .fill(hasAccess ? Color.green : tagColor)
                     )
                     .offset(x: 3, y: -3)
             }
@@ -61,6 +71,13 @@ struct EnhancedEncryptedTagView: View {
                 Text(tag.name ?? "")
                     .font(.subheadline)
                     .lineLimit(1)
+                
+                // Show access indicator if encrypted tag has global access
+                if tag.isEncrypted && tag.hasGlobalAccess {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(.green)
+                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
@@ -72,7 +89,7 @@ struct EnhancedEncryptedTagView: View {
                 Capsule()
                     .strokeBorder(tag.swiftUIColor.opacity(0.3), lineWidth: 1)
             )
-            .modifier(EncryptedTagModifier(isEncrypted: tag.isEncrypted, tagColor: tag.swiftUIColor))
+            .modifier(EncryptedTagModifier(isEncrypted: tag.isEncrypted, tagColor: tag.swiftUIColor, tag: tag))
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -80,8 +97,8 @@ struct EnhancedEncryptedTagView: View {
 
 extension View {
     /// Add an encryption indicator to a view
-    func encryptedTagIndicator(isEncrypted: Bool, color: Color) -> some View {
-        self.modifier(EncryptedTagModifier(isEncrypted: isEncrypted, tagColor: color))
+    func encryptedTagIndicator(isEncrypted: Bool, color: Color, tag: Tag? = nil) -> some View {
+        self.modifier(EncryptedTagModifier(isEncrypted: isEncrypted, tagColor: color, tag: tag))
     }
 }
 

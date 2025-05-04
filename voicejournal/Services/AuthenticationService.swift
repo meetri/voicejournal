@@ -222,6 +222,9 @@ class AuthenticationService: ObservableObject {
         JournalEntry.clearAllDecryptedEntries()
         AudioRecording.clearAllTempDecryptedFiles()
         
+        // Reset all granted encrypted tag access
+        EncryptedTagsAccessManager.shared.clearAllAccess()
+        
         // Set app to locked state
         isAuthenticated = false
     }

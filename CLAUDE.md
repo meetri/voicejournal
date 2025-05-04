@@ -4,7 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build/Test Commands
 - Check syntax using `xcodebuild` command, example: xcodebuild -scheme voicejournal -destination 'platform=iOS Simulator,name=iPhone 16' -quiet
-- install app to iphone (physical device) using `xcrun` example: xcrun devicectl device process launch --device 00008140-001270893C6A801C com.ztwoi.voicejournal
+- build and install app to external iphone/device only when requested using `xrun` example: `xcrun devicectl device process launch --device 00008140-001270893C6A801C com.ztwoi.voicejournal`
+- after major code updates and upon completion of any updates make sure to check that the build completes successfully
 
 ## Important Instructions
 
