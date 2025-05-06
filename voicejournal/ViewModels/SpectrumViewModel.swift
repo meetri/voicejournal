@@ -122,25 +122,6 @@ class SpectrumViewModel: ObservableObject, SpectrumAnalyzerDelegate {
         }
     }
     
-    /// Updates the analyzer with manually provided data when needed
-    /// - Parameter level: The audio level to use for creating minimal visual feedback
-    func updateWithMinimalVisualization(level: Float) {
-        // Simple visual pattern based on the level - not a real spectrum analysis
-        // but better than showing nothing if audio capture fails
-        var minimalData = [Float](repeating: 0, count: 64)
-        let intensity = min(1.0, max(0.0, level))
-        
-        // Create a simple pattern that is visually interesting but shows no real data
-        for i in 0..<minimalData.count {
-            minimalData[i] = intensity * 0.2 + intensity * 0.8 * Float.random(in: 0...1)
-        }
-        
-        DispatchQueue.main.async {
-            self.frequencyData = minimalData
-            self.updatePeakData(newData: minimalData)
-        }
-    }
-    
     // MARK: - Private Methods
     
     /// Sets up subscriptions to frequency data updates

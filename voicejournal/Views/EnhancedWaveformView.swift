@@ -100,7 +100,8 @@ struct EnhancedWaveformView: View {
                             viewModel: spectrumViewModel,
                             height: geometry.size.height,
                             style: .bars,
-                            useHardwareAcceleration: true
+                            useHardwareAcceleration: true,
+                            visualAmplification: 2.0 // Amplify the bars to fill the view
                         )
                     }
                 }
@@ -132,10 +133,6 @@ struct EnhancedWaveformView: View {
                     if !spectrumViewModel.isActive {
                         spectrumViewModel.start()
                     }
-                    
-                    // Provide minimal visual feedback in case audio engine fails
-                    // This uses the audio level but doesn't try to simulate spectral data
-                    spectrumViewModel.updateWithMinimalVisualization(level: Float(audioLevel))
                 } else {
                     // If we're not active, stop the analyzer to save resources
                     spectrumViewModel.stop()

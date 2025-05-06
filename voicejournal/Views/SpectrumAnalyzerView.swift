@@ -23,16 +23,24 @@ struct SpectrumAnalyzerView: View {
     /// Whether to use Metal/Canvas for rendering (more efficient)
     var useHardwareAcceleration: Bool = true
     
+    /// Visual amplification factor to scale the bars to fill more of the view height
+    var visualAmplification: CGFloat = 2.0
+    
     /// State for refresh trigger (used for animation)
     @State private var refreshTrigger = false
     
     // MARK: - Initialization
     
-    init(viewModel: SpectrumViewModel, height: CGFloat = 120, style: SpectrumStyle = .bars, useHardwareAcceleration: Bool = true) {
+    init(viewModel: SpectrumViewModel, 
+         height: CGFloat = 120, 
+         style: SpectrumStyle = .bars, 
+         useHardwareAcceleration: Bool = true,
+         visualAmplification: CGFloat = 2.0) {
         self.viewModel = viewModel
         self.height = height
         self.style = style
         self.useHardwareAcceleration = useHardwareAcceleration
+        self.visualAmplification = visualAmplification
     }
     
     // MARK: - Body
@@ -137,8 +145,8 @@ struct SpectrumAnalyzerView: View {
             
             let level = frequencyData[i]
             
-            // Calculate bar height (minimum 2 pixels)
-            let barHeight = max(2, CGFloat(level) * size.height)
+            // Calculate bar height with visual amplification (minimum 2 pixels, maximum size.height)
+            let barHeight = min(size.height, max(2, CGFloat(level) * size.height * visualAmplification))
             
             // Calculate bar position (from bottom up)
             let x = CGFloat(i) * (barWidth + barSpacing)
@@ -157,7 +165,9 @@ struct SpectrumAnalyzerView: View {
             // Draw peak if enabled
             if viewModel.showPeakHold && i < peakData.count {
                 let peakLevel = peakData[i]
-                let peakY = size.height - CGFloat(peakLevel) * size.height
+                // Apply same amplification to peak values but ensure they stay in view bounds
+                let amplifiedPeakLevel = min(1.0, CGFloat(peakLevel) * visualAmplification)
+                let peakY = size.height - amplifiedPeakLevel * size.height
                 
                 let peakRect = CGRect(x: x, y: peakY - 2, width: barWidth, height: 2)
                 let peakPath = Path(roundedRect: peakRect, cornerRadius: 1)
@@ -188,17 +198,21 @@ struct SpectrumAnalyzerView: View {
             
             let level = frequencyData[i]
             let x = CGFloat(i) * pointSpacing
-            let y = size.height - CGFloat(level) * size.height
+            // Apply amplification but constrain to view bounds
+            let amplifiedLevel = min(1.0, CGFloat(level) * visualAmplification)
+            let y = size.height - amplifiedLevel * size.height
             
             if i == 0 {
                 linePath.move(to: CGPoint(x: x, y: y))
                 if viewModel.showPeakHold && i < peakData.count {
-                    peakPath.move(to: CGPoint(x: x, y: size.height - CGFloat(peakData[i]) * size.height))
+                    let amplifiedPeakLevel = min(1.0, CGFloat(peakData[i]) * visualAmplification)
+                    peakPath.move(to: CGPoint(x: x, y: size.height - amplifiedPeakLevel * size.height))
                 }
             } else {
                 linePath.addLine(to: CGPoint(x: x, y: y))
                 if viewModel.showPeakHold && i < peakData.count {
-                    peakPath.addLine(to: CGPoint(x: x, y: size.height - CGFloat(peakData[i]) * size.height))
+                    let amplifiedPeakLevel = min(1.0, CGFloat(peakData[i]) * visualAmplification)
+                    peakPath.addLine(to: CGPoint(x: x, y: size.height - amplifiedPeakLevel * size.height))
                 }
             }
         }
@@ -248,15 +262,18 @@ struct SpectrumAnalyzerView: View {
             
             let level = frequencyData[i]
             let x = CGFloat(i) * pointSpacing
-            let y = size.height - CGFloat(level) * size.height
+            // Apply amplification but constrain to view bounds
+            let amplifiedLevel = min(1.0, CGFloat(level) * visualAmplification)
+            let y = size.height - amplifiedLevel * size.height
             
             areaPath.addLine(to: CGPoint(x: x, y: y))
             
             if viewModel.showPeakHold && i < peakData.count {
+                let amplifiedPeakLevel = min(1.0, CGFloat(peakData[i]) * visualAmplification)
                 if i == 0 {
-                    peakPath.move(to: CGPoint(x: x, y: size.height - CGFloat(peakData[i]) * size.height))
+                    peakPath.move(to: CGPoint(x: x, y: size.height - amplifiedPeakLevel * size.height))
                 } else {
-                    peakPath.addLine(to: CGPoint(x: x, y: size.height - CGFloat(peakData[i]) * size.height))
+                    peakPath.addLine(to: CGPoint(x: x, y: size.height - amplifiedPeakLevel * size.height))
                 }
             }
         }
@@ -321,7 +338,7 @@ struct SpectrumAnalyzerView: View {
                             Spacer()
                             RoundedRectangle(cornerRadius: 2)
                                 .fill(color)
-                                .frame(width: barWidth, height: max(2, CGFloat(level) * size.height))
+                                .frame(width: barWidth, height: min(size.height, max(2, CGFloat(level) * size.height * visualAmplification)))
                         }
                     }
                 }
@@ -335,13 +352,15 @@ struct SpectrumAnalyzerView: View {
                             let peakLevel = viewModel.peakFrequencyData[i]
                             
                             VStack {
+                                // Apply same amplification to peak values
+                                let amplifiedPeakLevel = min(1.0, CGFloat(peakLevel) * visualAmplification)
                                 Spacer()
-                                    .frame(height: size.height - CGFloat(peakLevel) * size.height)
+                                    .frame(height: size.height - amplifiedPeakLevel * size.height)
                                 Rectangle()
                                     .fill(Color.white.opacity(0.7))
                                     .frame(width: barWidth, height: 2)
                                 Spacer()
-                                    .frame(height: CGFloat(peakLevel) * size.height - 2)
+                                    .frame(height: amplifiedPeakLevel * size.height - 2)
                             }
                         }
                     }
@@ -368,7 +387,8 @@ struct SpectrumAnalyzerView: View {
                     
                     let level = frequencyData[i]
                     let x = CGFloat(i) * pointSpacing
-                    let y = size.height - CGFloat(level) * size.height
+                    let amplifiedLevel = min(1.0, CGFloat(level) * visualAmplification)
+                    let y = size.height - amplifiedLevel * size.height
                     
                     if i == 0 {
                         path.move(to: CGPoint(x: x, y: y))
@@ -501,26 +521,29 @@ enum SpectrumStyle {
         
         var body: some View {
             VStack(spacing: 20) {
-                // Bars style
+                // Bars style with amplification
                 SpectrumAnalyzerView(
                     viewModel: viewModel,
-                    style: .bars
+                    style: .bars,
+                    visualAmplification: 2.0
                 )
                 .frame(height: 120)
                 .padding()
                 
-                // Line style
+                // Line style with amplification
                 SpectrumAnalyzerView(
                     viewModel: viewModel,
-                    style: .line
+                    style: .line,
+                    visualAmplification: 2.0
                 )
                 .frame(height: 120)
                 .padding()
                 
-                // Area style
+                // Area style with amplification
                 SpectrumAnalyzerView(
                     viewModel: viewModel,
-                    style: .area
+                    style: .area,
+                    visualAmplification: 2.0
                 )
                 .frame(height: 120)
                 .padding()
