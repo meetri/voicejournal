@@ -419,7 +419,8 @@ struct SpectrumAnalyzerView: View {
                         
                         let level = peakData[i]
                         let x = CGFloat(i) * pointSpacing
-                        let y = size.height - CGFloat(level) * size.height
+                        let amplifiedLevel = min(1.0, CGFloat(level) * visualAmplification)
+                        let y = size.height - amplifiedLevel * size.height
                         
                         if i == 0 {
                             path.move(to: CGPoint(x: x, y: y))
@@ -454,7 +455,8 @@ struct SpectrumAnalyzerView: View {
                     
                     let level = frequencyData[i]
                     let x = CGFloat(i) * pointSpacing
-                    let y = size.height - CGFloat(level) * size.height
+                    let amplifiedLevel = min(1.0, CGFloat(level) * visualAmplification)
+                    let y = size.height - amplifiedLevel * size.height
                     
                     path.addLine(to: CGPoint(x: x, y: y))
                 }
@@ -484,7 +486,8 @@ struct SpectrumAnalyzerView: View {
                         
                         let level = peakData[i]
                         let x = CGFloat(i) * pointSpacing
-                        let y = size.height - CGFloat(level) * size.height
+                        let amplifiedLevel = min(1.0, CGFloat(level) * visualAmplification)
+                        let y = size.height - amplifiedLevel * size.height
                         
                         if i == 0 {
                             path.move(to: CGPoint(x: x, y: y))
