@@ -21,6 +21,7 @@ struct ThemeSelectorView: View {
     @State private var selectedThemeForEditing: CustomTheme?
     @State private var showingDeleteConfirmation = false
     @State private var themeToDelete: CustomTheme?
+    @State private var themeToCopy: CustomTheme?
     
     private let builtInThemes = ThemeID.allCases
     
@@ -37,6 +38,9 @@ struct ThemeSelectorView: View {
                             isBuiltIn: true,
                             onTap: {
                                 themeManager.setTheme(themeID)
+                            },
+                            onCopy: {
+                                copyBuiltInTheme(themeID)
                             }
                         )
                     }
@@ -64,6 +68,9 @@ struct ThemeSelectorView: View {
                                     onDelete: {
                                         themeToDelete = customTheme
                                         showingDeleteConfirmation = true
+                                    },
+                                    onCopy: {
+                                        copyTheme(customTheme)
                                     }
                                 )
                             }
@@ -118,6 +125,70 @@ struct ThemeSelectorView: View {
         
         themeToDelete = nil
     }
+    
+    private func copyTheme(_ theme: CustomTheme) {
+        guard let themeData = theme.themeData else { return }
+        
+        // Create a new ThemeData instance with a new ID and name
+        let copiedThemeData = ThemeData(
+            id: UUID(),
+            name: "\(themeData.name) Copy",
+            author: themeData.author,
+            createdDate: Date(),
+            lastModified: Date(),
+            isBuiltIn: false,
+            isEditable: true,
+            primaryHex: themeData.primaryHex,
+            secondaryHex: themeData.secondaryHex,
+            backgroundHex: themeData.backgroundHex,
+            surfaceHex: themeData.surfaceHex,
+            accentHex: themeData.accentHex,
+            errorHex: themeData.errorHex,
+            textHex: themeData.textHex,
+            textSecondaryHex: themeData.textSecondaryHex,
+            surfaceLightHex: themeData.surfaceLightHex,
+            cellBackgroundHex: themeData.cellBackgroundHex,
+            cellBorderHex: themeData.cellBorderHex,
+            shadowColorHex: themeData.shadowColorHex,
+            tabBarBackgroundHex: themeData.tabBarBackgroundHex
+        )
+        
+        // Create the new theme
+        let newTheme = CustomTheme.create(from: copiedThemeData, in: viewContext)
+        
+        do {
+            try viewContext.save()
+            
+            // Optionally open the editor for the new theme
+            selectedThemeForEditing = newTheme
+        } catch {
+            print("Error copying theme: \(error)")
+        }
+    }
+    
+    private func copyBuiltInTheme(_ themeID: ThemeID) {
+        let theme = themeID.theme
+        
+        // Create theme data from the built-in theme
+        let themeData = ThemeData(
+            from: theme,
+            name: "\(themeID.displayName) Copy",
+            author: nil,
+            isBuiltIn: false
+        )
+        
+        // Create the new theme
+        let newTheme = CustomTheme.create(from: themeData, in: viewContext)
+        
+        do {
+            try viewContext.save()
+            
+            // Optionally open the editor for the new theme
+            selectedThemeForEditing = newTheme
+        } catch {
+            print("Error copying built-in theme: \(error)")
+        }
+    }
 }
 
 /// Individual theme row in the list
@@ -130,6 +201,7 @@ struct ThemeRow: View {
     let onTap: () -> Void
     let onEdit: (() -> Void)?
     let onDelete: (() -> Void)?
+    let onCopy: (() -> Void)?
     
     init(theme: ThemeProtocol,
          name: String,
@@ -138,7 +210,8 @@ struct ThemeRow: View {
          isBuiltIn: Bool,
          onTap: @escaping () -> Void,
          onEdit: (() -> Void)? = nil,
-         onDelete: (() -> Void)? = nil) {
+         onDelete: (() -> Void)? = nil,
+         onCopy: (() -> Void)? = nil) {
         self.theme = theme
         self.name = name
         self.author = author
@@ -147,6 +220,7 @@ struct ThemeRow: View {
         self.onTap = onTap
         self.onEdit = onEdit
         self.onDelete = onDelete
+        self.onCopy = onCopy
     }
     
     var body: some View {
@@ -204,10 +278,19 @@ struct ThemeRow: View {
                     Label("Edit", systemImage: "pencil")
                 }
                 
+                Button(action: { onCopy?() }) {
+                    Label("Duplicate", systemImage: "doc.on.doc")
+                }
+                
                 Button(role: .destructive) {
                     onDelete?()
                 } label: {
                     Label("Delete", systemImage: "trash")
+                }
+            } else {
+                // Built-in themes can only be copied
+                Button(action: { onCopy?() }) {
+                    Label("Duplicate", systemImage: "doc.on.doc")
                 }
             }
         }
