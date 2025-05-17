@@ -23,7 +23,7 @@ struct ThemedViewModifier: ViewModifier {
         switch themeID {
         case .light:
             return .light
-        case .dark, .futuristic:
+        case .dark, .futuristic, .purplehaze:
             return .dark
         }
     }
@@ -51,8 +51,7 @@ struct ThemedNavigationModifier: ViewModifier {
     
     func body(content: Content) -> some View {
         content
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarBackground(themeManager.theme.surface, for: .navigationBar)
+            .toolbarBackground(.automatic, for: .navigationBar)
             .toolbarColorScheme(colorScheme(for: themeManager.themeID), for: .navigationBar)
     }
     
@@ -60,7 +59,7 @@ struct ThemedNavigationModifier: ViewModifier {
         switch themeID {
         case .light:
             return .light
-        case .dark, .futuristic:
+        case .dark, .futuristic, .purplehaze:
             return .dark
         }
     }

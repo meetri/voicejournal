@@ -51,6 +51,9 @@ struct ContentView: View {
         .onAppear {
             ThemeUtility.updateSystemAppearance(with: themeManager.theme)
         }
+        .onChange(of: themeManager.themeID) { _, newValue in
+            ThemeUtility.updateSystemAppearance(with: newValue.theme)
+        }
     }
     
 }

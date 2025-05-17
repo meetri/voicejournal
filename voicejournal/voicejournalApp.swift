@@ -55,7 +55,7 @@ struct voicejournalApp: App {
         switch themeID {
         case .light:
             return .light
-        case .dark, .futuristic:
+        case .dark, .futuristic, .purplehaze:
             return .dark
         }
     }

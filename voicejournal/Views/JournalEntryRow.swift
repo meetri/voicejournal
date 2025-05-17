@@ -156,7 +156,7 @@ struct JournalEntryRow: View {
             }
         }
         .padding(.vertical, 12)
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 8)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(themeManager.theme.cellBackground)
@@ -166,7 +166,7 @@ struct JournalEntryRow: View {
                 )
                 .shadow(color: themeManager.theme.shadowColor, radius: 2, x: 0, y: 1)
         )
-        .padding(.horizontal, 2)
+        .padding(.horizontal, 0)
         .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
         .listRowBackground(Color.clear)
     }

@@ -3,10 +3,11 @@ import UIKit
 
 struct ThemeUtility {
     static func updateSystemAppearance(with theme: ThemeProtocol) {
-        // Apply theme to navigation bar
+        // Apply theme to navigation bar with transparency
         let appearance = UINavigationBarAppearance()
-        appearance.configureWithOpaqueBackground()
+        appearance.configureWithTransparentBackground()
         appearance.backgroundColor = UIColor(theme.surface)
+        // appearance.backgroundEffect = UIBlurEffect(style: .systemMaterial)
         appearance.titleTextAttributes = [.foregroundColor: UIColor(theme.text)]
         appearance.largeTitleTextAttributes = [.foregroundColor: UIColor(theme.text)]
         
@@ -14,10 +15,12 @@ struct ThemeUtility {
         UINavigationBar.appearance().compactAppearance = appearance
         UINavigationBar.appearance().scrollEdgeAppearance = appearance
         
-        // Apply theme to tab bar
+        // Apply theme to tab bar with transparency
         let tabBarAppearance = UITabBarAppearance()
-        tabBarAppearance.configureWithOpaqueBackground()
-        tabBarAppearance.backgroundColor = UIColor(theme.surface)
+        tabBarAppearance.configureWithTransparentBackground()
+        tabBarAppearance.backgroundColor = UIColor(theme.tabBarBackground.opacity(0.7))
+        tabBarAppearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterial)
+        
         UITabBar.appearance().standardAppearance = tabBarAppearance
         UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance
         
