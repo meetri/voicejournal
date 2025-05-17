@@ -21,7 +21,7 @@ class AudioFileAnalyzer {
     
     // Smoothing for visualization
     private var previousBars: [Float] = []
-    private let smoothingFactor: Float = 0.7 // Higher = more smoothing
+    private let smoothingFactor: Float = 0.5 // Higher = more smoothing
     
     init() {
         self.log2n = vDSP_Length(log2(Float(fftSize)))

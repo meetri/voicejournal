@@ -25,7 +25,7 @@ class AudioSpectrumManager {
     
     // Smoothing for visualization
     private var previousBars: [Float] = []
-    private let smoothingFactor: Float = 0.7 // Higher = more smoothing
+    private let smoothingFactor: Float = 0.5 // Higher = more smoothing
     
     // MARK: - Initialization
     
