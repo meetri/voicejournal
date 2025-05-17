@@ -57,8 +57,17 @@ extension CustomTheme {
         self.isBuiltIn = themeData.isBuiltIn
         self.isEditable = themeData.isEditable
         
+        // Debug log to verify cell border is being saved
+        print("Updating theme '\(themeData.name)' with cell border: \(themeData.cellBorderHex)")
+        
         do {
             self.themeDataJSON = try JSONEncoder().encode(themeData)
+            
+            // Verify the data was encoded correctly
+            if let jsonData = self.themeDataJSON,
+               let decodedData = try? JSONDecoder().decode(ThemeData.self, from: jsonData) {
+                print("Successfully encoded theme with cell border: \(decodedData.cellBorderHex)")
+            }
         } catch {
             print("Error encoding theme data: \(error)")
         }
