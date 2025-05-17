@@ -8,8 +8,6 @@
 import SwiftUI
 import CoreData
 
-// Import our utility files
-@_exported import Foundation
 
 @main
 struct voicejournalApp: App {
@@ -20,10 +18,6 @@ struct voicejournalApp: App {
     // Create a UIApplicationDelegateAdaptor to handle app lifecycle events
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
-    init() {
-        // Initialize all utility files
-        ImportUtility.initializeAll()
-    }
 
     var body: some Scene {
         WindowGroup {
@@ -34,7 +28,7 @@ struct voicejournalApp: App {
                     .environment(\.themeManager, themeManager)
                     .preferredColorScheme(colorScheme(for: themeManager.themeID))
                     .onAppear {
-                        updateSystemAppearance()
+                        ThemeUtility.updateSystemAppearance(with: themeManager.theme)
                     }
             } else {
                 AuthenticationView()
@@ -42,7 +36,7 @@ struct voicejournalApp: App {
                     .environment(\.themeManager, themeManager)
                     .preferredColorScheme(colorScheme(for: themeManager.themeID))
                     .onAppear {
-                        updateSystemAppearance()
+                        ThemeUtility.updateSystemAppearance(with: themeManager.theme)
                     }
             }
         }
@@ -66,30 +60,4 @@ struct voicejournalApp: App {
         }
     }
     
-    private func updateSystemAppearance() {
-        // Apply theme to navigation bar
-        let appearance = UINavigationBarAppearance()
-        appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = UIColor(themeManager.theme.surface)
-        appearance.titleTextAttributes = [.foregroundColor: UIColor(themeManager.theme.text)]
-        appearance.largeTitleTextAttributes = [.foregroundColor: UIColor(themeManager.theme.text)]
-        
-        UINavigationBar.appearance().standardAppearance = appearance
-        UINavigationBar.appearance().compactAppearance = appearance
-        UINavigationBar.appearance().scrollEdgeAppearance = appearance
-        
-        // Apply theme to tab bar
-        let tabBarAppearance = UITabBarAppearance()
-        tabBarAppearance.configureWithOpaqueBackground()
-        tabBarAppearance.backgroundColor = UIColor(themeManager.theme.surface)
-        UITabBar.appearance().standardAppearance = tabBarAppearance
-        UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance
-        
-        // Apply theme to table view
-        UITableView.appearance().backgroundColor = UIColor(themeManager.theme.background)
-        UITableView.appearance().separatorColor = UIColor(themeManager.theme.surface)
-        
-        // Apply theme to collection view (for calendar)
-        UICollectionView.appearance().backgroundColor = UIColor(themeManager.theme.background)
-    }
 }

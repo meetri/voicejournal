@@ -8,6 +8,7 @@
 import Foundation
 import CoreData
 
+#if DEBUG
 /// Extension with debugging methods for TimelineViewModel
 extension TimelineViewModel {
     
@@ -143,3 +144,4 @@ extension TimelineViewModel {
         }
     }
 }
+#endif

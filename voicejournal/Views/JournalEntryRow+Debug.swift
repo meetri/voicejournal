@@ -8,6 +8,7 @@
 import SwiftUI
 import CoreData
 
+#if DEBUG
 // This file adds debug functionality to help diagnose tag display issues
 
 extension JournalEntryRow {
@@ -31,3 +32,4 @@ extension JournalEntryRow {
         }
     }
 }
+#endif

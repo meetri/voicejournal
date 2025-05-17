@@ -6,7 +6,6 @@
 //
 
 import CoreData
-import CoreTransferable
 import Foundation
 
 class PersistenceController {

@@ -1,0 +1,256 @@
+<overview>
+  This task enhances the user interface of the Voice Journal iOS app by adding a customizable theming system, applying a futuristic visual design (inspired by the Star Trek captain's log), and incorporating visual effects and animation techniques supported by iOS 17+ using SwiftUI.
+
+  The goal is to:
+  1. Add a global theme management system that supports predefined and user-generated themes.
+  2. Apply the selected theme consistently across the app using a centralized environment object.
+  3. Integrate futuristic UI elements such as glassmorphism (blurs, frosted backgrounds), parallax effects, and smooth animations.
+  4. Provide a Settings UI to allow users to change or create color themes.
+</overview>
+
+<frameworks>
+  SwiftUI (iOS 17+), Combine (for optional publishers), Foundation (for persistence with UserDefaults).
+</frameworks>
+
+<directory_structure>
+  - Models/
+    - Theme.swift
+  - Managers/
+    - ThemeManager.swift
+  - Views/
+    - SettingsView.swift
+    - ThemedBackgroundView.swift
+    - GlassCardView.swift
+  - Extensions/
+    - UserDefaults+Theme.swift
+    - EnvironmentValues+Theme.swift
+  - Resources/
+    - Color Assets (organized by theme)
+</directory_structure>
+
+<input_output_contracts>
+  - Input: User selects a theme via a Picker UI or defines custom colors.
+  - Output: The app updates all relevant UI components (colors, backgrounds, accents) live.
+  - Persistence: Theme choice is saved to UserDefaults and restored on next launch.
+</input_output_contracts>
+
+<pseudocode_steps>
+  1. Define a Theme protocol listing the required UI properties (background, foreground, accent).
+  2. Create Theme structs conforming to the protocol for predefined themes.
+  3. Create an enum ThemeID to map identifiers to theme structs.
+  4. Implement a ThemeManager (ObservableObject) that manages the active theme and handles persistence.
+  5. Inject ThemeManager into the SwiftUI environment.
+  6. Update views to read colors from the ThemeManager’s `theme`.
+  7. Create SettingsView with a theme picker and color pickers (for custom theme).
+  8. Add a GlassCardView using `.background(.ultraThinMaterial)` and rounded borders.
+  9. Add a parallax background using `GeometryReader`.
+</pseudocode_steps>
+
+<interfaces>
+
+  <protocol>
+    <name>ThemeProtocol</name>
+    <properties>
+      <property name="primary" type="Color" />
+      <property name="background" type="Color" />
+      <property name="accent" type="Color" />
+    </properties>
+  </protocol>
+
+  <enum>
+    <name>ThemeID</name>
+    <cases>light, dark, neon</cases>
+    <computed_property>
+      <name>theme</name>
+      <returns>ThemeProtocol</returns>
+    </computed_property>
+  </enum>
+
+  <class>
+    <name>ThemeManager</name>
+    <conformsTo>Observable</conformsTo>
+    <properties>
+      <property name="themeID" type="ThemeID" />
+      <property name="theme" type="ThemeProtocol" />
+    </properties>
+    <methods>
+      <method name="setTheme(_ id: ThemeID)" />
+    </methods>
+  </class>
+  
+  <view>
+    <name>GlassCardView</name>
+    <features>blurred glassmorphic background, rounded borders, dynamic content</features>
+  </view>
+
+  <view>
+    <name>SettingsView</name>
+    <features>Theme picker, live preview, apply button</features>
+  </view>
+
+</interfaces>
+
+<state_diagram>
+  [App Start] --> [Load ThemeManager from UserDefaults]
+                --> [ThemeManager.theme is injected via Environment]
+                --> [All Views use .environment(\.themeManager)]
+                --> [User Changes Theme in SettingsView]
+                --> [ThemeManager updates and publishes changes]
+                --> [Views update automatically via @Environment]
+</state_diagram>
+
+<code_examples>
+
+  <!-- Theme Protocol -->
+  <code lang="swift">
+  protocol ThemeProtocol {
+      var primary: Color { get }
+      var background: Color { get }
+      var accent: Color { get }
+  }
+
+  struct LightTheme: ThemeProtocol {
+      let primary = Color.black
+      let background = Color.white
+      let accent = Color.blue
+  }
+
+  struct NeonTheme: ThemeProtocol {
+      let primary = Color.green
+      let background = Color.black
+      let accent = Color.purple
+  }
+  </code>
+
+  <!-- ThemeID Enum -->
+  <code lang="swift">
+  enum ThemeID: String, CaseIterable {
+      case light, neon
+
+      var theme: ThemeProtocol {
+          switch self {
+          case .light: return LightTheme()
+          case .neon: return NeonTheme()
+          }
+      }
+
+      var displayName: String {
+          switch self {
+          case .light: return "Light"
+          case .neon: return "Neon"
+          }
+      }
+  }
+  </code>
+
+  <!-- ThemeManager -->
+  <code lang="swift">
+  @Observable
+  class ThemeManager {
+      private(set) var themeID: ThemeID
+      private(set) var theme: ThemeProtocol
+
+      init() {
+          let saved = UserDefaults.standard.string(forKey: "selectedThemeID")
+          let id = ThemeID(rawValue: saved ?? "") ?? .light
+          self.themeID = id
+          self.theme = id.theme
+      }
+
+      func setTheme(_ id: ThemeID) {
+          withAnimation {
+              self.themeID = id
+              self.theme = id.theme
+              UserDefaults.standard.setValue(id.rawValue, forKey: "selectedThemeID")
+              print("🔄 Theme updated to: \\(id.rawValue)")
+          }
+      }
+  }
+  </code>
+
+  <!-- Environment Extension -->
+  <code lang="swift">
+  private struct ThemeManagerKey: EnvironmentKey {
+      static let defaultValue: ThemeManager = ThemeManager()
+  }
+
+  extension EnvironmentValues {
+      var themeManager: ThemeManager {
+          get { self[ThemeManagerKey.self] }
+          set { self[ThemeManagerKey.self] = newValue }
+      }
+  }
+  </code>
+
+  <!-- App Entry Point -->
+  <code lang="swift">
+  @main
+  struct VoiceJournalApp: App {
+      @State private var themeManager = ThemeManager()
+
+      var body: some Scene {
+          WindowGroup {
+              ContentView()
+                  .environment(\.themeManager, themeManager)
+          }
+      }
+  }
+  </code>
+
+  <!-- GlassCardView -->
+  <code lang="swift">
+  struct GlassCardView: View {
+      var body: some View {
+          ZStack {
+              RoundedRectangle(cornerRadius: 20)
+                  .fill(.ultraThinMaterial)
+                  .background(.ultraThinMaterial)
+                  .overlay(
+                      RoundedRectangle(cornerRadius: 20)
+                          .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                  )
+                  .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
+              Text("Captain’s Log")
+                  .font(.title2)
+                  .foregroundColor(.white)
+          }
+          .padding()
+      }
+  }
+  </code>
+
+  <!-- SettingsView -->
+  <code lang="swift">
+  struct SettingsView: View {
+      @Environment(\.themeManager) var themeManager
+
+      var body: some View {
+          Form {
+              Picker("Theme", selection: Binding(
+                  get: { themeManager.themeID },
+                  set: { themeManager.setTheme($0) }
+              )) {
+                  ForEach(ThemeID.allCases, id: \.self) { id in
+                      Text(id.displayName).tag(id)
+                  }
+              }
+          }
+          .navigationTitle("Appearance")
+      }
+  }
+  </code>
+
+</code_examples>
+
+<debug_logging>
+  - When theme is changed, log the selected ID: "🔄 Theme updated to: ..."
+  - When app starts, log: "🚀 App loaded with theme: ..."
+  - When saving user theme: log success/failure to UserDefaults
+</debug_logging>
+
+<notes>
+  - Ensure dark mode is supported and test accessibility contrast.
+  - Add `.animation()` or `withAnimation` wrappers around theme changes.
+  - Apply `.background(theme.background.ignoresSafeArea())` to base layout views.
+  - Future enhancements may include saving user-created themes with custom ColorPickers.
+</notes>

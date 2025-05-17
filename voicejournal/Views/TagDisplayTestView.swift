@@ -8,6 +8,7 @@
 import SwiftUI
 import CoreData
 
+#if DEBUG
 /// A view for testing and demonstrating tag display in journal entries
 struct TagDisplayTestView: View {
     @Environment(\.managedObjectContext) private var viewContext
@@ -191,3 +192,4 @@ struct TagDisplayTestView: View {
     TagDisplayTestView()
         .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
 }
+#endif
