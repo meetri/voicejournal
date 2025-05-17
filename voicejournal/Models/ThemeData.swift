@@ -108,22 +108,22 @@ struct ThemeData: Codable, Identifiable {
 
 // MARK: - ThemeData to Theme Conversion
 
-struct CustomTheme: ThemeProtocol {
+struct CustomThemeData: ThemeProtocol {
     let data: ThemeData
     
-    var primary: Color { Color(hex: data.primaryHex) ?? .blue }
-    var secondary: Color { Color(hex: data.secondaryHex) ?? .gray }
-    var background: Color { Color(hex: data.backgroundHex) ?? .white }
-    var surface: Color { Color(hex: data.surfaceHex) ?? .gray }
-    var accent: Color { Color(hex: data.accentHex) ?? .purple }
-    var error: Color { Color(hex: data.errorHex) ?? .red }
-    var text: Color { Color(hex: data.textHex) ?? .black }
-    var textSecondary: Color { Color(hex: data.textSecondaryHex) ?? .gray }
-    var surfaceLight: Color { Color(hex: data.surfaceLightHex) ?? .gray }
-    var cellBackground: Color { Color(hex: data.cellBackgroundHex) ?? .white }
-    var cellBorder: Color { Color(hex: data.cellBorderHex) ?? .gray }
-    var shadowColor: Color { Color(hex: data.shadowColorHex) ?? .black }
-    var tabBarBackground: Color { Color(hex: data.tabBarBackgroundHex) ?? .white }
+    var primary: Color { Color(hex: data.primaryHex) }
+    var secondary: Color { Color(hex: data.secondaryHex) }
+    var background: Color { Color(hex: data.backgroundHex) }
+    var surface: Color { Color(hex: data.surfaceHex) }
+    var accent: Color { Color(hex: data.accentHex) }
+    var error: Color { Color(hex: data.errorHex) }
+    var text: Color { Color(hex: data.textHex) }
+    var textSecondary: Color { Color(hex: data.textSecondaryHex) }
+    var surfaceLight: Color { Color(hex: data.surfaceLightHex) }
+    var cellBackground: Color { Color(hex: data.cellBackgroundHex) }
+    var cellBorder: Color { Color(hex: data.cellBorderHex) }
+    var shadowColor: Color { Color(hex: data.shadowColorHex) }
+    var tabBarBackground: Color { Color(hex: data.tabBarBackgroundHex) }
 }
 
 // MARK: - Color Extensions for Hex Conversion
@@ -142,34 +142,6 @@ extension Color {
         } else {
             return String(format: "#%02lX%02lX%02lX%02lX", r, g, b, a)
         }
-    }
-    
-    init?(hex: String) {
-        var hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
-        hexSanitized = hexSanitized.replacingOccurrences(of: "#", with: "")
-        
-        var rgb: UInt64 = 0
-        var r: CGFloat = 0.0
-        var g: CGFloat = 0.0
-        var b: CGFloat = 0.0
-        var a: CGFloat = 1.0
-        
-        guard Scanner(string: hexSanitized).scanHexInt64(&rgb) else { return nil }
-        
-        if hexSanitized.count == 6 {
-            r = CGFloat((rgb & 0xFF0000) >> 16) / 255.0
-            g = CGFloat((rgb & 0x00FF00) >> 8) / 255.0
-            b = CGFloat(rgb & 0x0000FF) / 255.0
-        } else if hexSanitized.count == 8 {
-            r = CGFloat((rgb & 0xFF000000) >> 24) / 255.0
-            g = CGFloat((rgb & 0x00FF0000) >> 16) / 255.0
-            b = CGFloat((rgb & 0x0000FF00) >> 8) / 255.0
-            a = CGFloat(rgb & 0x000000FF) / 255.0
-        } else {
-            return nil
-        }
-        
-        self.init(red: r, green: g, blue: b, opacity: a)
     }
 }
 

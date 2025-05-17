@@ -210,7 +210,7 @@ struct ThemePreviewSheet: View {
     @Environment(\.dismiss) private var dismiss
     
     var previewTheme: ThemeProtocol {
-        return voicejournal.CustomTheme(data: themeData)
+        return CustomThemeData(data: themeData)
     }
     
     var body: some View {
@@ -337,16 +337,7 @@ struct ThemePreviewSheet: View {
 }
 
 #Preview("Edit Existing Theme") {
-    let context = PersistenceController.preview.container.viewContext
-    let sampleTheme = CustomTheme(context: context)
-    sampleTheme.updateFromThemeData(ThemeData(
-        from: LightTheme(),
-        name: "Sample Theme",
-        author: "John Doe",
-        isBuiltIn: false
-    ))
-    
-    return ThemeEditorView(editingTheme: sampleTheme)
-        .environment(\.managedObjectContext, context)
+    ThemeEditorView()
+        .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
         .environmentObject(ThemeManager())
 }

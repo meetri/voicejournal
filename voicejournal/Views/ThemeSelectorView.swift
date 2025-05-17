@@ -47,7 +47,7 @@ struct ThemeSelectorView: View {
                     Section(header: Text("Custom Themes")) {
                         ForEach(customThemes, id: \.id) { customTheme in
                             if let themeData = customTheme.themeData {
-                                let theme = voicejournal.CustomTheme(data: themeData)
+                                let theme = CustomThemeData(data: themeData)
                                 
                                 ThemeRow(
                                     theme: theme,
@@ -204,7 +204,9 @@ struct ThemeRow: View {
                     Label("Edit", systemImage: "pencil")
                 }
                 
-                Button(action: { onDelete?() }, role: .destructive) {
+                Button(role: .destructive) {
+                    onDelete?()
+                } label: {
                     Label("Delete", systemImage: "trash")
                 }
             }

@@ -51,8 +51,8 @@ struct ContentView: View {
         .onAppear {
             ThemeUtility.updateSystemAppearance(with: themeManager.theme)
         }
-        .onChange(of: themeManager.themeID) { _, newValue in
-            ThemeUtility.updateSystemAppearance(with: newValue.theme)
+        .onChange(of: themeManager.currentThemeID) { _, newValue in
+            ThemeUtility.updateSystemAppearance(with: themeManager.theme)
         }
     }
     
@@ -71,19 +71,18 @@ struct SettingsTabView: View {
         NavigationView {
             List {
                 Section(header: Text("Appearance")) {
-                    Picker("Theme", selection: Binding(
-                        get: { themeManager.themeID },
-                        set: { 
-                            themeManager.setTheme($0)
-                            // Update UI appearance when theme changes
-                            ThemeUtility.updateSystemAppearance(with: themeManager.theme)
-                        }
-                    )) {
-                        ForEach(ThemeID.allCases, id: \.self) { id in
-                            Text(id.displayName).tag(id)
+                    NavigationLink {
+                        ThemeSelectorView()
+                            .environment(\.managedObjectContext, viewContext)
+                            .environmentObject(themeManager)
+                    } label: {
+                        HStack {
+                            Label("Themes", systemImage: "paintbrush")
+                            Spacer()
+                            Text(getCurrentThemeName())
+                                .foregroundColor(.secondary)
                         }
                     }
-                    .pickerStyle(SegmentedPickerStyle())
                 }
                 
                 Section(header: Text("Organization")) {
@@ -136,6 +135,30 @@ struct SettingsTabView: View {
         }
     }
     
+    private func getCurrentThemeName() -> String {
+        if let builtInTheme = ThemeID(rawValue: themeManager.currentThemeID) {
+            return builtInTheme.displayName
+        }
+        
+        // For custom themes, we'd need to fetch from Core Data
+        // This is a simplified version - you might want to cache the custom theme name
+        let request = CustomTheme.fetchRequest()
+        if let uuid = UUID(uuidString: themeManager.currentThemeID) {
+            request.predicate = NSPredicate(format: "id == %@", uuid as CVarArg)
+        }
+        request.fetchLimit = 1
+        
+        do {
+            let themes = try viewContext.fetch(request)
+            if let customTheme = themes.first {
+                return customTheme.name ?? "Custom"
+            }
+        } catch {
+            print("Error fetching theme name: \(error)")
+        }
+        
+        return "Custom"
+    }
 }
 
 #Preview {

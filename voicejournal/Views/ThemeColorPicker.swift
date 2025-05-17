@@ -35,7 +35,7 @@ struct ThemeColorPicker: View {
                 }) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(Color(hex: color) ?? .gray)
+                            .fill(Color(hex: color))
                             .frame(width: 60, height: 40)
                         
                         RoundedRectangle(cornerRadius: 8)
@@ -52,7 +52,7 @@ struct ThemeColorPicker: View {
                     TextField("FFFFFF", text: $tempHex, onCommit: {
                         if isValidHex(tempHex) {
                             color = "#\(tempHex)"
-                            selectedColor = Color(hex: color) ?? .gray
+                            selectedColor = Color(hex: color)
                         }
                     })
                     .textFieldStyle(PlainTextFieldStyle())
@@ -84,7 +84,7 @@ struct ThemeColorPicker: View {
         }
         .onAppear {
             updateTempHex()
-            selectedColor = Color(hex: color) ?? .gray
+            selectedColor = Color(hex: color)
         }
         .sheet(isPresented: $showingColorPicker) {
             ColorPickerSheet(color: $color, selectedColor: $selectedColor)

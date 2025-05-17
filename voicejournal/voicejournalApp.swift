@@ -26,16 +26,18 @@ struct voicejournalApp: App {
                     .environment(\.managedObjectContext, persistenceController.container.viewContext)
                     .environmentObject(authService)
                     .environment(\.themeManager, themeManager)
-                    .preferredColorScheme(colorScheme(for: themeManager.themeID))
+                    .preferredColorScheme(colorScheme(for: themeManager.currentThemeID))
                     .onAppear {
+                        themeManager.setContext(persistenceController.container.viewContext)
                         ThemeUtility.updateSystemAppearance(with: themeManager.theme)
                     }
             } else {
                 AuthenticationView()
                     .environmentObject(authService)
                     .environment(\.themeManager, themeManager)
-                    .preferredColorScheme(colorScheme(for: themeManager.themeID))
+                    .preferredColorScheme(colorScheme(for: themeManager.currentThemeID))
                     .onAppear {
+                        themeManager.setContext(persistenceController.container.viewContext)
                         ThemeUtility.updateSystemAppearance(with: themeManager.theme)
                     }
             }
@@ -51,13 +53,18 @@ struct voicejournalApp: App {
     // Track the scene phase
     @Environment(\.scenePhase) var scenePhase
     
-    private func colorScheme(for themeID: ThemeID) -> ColorScheme? {
-        switch themeID {
-        case .light:
-            return .light
-        case .dark, .futuristic, .purplehaze:
-            return .dark
+    private func colorScheme(for themeID: String) -> ColorScheme? {
+        // Try to match built-in theme first
+        if let builtInTheme = ThemeID(rawValue: themeID) {
+            switch builtInTheme {
+            case .light:
+                return .light
+            case .dark, .futuristic, .purplehaze:
+                return .dark
+            }
         }
+        // For custom themes, default to automatic
+        return nil
     }
     
 }

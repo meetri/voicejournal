@@ -16,14 +16,17 @@ struct ThemedViewModifier: ViewModifier {
         content
             .background(themeManager.theme.background)
             .foregroundColor(themeManager.theme.text)
-            .preferredColorScheme(colorScheme(for: themeManager.themeID))
+            .preferredColorScheme(colorScheme(for: themeManager.currentThemeID))
     }
     
-    private func colorScheme(for themeID: ThemeID) -> ColorScheme? {
+    private func colorScheme(for themeID: String) -> ColorScheme? {
         switch themeID {
-        case .light:
+        case "light":
             return .light
-        case .dark, .futuristic, .purplehaze:
+        case "dark", "futuristic", "purplehaze":
+            return .dark
+        default:
+            // Custom themes default to dark mode
             return .dark
         }
     }
@@ -52,14 +55,17 @@ struct ThemedNavigationModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .toolbarBackground(.automatic, for: .navigationBar)
-            .toolbarColorScheme(colorScheme(for: themeManager.themeID), for: .navigationBar)
+            .toolbarColorScheme(colorScheme(for: themeManager.currentThemeID), for: .navigationBar)
     }
     
-    private func colorScheme(for themeID: ThemeID) -> ColorScheme? {
+    private func colorScheme(for themeID: String) -> ColorScheme? {
         switch themeID {
-        case .light:
+        case "light":
             return .light
-        case .dark, .futuristic, .purplehaze:
+        case "dark", "futuristic", "purplehaze":
+            return .dark
+        default:
+            // Custom themes default to dark mode
             return .dark
         }
     }
