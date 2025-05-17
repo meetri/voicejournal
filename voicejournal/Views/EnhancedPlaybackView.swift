@@ -32,14 +32,14 @@ struct EnhancedPlaybackView: View {
     var body: some View {
         VStack(spacing: 16) {
             // Spectrum analyzer visualization
-            EnhancedWaveformView(
+            AudioVisualizationView(
                 audioLevel: viewModel.visualizationLevel,
                 primaryColor: playbackColor,
                 secondaryColor: playbackSecondaryColor,
                 isActive: viewModel.isPlaying,
-                frequencyData: viewModel.frequencyData
+                frequencyData: viewModel.frequencyData,
+                height: 70
             )
-            .frame(height: 70)
             
             // Bookmarks indicator
             if !viewModel.bookmarks.isEmpty {
@@ -455,16 +455,14 @@ struct CompactEnhancedPlaybackView: View {
                 }
                 
                 // Mini spectrum analyzer
-                EnhancedWaveformView(
+                AudioVisualizationView(
                     audioLevel: viewModel.visualizationLevel,
                     primaryColor: viewModel.isPlaying ? .blue : .gray,
                     secondaryColor: viewModel.isPlaying ? .purple : .gray.opacity(0.6),
-                    barCount: 20,
-                    spacing: 2,
                     isActive: viewModel.isPlaying,
-                    frequencyData: viewModel.frequencyData
+                    frequencyData: viewModel.frequencyData,
+                    height: 30
                 )
-                .frame(height: 30)
             }
             
             // Progress and time

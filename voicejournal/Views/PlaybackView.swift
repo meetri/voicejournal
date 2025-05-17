@@ -32,17 +32,15 @@ struct PlaybackView: View {
     var body: some View {
         VStack(spacing: 16) {
             // Spectrum analyzer visualization
-            EnhancedWaveformView(
+            AudioVisualizationView(
                 audioLevel: viewModel.visualizationLevel,
                 primaryColor: playbackColor,
                 secondaryColor: playbackSecondaryColor,
                 isActive: viewModel.isPlaying,
-                frequencyData: viewModel.frequencyData
+                frequencyData: viewModel.frequencyData,
+                height: 60
             )
-            .frame(height: 60)
             .padding(.horizontal)
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
             
             // Bookmarks indicator
             if !viewModel.bookmarks.isEmpty {

@@ -82,17 +82,15 @@ struct RecordingView: View {
             Spacer()
             
             // Spectrum analyzer visualization
-            EnhancedWaveformView(
+            AudioVisualizationView(
                 audioLevel: viewModel.visualizationLevel,
                 primaryColor: recordingColor,
                 secondaryColor: recordingSecondaryColor,
                 isActive: viewModel.isRecording && !viewModel.isPaused,
-                frequencyData: viewModel.frequencyData
+                frequencyData: viewModel.frequencyData,
+                height: 120
             )
-            .frame(height: 120)
             .padding()
-            .background(Color(.systemGray6))
-            .cornerRadius(16)
             .onAppear {
                 print("DEBUG: RecordingView appeared - frequency data count: \(viewModel.frequencyData.count)")
             }
