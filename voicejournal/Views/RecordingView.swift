@@ -81,14 +81,13 @@ struct RecordingView: View {
             
             Spacer()
             
-            // Waveform visualization
-            let level = viewModel.visualizationLevel
-            
-            // Use a stable WaveformView without forcing recreation
-            WaveformView(
-                audioLevel: level,
-                color: recordingColor,
-                isActive: viewModel.isRecording && !viewModel.isPaused
+            // Spectrum analyzer visualization
+            EnhancedWaveformView(
+                audioLevel: viewModel.visualizationLevel,
+                primaryColor: recordingColor,
+                secondaryColor: recordingSecondaryColor,
+                isActive: viewModel.isRecording && !viewModel.isPaused,
+                frequencyData: viewModel.frequencyData
             )
             .frame(height: 120)
             .padding()
@@ -268,6 +267,17 @@ struct RecordingView: View {
             return .orange
         } else {
             return .red
+        }
+    }
+    
+    /// The secondary color for gradient effects
+    private var recordingSecondaryColor: Color {
+        if !viewModel.isRecording {
+            return .gray.opacity(0.6)
+        } else if viewModel.isPaused {
+            return .yellow
+        } else {
+            return .pink
         }
     }
     

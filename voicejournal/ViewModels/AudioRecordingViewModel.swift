@@ -163,6 +163,7 @@ class AudioRecordingViewModel: ObservableObject {
             
             // Start spectrum analysis
             spectrumAnalyzerService.startMicrophoneAnalysis()
+            try? spectrumAnalyzerService.start()
             
             isRecording = true
             isPaused = false

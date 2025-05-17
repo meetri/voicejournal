@@ -31,11 +31,13 @@ struct PlaybackView: View {
     
     var body: some View {
         VStack(spacing: 16) {
-            // Waveform visualization
-            WaveformView(
+            // Spectrum analyzer visualization
+            EnhancedWaveformView(
                 audioLevel: viewModel.visualizationLevel,
-                color: playbackColor,
-                isActive: viewModel.isPlaying
+                primaryColor: playbackColor,
+                secondaryColor: playbackSecondaryColor,
+                isActive: viewModel.isPlaying,
+                frequencyData: viewModel.frequencyData
             )
             .frame(height: 60)
             .padding(.horizontal)
@@ -235,6 +237,19 @@ struct PlaybackView: View {
             return .blue
         } else {
             return .blue.opacity(0.7)
+        }
+    }
+    
+    /// The secondary color for gradient effects
+    private var playbackSecondaryColor: Color {
+        if !viewModel.isAudioLoaded {
+            return .gray.opacity(0.6)
+        } else if viewModel.isPaused {
+            return .yellow
+        } else if viewModel.isPlaying {
+            return .purple
+        } else {
+            return .purple.opacity(0.7)
         }
     }
     

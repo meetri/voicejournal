@@ -30,8 +30,7 @@ struct EnhancedWaveformView: View {
     /// Whether the waveform is active (recording/playing)
     var isActive: Bool = true
     
-    /// The style of the waveform
-    var style: WaveformStyle = .bars
+    // Always use spectrum analyzer style
     
     // MARK: - View Model
     
@@ -56,7 +55,6 @@ struct EnhancedWaveformView: View {
         barCount: Int = 30,
         spacing: CGFloat = 3,
         isActive: Bool = true,
-        style: WaveformStyle = .bars,
         frequencyData: [Float] = []
     ) {
         self.audioLevel = audioLevel
@@ -65,7 +63,6 @@ struct EnhancedWaveformView: View {
         self.barCount = barCount
         self.spacing = spacing
         self.isActive = isActive
-        self.style = style
         self.frequencyData = frequencyData
         
         // Initialize the view model
@@ -87,44 +84,32 @@ struct EnhancedWaveformView: View {
                         )
                 )
             
-            // Waveform visualization based on selected style
-            Group {
-                switch style {
-                case .bars:
-                    barsWaveform
-                case .curve:
-                    curveWaveform
-                case .circles:
-                    circlesWaveform
-                case .spectrum:
-                    // Use the frequency data from parent for spectrum visualization
-                    GeometryReader { geometry in
-                        if !frequencyData.isEmpty {
-                            // Use the frequency data directly
-                            Canvas { context, size in
-                                let barCount = frequencyData.count
-                                let barSpacing: CGFloat = 2
-                                let barWidth = (size.width - (barSpacing * CGFloat(barCount - 1))) / CGFloat(barCount)
-                                
-                                for i in 0..<barCount {
-                                    let level = frequencyData[i]
-                                    let barHeight = min(size.height, max(2, CGFloat(level) * size.height * 2.0))
-                                    let x = CGFloat(i) * (barWidth + barSpacing)
-                                    let y = size.height - barHeight
-                                    
-                                    let barRect = CGRect(x: x, y: y, width: barWidth, height: barHeight)
-                                    let barPath = Path(roundedRect: barRect, cornerRadius: 2)
-                                    
-                                    let color = primaryColor.opacity(Double(level * 0.8 + 0.2))
-                                    context.fill(barPath, with: .color(color))
-                                }
-                            }
-                        } else {
-                            // Fallback to empty spectrum if no data
-                            Rectangle()
-                                .fill(Color.clear)
+            // Always use spectrum visualization
+            GeometryReader { geometry in
+                if !frequencyData.isEmpty {
+                    // Use the frequency data directly
+                    Canvas { context, size in
+                        let barCount = frequencyData.count
+                        let barSpacing: CGFloat = 2
+                        let barWidth = (size.width - (barSpacing * CGFloat(barCount - 1))) / CGFloat(barCount)
+                        
+                        for i in 0..<barCount {
+                            let level = frequencyData[i]
+                            let barHeight = min(size.height, max(2, CGFloat(level) * size.height * 2.0))
+                            let x = CGFloat(i) * (barWidth + barSpacing)
+                            let y = size.height - barHeight
+                            
+                            let barRect = CGRect(x: x, y: y, width: barWidth, height: barHeight)
+                            let barPath = Path(roundedRect: barRect, cornerRadius: 2)
+                            
+                            let color = primaryColor.opacity(Double(level * 0.8 + 0.2))
+                            context.fill(barPath, with: .color(color))
                         }
                     }
+                } else {
+                    // Fallback to empty spectrum if no data
+                    Rectangle()
+                        .fill(Color.clear)
                 }
             }
             .padding(8)
@@ -167,205 +152,35 @@ struct EnhancedWaveformView: View {
     
     // MARK: - Waveform Styles
     
-    /// Bars style waveform visualization
-    private var barsWaveform: some View {
-        Canvas { context, size in
-            // Using refreshTrigger to ensure canvas redraws when timer fires
-            let _ = refreshTrigger
-            // Calculate bar width based on available space
-            let barWidth = (size.width - (spacing * CGFloat(barCount - 1))) / CGFloat(barCount)
-            
-            // Draw each bar
-            for i in 0..<barCount {
-                if viewModel.levelHistory.count <= i {
-                    continue
-                }
-                
-                let level = viewModel.levelHistory[i]
-                
-                // Calculate bar height based on level (minimum 2 pixels)
-                let barHeight = max(2, level * size.height)
-                
-                // Calculate bar position
-                let x = CGFloat(i) * (barWidth + spacing)
-                let y = (size.height - barHeight) / 2
-                
-                // Create bar path
-                let barRect = CGRect(x: x, y: y, width: barWidth, height: barHeight)
-                let barPath = Path(roundedRect: barRect, cornerRadius: 4)
-                
-                // Draw bar with solid color instead of gradient for better performance
-                context.fill(
-                    barPath,
-                    with: .color(primaryColor)
-                )
-            }
-        }
-    }
-    
-    /// Curve style waveform visualization
-    private var curveWaveform: some View {
-        Canvas { context, size in
-            // Using refreshTrigger to ensure canvas redraws when timer fires
-            let _ = refreshTrigger
-            // Create a path for the waveform curve
-            var path = Path()
-            
-            // Start at the left edge
-            path.move(to: CGPoint(x: 0, y: size.height / 2))
-            
-            // Calculate points for the curve
-            let pointCount = min(barCount, viewModel.levelHistory.count)
-            let pointSpacing = size.width / CGFloat(pointCount - 1)
-            
-            for i in 0..<pointCount {
-                let level = viewModel.levelHistory[i]
-                let x = CGFloat(i) * pointSpacing
-                let y = (size.height / 2) - (level * size.height / 2)
-                
-                if i == 0 {
-                    path.move(to: CGPoint(x: x, y: y))
-                } else {
-                    path.addLine(to: CGPoint(x: x, y: y))
-                }
-            }
-            
-            // Mirror the curve for the bottom half
-            for i in (0..<pointCount).reversed() {
-                let level = viewModel.levelHistory[i]
-                let x = CGFloat(i) * pointSpacing
-                let y = (size.height / 2) + (level * size.height / 2)
-                
-                path.addLine(to: CGPoint(x: x, y: y))
-            }
-            
-            // Close the path
-            path.closeSubpath()
-            
-            // Fill the path with solid color for better performance
-            context.fill(
-                path,
-                with: .color(primaryColor.opacity(0.7))
-            )
-        }
-    }
-    
-    /// Circles style waveform visualization
-    private var circlesWaveform: some View {
-        Canvas { context, size in
-            // Using refreshTrigger to ensure canvas redraws when timer fires
-            let _ = refreshTrigger
-            // Calculate circle spacing based on available space
-            let circleSpacing = size.width / CGFloat(barCount)
-            let maxRadius = min(circleSpacing / 2 - 1, size.height / 2 - 1)
-            
-            // Draw each circle
-            for i in 0..<barCount {
-                if viewModel.levelHistory.count <= i {
-                    continue
-                }
-                
-                let level = viewModel.levelHistory[i]
-                
-                // Calculate circle radius based on level
-                let radius = max(2, level * maxRadius)
-                
-                // Calculate circle position
-                let x = CGFloat(i) * circleSpacing + circleSpacing / 2
-                let y = size.height / 2
-                
-                // Create circle path
-                let circleRect = CGRect(
-                    x: x - radius,
-                    y: y - radius,
-                    width: radius * 2,
-                    height: radius * 2
-                )
-                let circlePath = Path(ellipseIn: circleRect)
-                
-                // Draw circle with solid color for better performance
-                context.fill(
-                    circlePath,
-                    with: .color(primaryColor)
-                )
-            }
-        }
-    }
+    // Removed old waveform styles (bars, curve, circles) - always using spectrum now
 }
 
 // MARK: - Waveform Style Enum
 
-/// The style of the waveform visualization
-enum WaveformStyle {
-    /// Traditional bar-style visualization
-    case bars
-    
-    /// Curved line visualization
-    case curve
-    
-    /// Circles visualization
-    case circles
-    
-    /// Spectrum analyzer visualization
-    case spectrum
-}
+// WaveformStyle enum removed - always using spectrum analyzer now
 
 // MARK: - Preview
 
 #Preview {
     VStack(spacing: 20) {
-        // Bars style waveform
-        EnhancedWaveformView(
-            audioLevel: 0.5,
-            primaryColor: .blue,
-            secondaryColor: .purple,
-            isActive: true,
-            style: .bars
-        )
-        .frame(height: 60)
-        .padding()
-        
-        // Curve style waveform
-        EnhancedWaveformView(
-            audioLevel: 0.7,
-            primaryColor: .green,
-            secondaryColor: .blue,
-            isActive: true,
-            style: .curve
-        )
-        .frame(height: 60)
-        .padding()
-        
-        // Circles style waveform
-        EnhancedWaveformView(
-            audioLevel: 0.6,
-            primaryColor: .orange,
-            secondaryColor: .red,
-            isActive: true,
-            style: .circles
-        )
-        .frame(height: 60)
-        .padding()
-        
-        // Spectrum analyzer waveform
+        // Active spectrum analyzer
         EnhancedWaveformView(
             audioLevel: 0.8,
             primaryColor: .blue,
             secondaryColor: .purple,
             isActive: true,
-            style: .spectrum,
             frequencyData: [0.3, 0.5, 0.7, 0.6, 0.4, 0.3, 0.5, 0.6, 0.7, 0.8, 0.6, 0.4, 0.3, 0.2, 0.3, 0.4, 0.5, 0.6, 0.5, 0.4, 0.3, 0.2, 0.3, 0.4, 0.5, 0.4, 0.3, 0.2, 0.1, 0.2]
         )
         .frame(height: 80)
         .padding()
         
-        // Inactive waveform
+        // Inactive spectrum analyzer
         EnhancedWaveformView(
             audioLevel: 0.0,
             primaryColor: .gray,
             secondaryColor: .gray.opacity(0.5),
             isActive: false,
-            style: .bars
+            frequencyData: []
         )
         .frame(height: 60)
         .padding()

@@ -20,8 +20,6 @@ struct EnhancedPlaybackView: View {
     @State private var sliderValue: Double = 0.0
     @State private var showBookmarkList = false
     @State private var newBookmarkLabel = ""
-    @State private var waveformStyle: WaveformStyle = .bars
-    @State private var showingStylePicker = false
     
     // MARK: - Initialization
     
@@ -33,38 +31,15 @@ struct EnhancedPlaybackView: View {
     
     var body: some View {
         VStack(spacing: 16) {
-            // Waveform visualization with style picker
-            ZStack(alignment: .topTrailing) {
-                EnhancedWaveformView(
-                    audioLevel: viewModel.visualizationLevel,
-                    primaryColor: playbackColor,
-                    secondaryColor: playbackSecondaryColor,
-                    isActive: viewModel.isPlaying,
-                    style: waveformStyle,
-                    frequencyData: viewModel.frequencyData
-                )
-                .frame(height: 70)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    showingStylePicker = true
-                }
-                
-                // Style picker button
-                Button(action: {
-                    showingStylePicker = true
-                }) {
-                    Image(systemName: "waveform.circle")
-                        .font(.system(size: 20))
-                        .foregroundColor(playbackColor)
-                        .padding(8)
-                        .background(Color(.systemBackground).opacity(0.7))
-                        .clipShape(Circle())
-                }
-                .padding(8)
-            }
-            .popover(isPresented: $showingStylePicker) {
-                waveformStylePicker
-            }
+            // Spectrum analyzer visualization
+            EnhancedWaveformView(
+                audioLevel: viewModel.visualizationLevel,
+                primaryColor: playbackColor,
+                secondaryColor: playbackSecondaryColor,
+                isActive: viewModel.isPlaying,
+                frequencyData: viewModel.frequencyData
+            )
+            .frame(height: 70)
             
             // Bookmarks indicator
             if !viewModel.bookmarks.isEmpty {
@@ -298,120 +273,6 @@ struct EnhancedPlaybackView: View {
     
     // MARK: - Subviews
     
-    /// Waveform style picker
-    private var waveformStylePicker: some View {
-        VStack(spacing: 16) {
-            Text("Waveform Style")
-                .font(.headline)
-                .padding(.top)
-            
-            VStack(spacing: 12) {
-                Button(action: {
-                    waveformStyle = .bars
-                    showingStylePicker = false
-                }) {
-                    VStack {
-                        EnhancedWaveformView(
-                            audioLevel: 0.5,
-                            primaryColor: playbackColor,
-                            secondaryColor: playbackSecondaryColor,
-                            isActive: true,
-                            style: .bars
-                        )
-                        .frame(width: 200, height: 40)
-                        
-                        Text("Bars")
-                            .font(.subheadline)
-                            .foregroundColor(waveformStyle == .bars ? playbackColor : .primary)
-                    }
-                    .padding(8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(waveformStyle == .bars ? playbackColor : Color.clear, lineWidth: 2)
-                    )
-                }
-                
-                Button(action: {
-                    waveformStyle = .curve
-                    showingStylePicker = false
-                }) {
-                    VStack {
-                        EnhancedWaveformView(
-                            audioLevel: 0.5,
-                            primaryColor: playbackColor,
-                            secondaryColor: playbackSecondaryColor,
-                            isActive: true,
-                            style: .curve
-                        )
-                        .frame(width: 200, height: 40)
-                        
-                        Text("Curve")
-                            .font(.subheadline)
-                            .foregroundColor(waveformStyle == .curve ? playbackColor : .primary)
-                    }
-                    .padding(8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(waveformStyle == .curve ? playbackColor : Color.clear, lineWidth: 2)
-                    )
-                }
-                
-                Button(action: {
-                    waveformStyle = .circles
-                    showingStylePicker = false
-                }) {
-                    VStack {
-                        EnhancedWaveformView(
-                            audioLevel: 0.5,
-                            primaryColor: playbackColor,
-                            secondaryColor: playbackSecondaryColor,
-                            isActive: true,
-                            style: .circles
-                        )
-                        .frame(width: 200, height: 40)
-                        
-                        Text("Circles")
-                            .font(.subheadline)
-                            .foregroundColor(waveformStyle == .circles ? playbackColor : .primary)
-                    }
-                    .padding(8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(waveformStyle == .circles ? playbackColor : Color.clear, lineWidth: 2)
-                    )
-                }
-                
-                Button(action: {
-                    waveformStyle = .spectrum
-                    showingStylePicker = false
-                }) {
-                    VStack {
-                        EnhancedWaveformView(
-                            audioLevel: 0.5,
-                            primaryColor: playbackColor,
-                            secondaryColor: playbackSecondaryColor,
-                            isActive: true,
-                            style: .spectrum
-                        )
-                        .frame(width: 200, height: 40)
-                        
-                        Text("Spectrum")
-                            .font(.subheadline)
-                            .foregroundColor(waveformStyle == .spectrum ? playbackColor : .primary)
-                    }
-                    .padding(8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(waveformStyle == .spectrum ? playbackColor : Color.clear, lineWidth: 2)
-                    )
-                }
-            }
-            .padding()
-        }
-        .frame(width: 250)
-        .padding(.bottom)
-    }
-    
     /// View showing bookmark indicators
     private var bookmarkIndicators: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -575,8 +436,6 @@ struct CompactEnhancedPlaybackView: View {
     
     // MARK: - State
     
-    @State private var waveformStyle: WaveformStyle = .bars
-    
     // MARK: - Body
     
     var body: some View {
@@ -595,7 +454,7 @@ struct CompactEnhancedPlaybackView: View {
                         .foregroundColor(viewModel.isPlaying ? .blue : .gray)
                 }
                 
-                // Mini waveform
+                // Mini spectrum analyzer
                 EnhancedWaveformView(
                     audioLevel: viewModel.visualizationLevel,
                     primaryColor: viewModel.isPlaying ? .blue : .gray,
@@ -603,7 +462,7 @@ struct CompactEnhancedPlaybackView: View {
                     barCount: 20,
                     spacing: 2,
                     isActive: viewModel.isPlaying,
-                    style: waveformStyle
+                    frequencyData: viewModel.frequencyData
                 )
                 .frame(height: 30)
             }
