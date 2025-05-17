@@ -105,32 +105,44 @@ class AudioFileAnalyzer {
                 var magnitudes = [Float](repeating: 0.0, count: fftSize/2)
                 vDSP_zvabs(&split, 1, &magnitudes, 1, vDSP_Length(fftSize/2))
                 
-                // Apply logarithmic scaling for more natural visualization
-                var scaledMagnitudes = [Float](repeating: 0.0, count: magnitudes.count)
-                var one: Float = 1.0
-                vDSP_vsadd(magnitudes, 1, &one, &scaledMagnitudes, 1, vDSP_Length(magnitudes.count))
-                var logMagnitudes = [Float](repeating: 0.0, count: scaledMagnitudes.count)
-                vvlog10f(&logMagnitudes, &scaledMagnitudes, [Int32(scaledMagnitudes.count)])
-                scaledMagnitudes = logMagnitudes
+                // Scale magnitudes to compensate for FFT size
+                var scaleFactor: Float = 2.0 / Float(fftSize)
+                vDSP_vsmul(magnitudes, 1, &scaleFactor, &magnitudes, 1, vDSP_Length(magnitudes.count))
                 
-                // Normalize to 0-1 range with a more realistic scale
-                var minValue: Float = 0
-                var maxValue: Float = 0
-                vDSP_minv(scaledMagnitudes, 1, &minValue, vDSP_Length(scaledMagnitudes.count))
-                vDSP_maxv(scaledMagnitudes, 1, &maxValue, vDSP_Length(scaledMagnitudes.count))
-                
-                let range = maxValue - minValue
-                if range > 0 {
-                    var negMinValue = -minValue
-                    vDSP_vsadd(scaledMagnitudes, 1, &negMinValue, &scaledMagnitudes, 1, vDSP_Length(scaledMagnitudes.count))
-                    vDSP_vsdiv(scaledMagnitudes, 1, [range], &scaledMagnitudes, 1, vDSP_Length(scaledMagnitudes.count))
+                // Apply logarithmic scaling for better perception
+                // log10(x + 1) to avoid log(0) and maintain dynamic range
+                var logMagnitudes = [Float](repeating: 0.0, count: magnitudes.count)
+                for i in 0..<magnitudes.count {
+                    // Add a small epsilon to avoid log(0), but keep it small to preserve silence
+                    let epsilon: Float = 1e-10
+                    logMagnitudes[i] = log10(magnitudes[i] + epsilon)
                 }
                 
-                // Apply a power curve for better visual response
-                var poweredMagnitudes = [Float](repeating: 0.0, count: scaledMagnitudes.count)
-                vDSP_vsq(scaledMagnitudes, 1, &poweredMagnitudes, 1, vDSP_Length(scaledMagnitudes.count))
+                // Apply a noise floor threshold to eliminate background noise
+                let noiseFloor: Float = -60.0 // dB threshold
+                let minMagnitude: Float = pow(10, noiseFloor / 20.0)
                 
-                let bars = self.reduceToBars(magnitudes: poweredMagnitudes)
+                // Convert to linear scale (0-1 range) with proper silence detection
+                var scaledMagnitudes = [Float](repeating: 0.0, count: logMagnitudes.count)
+                let dynamicRange: Float = 60.0 // dB dynamic range
+                let minDB: Float = -dynamicRange
+                let maxDB: Float = 0.0
+                
+                for i in 0..<logMagnitudes.count {
+                    // Convert log magnitude to dB (20 * log10(magnitude))
+                    let db = 20.0 * logMagnitudes[i]
+                    
+                    // Apply noise floor
+                    if magnitudes[i] < minMagnitude {
+                        scaledMagnitudes[i] = 0.0
+                    } else {
+                        // Map dB to 0-1 range with clamping
+                        let normalized = (db - minDB) / (maxDB - minDB)
+                        scaledMagnitudes[i] = max(0.0, min(1.0, normalized))
+                    }
+                }
+                
+                let bars = self.reduceToBars(magnitudes: scaledMagnitudes)
                 
                 DispatchQueue.main.async {
                     self.delegate?.didUpdateSpectrum(bars)
