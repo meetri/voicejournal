@@ -168,8 +168,8 @@ struct CalendarView: View {
             }
             .padding(.vertical, 4)
             
-            // Weekday header for month and week views
-            if viewModel.zoomLevel != .year {
+            // Weekday header for month view only
+            if viewModel.zoomLevel == .month {
                 weekdayHeader
             }
         }
@@ -419,12 +419,13 @@ struct WeekCalendarView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Week days
-            HStack(spacing: 0) {
+            HStack(spacing: 4) {
                 ForEach(viewModel.daysInWeek(), id: \.self) { date in
                     WeekDayCell(date: date, viewModel: viewModel)
                 }
             }
             .padding(.horizontal, 8)
+            .frame(height: 100)
             
             // Entries for selected day
             let entries = viewModel.entries(for: viewModel.selectedDate)
@@ -491,30 +492,37 @@ struct WeekCalendarView: View {
                 Text(date, formatter: weekdayFormatter)
                     .font(.caption)
                     .foregroundColor(.secondary)
+                    .frame(height: 16)
                 
-                // Day number
-                Text("\(Calendar.current.component(.day, from: date))")
-                    .font(.title3)
-                    .fontWeight(viewModel.isToday(date) ? .bold : .regular)
-                    .foregroundColor(textColor())
-                
-                // Month if first day of month
-                if Calendar.current.component(.day, from: date) == 1 {
-                    Text(date, formatter: monthFormatter)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                // Day number with optional month
+                HStack(spacing: 4) {
+                    Text("\(Calendar.current.component(.day, from: date))")
+                        .font(.title3)
+                        .fontWeight(viewModel.isToday(date) ? .bold : .regular)
+                        .foregroundColor(textColor())
+                    
+                    // Month if first day of month
+                    if Calendar.current.component(.day, from: date) == 1 {
+                        Text(date, formatter: monthFormatter)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
+                .frame(height: 24)
                 
                 // Entry indicators
                 if viewModel.hasEntries(on: date) {
                     entryIndicators
+                        .frame(height: 20)
                 } else {
                     Spacer()
-                        .frame(height: 16)
+                        .frame(height: 20)
                 }
+                
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
+            .frame(height: 80)
+            .padding(.vertical, 4)
             .background(
                 RoundedRectangle(cornerRadius: 8)
                     .fill(cellBackgroundColor())
