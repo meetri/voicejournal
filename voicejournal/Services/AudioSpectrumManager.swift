@@ -23,6 +23,10 @@ class AudioSpectrumManager {
     weak var delegate: AudioSpectrumDelegate?
     private var playerNode: AVAudioPlayerNode?
     
+    // Smoothing for visualization
+    private var previousBars: [Float] = []
+    private let smoothingFactor: Float = 0.7 // Higher = more smoothing
+    
     // MARK: - Initialization
     
     init(fftSize: Int = 1024, barCount: Int = 30) {
@@ -30,6 +34,9 @@ class AudioSpectrumManager {
         self.barCount = barCount
         self.log2n = vDSP_Length(log2(Float(fftSize)))
         self.fftSetup = vDSP_create_fftsetup(log2n, FFTRadix(kFFTRadix2))
+        
+        // Initialize smoothing array
+        self.previousBars = [Float](repeating: 0, count: barCount)
     }
     
     // MARK: - Public Methods
@@ -224,6 +231,23 @@ class AudioSpectrumManager {
             if count > 0 {
                 bars[i] = sum / Float(count)
             }
+        }
+        
+        // Apply smoothing using exponential moving average
+        for i in 0..<barCount {
+            let currentValue = bars[i]
+            let previousValue = previousBars[i]
+            
+            // Smooth the values, but allow quick rises and slow falls
+            if currentValue > previousValue {
+                // Allow quick rises
+                bars[i] = currentValue * 0.9 + previousValue * 0.1
+            } else {
+                // Slow falls
+                bars[i] = currentValue * 0.3 + previousValue * 0.7
+            }
+            
+            previousBars[i] = bars[i]
         }
         
         return bars

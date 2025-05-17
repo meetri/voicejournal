@@ -19,9 +19,16 @@ class AudioFileAnalyzer {
     
     weak var delegate: AudioSpectrumDelegate?
     
+    // Smoothing for visualization
+    private var previousBars: [Float] = []
+    private let smoothingFactor: Float = 0.7 // Higher = more smoothing
+    
     init() {
         self.log2n = vDSP_Length(log2(Float(fftSize)))
         self.fftSetup = vDSP_create_fftsetup(log2n, FFTRadix(kFFTRadix2))
+        
+        // Initialize smoothing array
+        self.previousBars = [Float](repeating: 0, count: barCount)
     }
     
     /// Load an audio file for analysis
@@ -173,6 +180,23 @@ class AudioFileAnalyzer {
             if count > 0 {
                 bars[i] = sum / Float(count)
             }
+        }
+        
+        // Apply smoothing using exponential moving average
+        for i in 0..<barCount {
+            let currentValue = bars[i]
+            let previousValue = previousBars[i]
+            
+            // Smooth the values, but allow quick rises and slow falls
+            if currentValue > previousValue {
+                // Allow quick rises
+                bars[i] = currentValue * 0.9 + previousValue * 0.1
+            } else {
+                // Slow falls
+                bars[i] = currentValue * 0.3 + previousValue * 0.7
+            }
+            
+            previousBars[i] = bars[i]
         }
         
         return bars
