@@ -88,7 +88,7 @@ struct RecordingView: View {
                 secondaryColor: recordingSecondaryColor,
                 isActive: viewModel.isRecording && !viewModel.isPaused,
                 frequencyData: viewModel.frequencyData,
-                height: 120
+                height: 70
             )
             .padding()
             .onAppear {

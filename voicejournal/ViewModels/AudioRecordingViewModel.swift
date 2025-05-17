@@ -107,7 +107,8 @@ class AudioRecordingViewModel: ObservableObject {
         self.managedObjectContext = context
         self.recordingService = recordingService
         self.speechRecognitionService = speechRecognitionService
-        self.spectrumAnalyzerService = SpectrumAnalyzerService()
+        // Use 30 frequency bins to match the playback view bar count
+        self.spectrumAnalyzerService = SpectrumAnalyzerService(frequencyBinCount: 30)
         self.journalEntry = existingEntry
         
         // Set the speech recognition locale from settings
