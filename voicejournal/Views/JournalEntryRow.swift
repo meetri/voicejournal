@@ -165,7 +165,7 @@ struct JournalEntryRow: View {
                 )
                 .shadow(color: themeManager.theme.shadowColor, radius: 2, x: 0, y: 1)
         )
-        .padding(.horizontal)
+        .padding(.horizontal, 8)
         .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
         .listRowBackground(Color.clear)
     }

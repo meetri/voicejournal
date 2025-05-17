@@ -53,8 +53,8 @@ struct DarkTheme: ThemeProtocol {
     let text = Color.white
     let textSecondary = Color(.lightGray)
     let surfaceLight = Color(.systemGray5)
-    let cellBackground = Color(white: 0.11)
-    let cellBorder = Color.white.opacity(0.08)
+    let cellBackground = Color(white: 0.06)
+    let cellBorder = Color.white.opacity(0.04)
     let shadowColor = Color.clear  // No shadows in dark mode for cleaner look
 }
 
