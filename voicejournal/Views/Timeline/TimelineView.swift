@@ -14,7 +14,6 @@ struct TimelineView: View {
     // MARK: - Environment
     
     @Environment(\.managedObjectContext) private var viewContext
-    @Environment(\.themeManager) var themeManager
     
     // MARK: - State
     
@@ -44,52 +43,38 @@ struct TimelineView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Gradient background for the entire view
-                themeManager.theme.background
-                    .ignoresSafeArea()
+            VStack(spacing: 0) {
+                // Timeline header
+                timelineHeader
                 
-                VStack(spacing: 0) {
-                    // Timeline header
-                    timelineHeader
-                    
-                    // Timeline content
-                    if viewModel.isLoading {
-                        loadingView
-                    } else if viewModel.sortedDates.isEmpty {
-                        emptyStateView
-                    } else {
-                        timelineContent
-                    }
+                // Timeline content
+                if viewModel.isLoading {
+                    loadingView
+                } else if viewModel.sortedDates.isEmpty {
+                    emptyStateView
+                } else {
+                    timelineContent
                 }
-                
-                // Floating Action Button for creating new recordings
-                VStack {
+            }
+            
+            // Floating Action Button for creating new recordings
+            VStack {
+                Spacer()
+                HStack {
                     Spacer()
-                    HStack {
-                        Spacer()
-                        Button(action: {
-                            showingEntryCreation = true
-                        }) {
-                            Image(systemName: "mic.fill")
-                                .font(.title2)
-                                .foregroundColor(.white)
-                                .frame(width: 60, height: 60)
-                                .background(
-                                    LinearGradient(
-                                        colors: [
-                                            themeManager.theme.primary,
-                                            themeManager.theme.primary.opacity(0.8)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .clipShape(Circle())
-                                .shadow(color: themeManager.theme.primary.opacity(0.3), radius: 8, x: 0, y: 4)
-                        }
-                        .padding([.bottom, .trailing], 20)
-                        .accessibilityLabel("New Recording")
+                    Button(action: {
+                        showingEntryCreation = true
+                    }) {
+                        Image(systemName: "mic.fill")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                            .frame(width: 60, height: 60)
+                            .background(Color.blue)
+                            .clipShape(Circle())
+                            .shadow(radius: 4)
                     }
+                    .padding([.bottom, .trailing], 20)
+                    .accessibilityLabel("New Recording")
                 }
             }
         }
@@ -147,6 +132,7 @@ struct TimelineView: View {
                 filterMode: $viewModel.tagFilterMode
             )
             .environment(\.managedObjectContext, viewContext)
+            }
         }
     }
     
@@ -154,168 +140,111 @@ struct TimelineView: View {
     
     /// Timeline header with date range selection
     private var timelineHeader: some View {
-        VStack(spacing: 12) {
-            headerTopRow
-            searchAndFilterControls
-        }
-        .padding(.vertical, 12)
-        .background(
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    Rectangle()
-                        .fill(themeManager.theme.surface.opacity(0.05))
-                )
-        )
-    }
-    
-    private var headerTopRow: some View {
-        HStack {
-            Text("Timeline")
-                .font(.title2)
-                .fontWeight(.semibold)
-                .foregroundColor(themeManager.theme.text)
-            
-            Spacer()
-            
-            dateRangeButton
-        }
-        .padding(.horizontal)
-    }
-    
-    private var dateRangeButton: some View {
-        Button(action: {
-            showingRangePicker = true
-        }) {
-            HStack(spacing: 4) {
-                Text(viewModel.dateRangeTitle())
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+        VStack(spacing: 8) {
+            // Top row with title and date controls
+            HStack {
+                Text("Timeline")
+                    .font(.headline)
                 
-                Image(systemName: "chevron.down")
-                    .font(.caption)
-            }
-            .padding(.vertical, 6)
-            .padding(.horizontal, 12)
-            .background(
-                Capsule()
-                    .fill(.ultraThinMaterial)
-            )
-            .foregroundColor(themeManager.theme.primary)
-            .overlay(
-                Capsule()
-                    .stroke(themeManager.theme.primary.opacity(0.2), lineWidth: 1)
-            )
-        }
-    }
-    
-    private var searchAndFilterControls: some View {
-        HStack(spacing: 8) {
-            searchBar
-            tagFilterButton
-            sortMenu
-        }
-        .padding(.horizontal)
-    }
-    
-    private var searchBar: some View {
-        HStack {
-            Image(systemName: "magnifyingglass")
-                .foregroundColor(themeManager.theme.textSecondary)
-            
-            TextField("Search entries...", text: $searchText)
-                .textFieldStyle(PlainTextFieldStyle())
-                .foregroundColor(themeManager.theme.text)
-                .onChange(of: searchText) { _, newValue in
-                    viewModel.searchText = newValue
-                }
-            
-            if !searchText.isEmpty {
+                Spacer()
+                                
                 Button(action: {
-                    searchText = ""
-                    viewModel.searchText = ""
+                    showingRangePicker = true
                 }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(themeManager.theme.textSecondary)
+                    HStack(spacing: 4) {
+                        Text(viewModel.dateRangeTitle())
+                            .font(.subheadline)
+                        
+                        Image(systemName: "chevron.down")
+                            .font(.caption)
+                    }
+                    .padding(.vertical, 4)
+                    .padding(.horizontal, 8)
+                    .background(Color.blue.opacity(0.1))
+                    .foregroundColor(.blue)
+                    .cornerRadius(8)
                 }
             }
-        }
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(.ultraThinMaterial)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(themeManager.theme.surface.opacity(0.5), lineWidth: 1)
-        )
-    }
-    
-    private var tagFilterButton: some View {
-        Button(action: {
-            showingTagFilter = true
-        }) {
-            HStack(spacing: 4) {
-                Image(systemName: "tag")
-                Text(viewModel.selectedTags.isEmpty ? "Tags" : "\(viewModel.selectedTags.count)")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-            }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 12)
-            .background(
-                viewModel.selectedTags.isEmpty 
-                    ? AnyView(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(.ultraThinMaterial)
-                      )
-                    : AnyView(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(themeManager.theme.primary.opacity(0.1))
-                      )
-            )
-            .foregroundColor(viewModel.selectedTags.isEmpty ? themeManager.theme.text : themeManager.theme.primary)
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(viewModel.selectedTags.isEmpty ? themeManager.theme.surface.opacity(0.5) : themeManager.theme.primary.opacity(0.3), lineWidth: 1)
-            )
-        }
-    }
-    
-    private var sortMenu: some View {
-        Menu {
-            ForEach(SortOrder.allCases) { order in
-                Button(action: {
-                    print("🔄 Sort order selected: \(order.rawValue)")
-                    viewModel.applySortOrder(order)
-                }) {
-                    HStack {
-                        Text(order.rawValue)
-                        if viewModel.sortOrder == order {
-                            Image(systemName: "checkmark")
+            .padding(.horizontal)
+            
+            // Search bar and filter controls
+            HStack(spacing: 8) {
+                // Search bar
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.secondary)
+                    
+                    TextField("Search entries...", text: $searchText)
+                        .textFieldStyle(PlainTextFieldStyle())
+                        .onChange(of: searchText) { _, newValue in
+                            viewModel.searchText = newValue
+                        }
+                    
+                    if !searchText.isEmpty {
+                        Button(action: {
+                            searchText = ""
+                            viewModel.searchText = ""
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
                         }
                     }
                 }
+                .padding(8)
+                .background(Color(.secondarySystemBackground))
+                .cornerRadius(10)
+                
+                // Tag filter button
+                Button(action: {
+                    showingTagFilter = true
+                }) {
+                    HStack {
+                        Image(systemName: "tag")
+                        Text(viewModel.selectedTags.isEmpty ? "Tags" : "\(viewModel.selectedTags.count)")
+                            .font(.subheadline)
+                    }
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 12)
+                    .background(viewModel.selectedTags.isEmpty ? Color(.secondarySystemBackground) : Color.blue.opacity(0.1))
+                    .foregroundColor(viewModel.selectedTags.isEmpty ? .primary : .blue)
+                    .cornerRadius(10)
+                }
+                
+                // Sort order menu
+                Menu {
+                    ForEach(SortOrder.allCases) { order in
+                        Button(action: {
+                            print("🔄 Sort order selected: \(order.rawValue)")
+                            // Use the direct method to apply sort order and force immediate fetch
+                            viewModel.applySortOrder(order)
+                        }) {
+                            HStack {
+                                Text(order.rawValue)
+                                if viewModel.sortOrder == order {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "arrow.up.arrow.down")
+                        Text("Sort")
+                            .font(.subheadline)
+                    }
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 12)
+                    .background(Color(.secondarySystemBackground))
+                    .foregroundColor(.primary)
+                    .cornerRadius(10)
+                }
             }
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "arrow.up.arrow.down")
-                Text("Sort")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-            }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(.ultraThinMaterial)
-            )
-            .foregroundColor(themeManager.theme.text)
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(themeManager.theme.surface.opacity(0.5), lineWidth: 1)
-            )
+            .padding(.horizontal)
+            
+            Divider()
         }
+        .padding(.vertical, 8)
+        .background(Color(.systemBackground))
     }
     
     /// Timeline content with entries in a flat list
@@ -326,7 +255,7 @@ struct TimelineView: View {
                     // Display all entries without section headers
                     ForEach(entries) { entry in
                         NavigationLink(destination: JournalEntryView(journalEntry: entry)) {
-                            ModernJournalEntryRow(entry: entry, onToggleLock: { toggledEntry in
+                            JournalEntryRow(entry: entry, onToggleLock: { toggledEntry in
                                 selectedEntryToToggleLock = toggledEntry
                                 showLockConfirmation = true
                             })
@@ -357,8 +286,6 @@ struct TimelineView: View {
             }
         }
         .listStyle(PlainListStyle())
-        .scrollContentBackground(.hidden)
-        .background(themeManager.theme.background)
         .onChange(of: scrollToDate) { oldValue, newValue in
             if let date = newValue {
                 // Find the closest date in our sorted dates
@@ -403,11 +330,11 @@ struct TimelineView: View {
         VStack {
             Spacer()
             ProgressView()
-                .progressViewStyle(CircularProgressViewStyle(tint: themeManager.theme.primary))
+                .progressViewStyle(CircularProgressViewStyle())
                 .scaleEffect(1.5)
             Text("Loading entries...")
                 .font(.headline)
-                .foregroundColor(themeManager.theme.textSecondary)
+                .foregroundColor(.secondary)
                 .padding(.top, 16)
             Spacer()
         }
@@ -420,17 +347,16 @@ struct TimelineView: View {
             
             Image(systemName: "calendar.badge.clock")
                 .font(.system(size: 72))
-                .foregroundColor(themeManager.theme.accent.opacity(0.7))
+                .foregroundColor(.secondary)
             
             Text("No Journal Entries")
                 .font(.title2)
                 .fontWeight(.semibold)
-                .foregroundColor(themeManager.theme.text)
             
             if !viewModel.searchText.isEmpty {
                 Text("No entries match your search for \"\(viewModel.searchText)\".")
                     .font(.body)
-                    .foregroundColor(themeManager.theme.textSecondary)
+                    .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
                 
@@ -441,16 +367,14 @@ struct TimelineView: View {
                     Text("Clear Search")
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
-                        .background(
-                            Capsule()
-                                .fill(themeManager.theme.primary)
-                        )
+                        .background(Color.blue)
                         .foregroundColor(.white)
+                        .cornerRadius(8)
                 }
             } else if !viewModel.selectedTags.isEmpty {
                 Text("No entries match the selected tag filters.")
                     .font(.body)
-                    .foregroundColor(themeManager.theme.textSecondary)
+                    .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
                 
@@ -460,16 +384,14 @@ struct TimelineView: View {
                     Text("Clear Tag Filters")
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
-                        .background(
-                            Capsule()
-                                .fill(themeManager.theme.primary)
-                        )
+                        .background(Color.blue)
                         .foregroundColor(.white)
+                        .cornerRadius(8)
                 }
             } else {
                 Text("No entries found for the selected date range.")
                     .font(.body)
-                    .foregroundColor(themeManager.theme.textSecondary)
+                    .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
                 
@@ -479,11 +401,9 @@ struct TimelineView: View {
                     Text("Show All Entries")
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
-                        .background(
-                            Capsule()
-                                .fill(themeManager.theme.primary)
-                        )
+                        .background(Color.blue)
                         .foregroundColor(.white)
+                        .cornerRadius(8)
                 }
             }
             // .padding(.top, 8)
