@@ -124,9 +124,9 @@ class AudioFileAnalyzer {
                 
                 // Convert to linear scale (0-1 range) with proper silence detection
                 var scaledMagnitudes = [Float](repeating: 0.0, count: logMagnitudes.count)
-                let dynamicRange: Float = 60.0 // dB dynamic range
+                let dynamicRange: Float = 50.0 // dB dynamic range (reduced for better scaling)
                 let minDB: Float = -dynamicRange
-                let maxDB: Float = 0.0
+                let maxDB: Float = -5.0 // Adjusted to boost overall levels
                 
                 for i in 0..<logMagnitudes.count {
                     // Convert log magnitude to dB (20 * log10(magnitude))

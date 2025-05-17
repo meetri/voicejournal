@@ -107,7 +107,7 @@ struct EnhancedWaveformView: View {
                             // Check for NaN or invalid values
                             let safeLevel = level.isNaN || level.isInfinite ? 0 : max(0, min(1, level))
                             
-                            let barHeight = max(2, CGFloat(safeLevel) * size.height * 0.8)
+                            let barHeight = max(2, CGFloat(safeLevel) * size.height * 0.95)
                             let x = CGFloat(i) * (barWidth + barSpacing)
                             let y = size.height - barHeight
                             

@@ -136,9 +136,9 @@ class SpectrumAnalyzerService: AudioSpectrumDelegate {
     /// - Parameter bars: The raw spectrum data
     /// - Returns: The processed spectrum data
     private func processSpectrumData(_ bars: [Float]) -> [Float] {
-        // Apply any additional processing needed
-        // For now, just return the bars as-is since they're already normalized 0-1
-        return bars
+        // Apply visual amplification to make the visualization more responsive
+        let visualAmplification: Float = 1.8
+        return bars.map { min(1.0, $0 * visualAmplification) }
     }
     
     // MARK: - Types
