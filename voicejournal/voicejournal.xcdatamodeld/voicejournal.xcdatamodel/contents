@@ -49,4 +49,15 @@
         <attribute name="timingData" optional="YES" attributeType="String"/>
         <relationship name="journalEntry" maxCount="1" deletionRule="Nullify" destinationEntity="JournalEntry" inverseName="transcription" inverseEntity="JournalEntry"/>
     </entity>
+    <entity name="CustomTheme" representedClassName="CustomTheme" syncable="YES">
+        <attribute name="author" optional="YES" attributeType="String"/>
+        <attribute name="createdDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="isBuiltIn" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="isEditable" optional="YES" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
+        <attribute name="isSelected" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="lastModified" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="name" optional="YES" attributeType="String"/>
+        <attribute name="themeDataJSON" optional="YES" attributeType="Binary"/>
+    </entity>
 </model>
