@@ -10,6 +10,8 @@ import CoreData
 
 /// A reusable row component for displaying journal entries in lists
 struct JournalEntryRow: View {
+    @Environment(\.themeManager) private var themeManager
+    
     let entry: JournalEntry
     var onToggleLock: ((JournalEntry) -> Void)?
     
@@ -153,8 +155,18 @@ struct JournalEntryRow: View {
                 }
             }
         }
-        .padding(.vertical, 8)
-        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(themeManager.theme.cellBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(themeManager.theme.cellBorder, lineWidth: 1)
+                )
+                .shadow(color: themeManager.theme.shadowColor, radius: 2, x: 0, y: 1)
+        )
+        .padding(.horizontal)
+        .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
         .listRowBackground(Color.clear)
     }
     

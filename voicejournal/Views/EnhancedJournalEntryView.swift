@@ -15,6 +15,7 @@ struct EnhancedJournalEntryView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.themeManager) private var themeManager
     
     // MARK: - Properties
     
@@ -171,8 +172,12 @@ struct EnhancedJournalEntryView: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.systemBackground))
-                .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 2)
+                .fill(themeManager.theme.cellBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(themeManager.theme.cellBorder, lineWidth: 1)
+                )
+                .shadow(color: themeManager.theme.shadowColor, radius: 3, x: 0, y: 2)
         )
         .padding(.horizontal)
     }
@@ -200,8 +205,12 @@ struct EnhancedJournalEntryView: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.systemBackground))
-                .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 2)
+                .fill(themeManager.theme.cellBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(themeManager.theme.cellBorder, lineWidth: 1)
+                )
+                .shadow(color: themeManager.theme.shadowColor, radius: 3, x: 0, y: 2)
         )
     }
     
@@ -228,7 +237,7 @@ struct EnhancedJournalEntryView: View {
                 .padding()
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(.systemGray6))
+                        .fill(themeManager.theme.surface)
                 )
             } else {
                 Text(text)
@@ -236,15 +245,19 @@ struct EnhancedJournalEntryView: View {
                     .padding()
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(.systemGray6))
+                            .fill(themeManager.theme.surface)
                     )
             }
         }
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.systemBackground))
-                .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 2)
+                .fill(themeManager.theme.cellBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(themeManager.theme.cellBorder, lineWidth: 1)
+                )
+                .shadow(color: themeManager.theme.shadowColor, radius: 3, x: 0, y: 2)
         )
     }
     
@@ -287,8 +300,12 @@ struct EnhancedJournalEntryView: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.systemBackground))
-                .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 2)
+                .fill(themeManager.theme.cellBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(themeManager.theme.cellBorder, lineWidth: 1)
+                )
+                .shadow(color: themeManager.theme.shadowColor, radius: 3, x: 0, y: 2)
         )
     }
     
@@ -347,8 +364,12 @@ struct EnhancedJournalEntryView: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.systemBackground))
-                .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 2)
+                .fill(themeManager.theme.cellBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(themeManager.theme.cellBorder, lineWidth: 1)
+                )
+                .shadow(color: themeManager.theme.shadowColor, radius: 3, x: 0, y: 2)
         )
     }
     

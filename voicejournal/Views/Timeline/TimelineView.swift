@@ -14,6 +14,7 @@ struct TimelineView: View {
     // MARK: - Environment
     
     @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.themeManager) private var themeManager
     
     // MARK: - State
     
@@ -191,7 +192,7 @@ struct TimelineView: View {
                     }
                 }
                 .padding(8)
-                .background(Color(.secondarySystemBackground))
+                .background(themeManager.theme.surface)
                 .cornerRadius(10)
                 
                 // Tag filter button
@@ -233,7 +234,7 @@ struct TimelineView: View {
                     }
                     .padding(.vertical, 8)
                     .padding(.horizontal, 12)
-                    .background(Color(.secondarySystemBackground))
+                    .background(themeManager.theme.surface)
                     .foregroundColor(.primary)
                     .cornerRadius(10)
                 }
@@ -243,7 +244,7 @@ struct TimelineView: View {
             Divider()
         }
         .padding(.vertical, 8)
-        .background(Color(.systemBackground))
+        .background(themeManager.theme.background)
     }
     
     /// Timeline content with entries in a flat list
@@ -284,7 +285,7 @@ struct TimelineView: View {
                 }
             }
         }
-        .listStyle(PlainListStyle())
+        .themedList()
         .onChange(of: scrollToDate) { oldValue, newValue in
             if let date = newValue {
                 // Find the closest date in our sorted dates
@@ -320,7 +321,7 @@ struct TimelineView: View {
             Spacer()
         }
         .padding(.horizontal)
-        .background(Color(.systemBackground).opacity(0.9))
+        .background(themeManager.theme.background.opacity(0.9))
     }
     
     /// Loading view shown while fetching entries

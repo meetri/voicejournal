@@ -39,6 +39,8 @@ struct ThemedListModifier: ViewModifier {
             .scrollContentBackground(.hidden)
             .background(themeManager.theme.background)
             .listStyle(PlainListStyle())
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
     }
 }
 

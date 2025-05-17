@@ -19,6 +19,9 @@ protocol ThemeProtocol {
     var text: Color { get }
     var textSecondary: Color { get }
     var surfaceLight: Color { get }
+    var cellBackground: Color { get }
+    var cellBorder: Color { get }
+    var shadowColor: Color { get }
 }
 
 // MARK: - Light Theme
@@ -33,6 +36,9 @@ struct LightTheme: ThemeProtocol {
     let text = Color(.label)
     let textSecondary = Color(.secondaryLabel)
     let surfaceLight = Color(.tertiarySystemBackground)
+    let cellBackground = Color(.systemBackground)
+    let cellBorder = Color.gray.opacity(0.1)
+    let shadowColor = Color.black.opacity(0.05)
 }
 
 // MARK: - Dark Theme
@@ -47,6 +53,9 @@ struct DarkTheme: ThemeProtocol {
     let text = Color.white
     let textSecondary = Color(.lightGray)
     let surfaceLight = Color(.systemGray5)
+    let cellBackground = Color(white: 0.11)
+    let cellBorder = Color.white.opacity(0.08)
+    let shadowColor = Color.clear  // No shadows in dark mode for cleaner look
 }
 
 // MARK: - Futuristic Theme
@@ -61,6 +70,9 @@ struct FuturisticTheme: ThemeProtocol {
     let text = Color(red: 0.9, green: 0.95, blue: 1.0)  // Light blue-white
     let textSecondary = Color(red: 0.6, green: 0.7, blue: 0.8)
     let surfaceLight = Color(red: 0.15, green: 0.15, blue: 0.25)
+    let cellBackground = Color(red: 0.08, green: 0.08, blue: 0.15)
+    let cellBorder = Color(red: 0.0, green: 0.8, blue: 0.4).opacity(0.15)
+    let shadowColor = Color(red: 0.0, green: 0.8, blue: 0.4).opacity(0.1)
 }
 
 // MARK: - Theme ID Enum
