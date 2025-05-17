@@ -14,6 +14,7 @@ struct CalendarView: View {
     // MARK: - Environment
     
     @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.themeManager) var themeManager
     
     // MARK: - State
     
@@ -37,26 +38,29 @@ struct CalendarView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-            VStack(spacing: 0) {
-                // Calendar header
-                calendarHeader
+                themeManager.theme.background
+                    .ignoresSafeArea()
                 
-                // Calendar content based on zoom level
-                switch viewModel.zoomLevel {
-                case .year:
-                    YearCalendarView(viewModel: viewModel)
-                case .month:
-                    MonthCalendarView(viewModel: viewModel)
-                case .week:
-                    WeekCalendarView(
-                        viewModel: viewModel,
-                        selectedEntryToDelete: $selectedEntryToDelete,
-                        showDeleteConfirmation: $showDeleteConfirmation,
-                        selectedEntryToToggleLock: $selectedEntryToToggleLock,
-                        showLockConfirmation: $showLockConfirmation
-                    )
+                VStack(spacing: 0) {
+                    // Calendar header
+                    calendarHeader
+                    
+                    // Calendar content based on zoom level
+                    switch viewModel.zoomLevel {
+                    case .year:
+                        YearCalendarView(viewModel: viewModel)
+                    case .month:
+                        MonthCalendarView(viewModel: viewModel)
+                    case .week:
+                        WeekCalendarView(
+                            viewModel: viewModel,
+                            selectedEntryToDelete: $selectedEntryToDelete,
+                            showDeleteConfirmation: $showDeleteConfirmation,
+                            selectedEntryToToggleLock: $selectedEntryToToggleLock,
+                            showLockConfirmation: $showLockConfirmation
+                        )
+                    }
                 }
-            }
             
             // Floating Action Button for creating new recordings
             VStack {

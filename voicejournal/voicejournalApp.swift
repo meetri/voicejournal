@@ -32,10 +32,18 @@ struct voicejournalApp: App {
                     .environment(\.managedObjectContext, persistenceController.container.viewContext)
                     .environmentObject(authService)
                     .environment(\.themeManager, themeManager)
+                    .preferredColorScheme(colorScheme(for: themeManager.themeID))
+                    .onAppear {
+                        updateSystemAppearance()
+                    }
             } else {
                 AuthenticationView()
                     .environmentObject(authService)
                     .environment(\.themeManager, themeManager)
+                    .preferredColorScheme(colorScheme(for: themeManager.themeID))
+                    .onAppear {
+                        updateSystemAppearance()
+                    }
             }
         }
         .onChange(of: scenePhase) { oldPhase, newPhase in
@@ -48,4 +56,40 @@ struct voicejournalApp: App {
     
     // Track the scene phase
     @Environment(\.scenePhase) var scenePhase
+    
+    private func colorScheme(for themeID: ThemeID) -> ColorScheme? {
+        switch themeID {
+        case .light:
+            return .light
+        case .dark, .futuristic:
+            return .dark
+        }
+    }
+    
+    private func updateSystemAppearance() {
+        // Apply theme to navigation bar
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = UIColor(themeManager.theme.surface)
+        appearance.titleTextAttributes = [.foregroundColor: UIColor(themeManager.theme.text)]
+        appearance.largeTitleTextAttributes = [.foregroundColor: UIColor(themeManager.theme.text)]
+        
+        UINavigationBar.appearance().standardAppearance = appearance
+        UINavigationBar.appearance().compactAppearance = appearance
+        UINavigationBar.appearance().scrollEdgeAppearance = appearance
+        
+        // Apply theme to tab bar
+        let tabBarAppearance = UITabBarAppearance()
+        tabBarAppearance.configureWithOpaqueBackground()
+        tabBarAppearance.backgroundColor = UIColor(themeManager.theme.surface)
+        UITabBar.appearance().standardAppearance = tabBarAppearance
+        UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance
+        
+        // Apply theme to table view
+        UITableView.appearance().backgroundColor = UIColor(themeManager.theme.background)
+        UITableView.appearance().separatorColor = UIColor(themeManager.theme.surface)
+        
+        // Apply theme to collection view (for calendar)
+        UICollectionView.appearance().backgroundColor = UIColor(themeManager.theme.background)
+    }
 }

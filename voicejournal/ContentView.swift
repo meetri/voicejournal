@@ -11,6 +11,7 @@ import CoreData
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject private var authService: AuthenticationService
+    @Environment(\.themeManager) var themeManager
     
     @State private var selectedTab = 0
     
@@ -20,6 +21,7 @@ struct ContentView: View {
             NavigationView {
                 TimelineView(context: viewContext)
                     .navigationTitle("Voice Journal")
+                    .themedNavigation()
             }
             .tabItem {
                 Label("Timeline", systemImage: "clock")
@@ -30,6 +32,7 @@ struct ContentView: View {
             NavigationView {
                 CalendarView(context: viewContext)
                     .navigationTitle("Calendar")
+                    .themedNavigation()
             }
             .tabItem {
                 Label("Calendar", systemImage: "calendar")
@@ -43,7 +46,35 @@ struct ContentView: View {
                 }
                 .tag(2)
         }
-        .accentColor(.blue)
+        .accentColor(themeManager.theme.accent)
+        .themed()
+        .onAppear {
+            updateSystemAppearance()
+        }
+    }
+    
+    private func updateSystemAppearance() {
+        // Apply theme to navigation bar
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = UIColor(themeManager.theme.surface)
+        appearance.titleTextAttributes = [.foregroundColor: UIColor(themeManager.theme.text)]
+        appearance.largeTitleTextAttributes = [.foregroundColor: UIColor(themeManager.theme.text)]
+        
+        UINavigationBar.appearance().standardAppearance = appearance
+        UINavigationBar.appearance().compactAppearance = appearance
+        UINavigationBar.appearance().scrollEdgeAppearance = appearance
+        
+        // Apply theme to tab bar
+        let tabBarAppearance = UITabBarAppearance()
+        tabBarAppearance.configureWithOpaqueBackground()
+        tabBarAppearance.backgroundColor = UIColor(themeManager.theme.surface)
+        UITabBar.appearance().standardAppearance = tabBarAppearance
+        UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance
+        
+        // Apply to table views
+        UITableView.appearance().backgroundColor = UIColor(themeManager.theme.background)
+        UITableView.appearance().separatorColor = UIColor(themeManager.theme.surface)
     }
 }
 
@@ -186,6 +217,7 @@ struct JournalEntryDetailView: View {
 struct SettingsTabView: View {
     @EnvironmentObject private var authService: AuthenticationService
     @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.themeManager) var themeManager
     
     @State private var showTagManagement = false
     @State private var showEncryptedTagManagement = false
@@ -193,6 +225,22 @@ struct SettingsTabView: View {
     var body: some View {
         NavigationView {
             List {
+                Section(header: Text("Appearance")) {
+                    Picker("Theme", selection: Binding(
+                        get: { themeManager.themeID },
+                        set: { 
+                            themeManager.setTheme($0)
+                            // Update UI appearance when theme changes
+                            updateSystemAppearance()
+                        }
+                    )) {
+                        ForEach(ThemeID.allCases, id: \.self) { id in
+                            Text(id.displayName).tag(id)
+                        }
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                }
+                
                 Section(header: Text("Organization")) {
                     NavigationLink {
                         TagManagementView()
@@ -227,7 +275,33 @@ struct SettingsTabView: View {
                 }
             }
             .navigationTitle("Settings")
+            .themedList()
+            .themedNavigation()
         }
+    }
+    
+    private func updateSystemAppearance() {
+        // Apply theme to navigation bar
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = UIColor(themeManager.theme.surface)
+        appearance.titleTextAttributes = [.foregroundColor: UIColor(themeManager.theme.text)]
+        appearance.largeTitleTextAttributes = [.foregroundColor: UIColor(themeManager.theme.text)]
+        
+        UINavigationBar.appearance().standardAppearance = appearance
+        UINavigationBar.appearance().compactAppearance = appearance
+        UINavigationBar.appearance().scrollEdgeAppearance = appearance
+        
+        // Apply theme to tab bar
+        let tabBarAppearance = UITabBarAppearance()
+        tabBarAppearance.configureWithOpaqueBackground()
+        tabBarAppearance.backgroundColor = UIColor(themeManager.theme.surface)
+        UITabBar.appearance().standardAppearance = tabBarAppearance
+        UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance
+        
+        // Update table view appearance
+        UITableView.appearance().backgroundColor = UIColor(themeManager.theme.background)
+        UITableView.appearance().separatorColor = UIColor(themeManager.theme.surface)
     }
 }
 
