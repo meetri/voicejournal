@@ -165,77 +165,101 @@ struct EnhancedPlaybackView: View {
             .padding(.vertical, 8)
             
             // Additional controls
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
+            VStack(spacing: 12) {
+                // Primary controls row
+                HStack(spacing: 12) {
                     // Playback rate button
                     Button(action: {
                         viewModel.setRate(viewModel.nextRate)
-                        
-                        // Add haptic feedback
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     }) {
-                        Text(viewModel.rateString)
-                            .font(.system(.subheadline, design: .rounded))
-                            .fontWeight(.medium)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(playbackColor.opacity(0.15))
-                            .foregroundColor(playbackColor)
-                            .cornerRadius(16)
+                        HStack(spacing: 4) {
+                            Image(systemName: "speedometer")
+                                .font(.system(size: 14))
+                            Text(viewModel.rateString)
+                                .font(.system(.footnote, design: .rounded))
+                                .fontWeight(.medium)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity)
+                        .background(playbackColor.opacity(0.1))
+                        .foregroundColor(playbackColor)
+                        .cornerRadius(10)
                     }
                     
                     // Bookmark button
                     Button(action: {
                         viewModel.showBookmarkDialog = true
-                        
-                        // Add haptic feedback
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     }) {
-                        Label("Bookmark", systemImage: "bookmark.fill")
-                            .font(.system(.subheadline))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(Color.blue.opacity(0.15))
-                            .foregroundColor(.blue)
-                            .cornerRadius(16)
+                        HStack(spacing: 4) {
+                            Image(systemName: "bookmark.fill")
+                                .font(.system(size: 14))
+                            Text("Add")
+                                .font(.system(.footnote))
+                                .fontWeight(.medium)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity)
+                        .background(Color.blue.opacity(0.1))
+                        .foregroundColor(.blue)
+                        .cornerRadius(10)
                     }
-                    
+                }
+                
+                // Secondary controls row
+                HStack(spacing: 12) {
                     // Bookmark list button
                     Button(action: {
                         withAnimation(.spring()) {
                             showBookmarkList.toggle()
                         }
-                        
-                        // Add haptic feedback
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     }) {
-                        Label("Bookmarks", systemImage: "list.bullet")
-                            .font(.system(.subheadline))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(Color.purple.opacity(0.15))
-                            .foregroundColor(.purple)
-                            .cornerRadius(16)
+                        HStack(spacing: 4) {
+                            Image(systemName: showBookmarkList ? "list.bullet.indent" : "list.bullet")
+                                .font(.system(size: 14))
+                            Text("Bookmarks")
+                                .font(.system(.footnote))
+                                .fontWeight(.medium)
+                            if !viewModel.bookmarks.isEmpty {
+                                Text("(\(viewModel.bookmarks.count))")
+                                    .font(.system(.caption2))
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity)
+                        .background(Color.purple.opacity(0.1))
+                        .foregroundColor(.purple)
+                        .cornerRadius(10)
                     }
                     
                     // Stop button
                     Button(action: {
                         viewModel.stop()
-                        
-                        // Add haptic feedback
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     }) {
-                        Label("Stop", systemImage: "stop.fill")
-                            .font(.system(.subheadline))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(Color.red.opacity(0.15))
-                            .foregroundColor(.red)
-                            .cornerRadius(16)
+                        HStack(spacing: 4) {
+                            Image(systemName: "stop.fill")
+                                .font(.system(size: 14))
+                            Text("Stop")
+                                .font(.system(.footnote))
+                                .fontWeight(.medium)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity)
+                        .background(Color.red.opacity(0.1))
+                        .foregroundColor(.red)
+                        .cornerRadius(10)
                     }
                 }
-                .padding(.horizontal, 4)
             }
+            .padding(.horizontal)
             
             // Show bookmark list if enabled
             if showBookmarkList {
@@ -275,38 +299,51 @@ struct EnhancedPlaybackView: View {
     
     /// View showing bookmark indicators
     private var bookmarkIndicators: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(viewModel.bookmarks, id: \.self) { bookmark in
-                    Button(action: {
-                        viewModel.seekToBookmark(bookmark)
-                        
-                        // Add haptic feedback
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    }) {
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(Color(hex: bookmark.color ?? "#FF5733"))
-                                .frame(width: 8, height: 8)
+        HStack(spacing: 4) {
+            // Show up to 5 bookmarks inline with "more" indicator
+            let visibleBookmarks = Array(viewModel.bookmarks.prefix(5))
+            let remainingCount = max(0, viewModel.bookmarks.count - 5)
+            
+            ForEach(visibleBookmarks, id: \.self) { bookmark in
+                Button(action: {
+                    viewModel.seekToBookmark(bookmark)
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                }) {
+                    HStack(spacing: 2) {
+                        Circle()
+                            .fill(Color(hex: bookmark.color ?? "#FF5733"))
+                            .frame(width: 6, height: 6)
                             
-                            Text(bookmark.label ?? bookmark.formattedTimestamp)
-                                .font(.caption)
-                                .lineLimit(1)
-                        }
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color(.systemGray6))
-                                .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
-                        )
+                        Text(bookmark.label ?? bookmark.formattedTimestamp)
+                            .font(.caption)
+                            .lineLimit(1)
                     }
-                    .buttonStyle(PlainButtonStyle())
+                    .padding(.vertical, 4)
+                    .padding(.horizontal, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color(.systemGray6))
+                    )
                 }
+                .buttonStyle(PlainButtonStyle())
             }
-            .padding(.horizontal, 4)
+            
+            if remainingCount > 0 {
+                Text("+\(remainingCount)")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color(.systemGray6))
+                    )
+            }
+            
+            Spacer()
         }
-        .frame(height: 30)
+        .padding(.horizontal)
     }
     
     /// View showing the list of bookmarks
