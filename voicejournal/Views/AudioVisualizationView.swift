@@ -30,7 +30,7 @@ struct AudioVisualizationView: View {
     var height: CGFloat = 120
     
     /// Visual amplification factor to scale the bars to fill more of the view height
-    var visualAmplification: CGFloat = 2.0
+    var visualAmplification: CGFloat = 1.0
     
     // MARK: - Body
     
