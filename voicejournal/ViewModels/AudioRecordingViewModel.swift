@@ -85,10 +85,14 @@ class AudioRecordingViewModel: ObservableObject {
     /// The journal entry associated with the recording
     @Published private(set) var journalEntry: JournalEntry?
     
+    /// Frequency data for spectrum visualization
+    @Published private(set) var frequencyData: [Float] = []
+    
     // MARK: - Private Properties
     
     private let recordingService: AudioRecordingService
     private let speechRecognitionService: SpeechRecognitionService
+    private let spectrumAnalyzerService: SpectrumAnalyzerService
     private var cancellables = Set<AnyCancellable>()
     private var managedObjectContext: NSManagedObjectContext
     private var processingTask: Task<Void, Never>?
@@ -100,6 +104,7 @@ class AudioRecordingViewModel: ObservableObject {
         self.managedObjectContext = context
         self.recordingService = recordingService
         self.speechRecognitionService = speechRecognitionService
+        self.spectrumAnalyzerService = SpectrumAnalyzerService()
         self.journalEntry = existingEntry
         
         // Set the speech recognition locale from settings
@@ -155,6 +160,9 @@ class AudioRecordingViewModel: ObservableObject {
             
             // Start recording
             try await recordingService.startRecording()
+            
+            // Start spectrum analysis
+            spectrumAnalyzerService.startMicrophoneAnalysis()
             
             isRecording = true
             isPaused = false
@@ -277,6 +285,9 @@ class AudioRecordingViewModel: ObservableObject {
             isRecording = false
             isPaused = false
             
+            // Stop spectrum analysis
+            spectrumAnalyzerService.stop()
+            
             // Stop speech recognition if active
             if isTranscribing {
                 speechRecognitionService.stopRecognition()
@@ -353,6 +364,9 @@ class AudioRecordingViewModel: ObservableObject {
             // Cancel any background processing
             processingTask?.cancel()
             processingTask = nil
+            
+            // Stop spectrum analysis
+            spectrumAnalyzerService.stop()
             
             isRecording = false
             isPaused = false
@@ -445,6 +459,14 @@ class AudioRecordingViewModel: ObservableObject {
             .receive(on: RunLoop.main)
             .sink { [weak self] progress in
                 self?.transcriptionProgress = progress
+            }
+            .store(in: &cancellables)
+        
+        // Subscribe to frequency data from spectrum analyzer
+        spectrumAnalyzerService.frequencyDataPublisher
+            .receive(on: RunLoop.main)
+            .sink { [weak self] data in
+                self?.frequencyData = data
             }
             .store(in: &cancellables)
     }

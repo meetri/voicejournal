@@ -40,7 +40,8 @@ struct EnhancedPlaybackView: View {
                     primaryColor: playbackColor,
                     secondaryColor: playbackSecondaryColor,
                     isActive: viewModel.isPlaying,
-                    style: waveformStyle
+                    style: waveformStyle,
+                    frequencyData: viewModel.frequencyData
                 )
                 .frame(height: 70)
                 .contentShape(Rectangle())

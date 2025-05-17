@@ -76,9 +76,14 @@ class AudioPlaybackViewModel: ObservableObject {
     /// Timing data for transcription text highlighting
     private var transcriptionTimingData: [TranscriptionSegment] = []
     
+    /// Frequency data for spectrum visualization
+    @Published private(set) var frequencyData: [Float] = []
+    
     // MARK: - Private Properties
     
     private let playbackService: AudioPlaybackService
+    private let spectrumAnalyzerService: SpectrumAnalyzerService
+    private let audioFileAnalyzer = AudioFileAnalyzer()
     private var cancellables = Set<AnyCancellable>()
     private var audioFileURL: URL?
     private var highlightUpdateTimer: Timer?
@@ -87,6 +92,7 @@ class AudioPlaybackViewModel: ObservableObject {
     
     init(playbackService: AudioPlaybackService) {
         self.playbackService = playbackService
+        self.spectrumAnalyzerService = SpectrumAnalyzerService()
         
         // Set up publishers
         setupPublishers()
@@ -147,6 +153,24 @@ class AudioPlaybackViewModel: ObservableObject {
     func play() {
         do {
             try playbackService.play()
+            
+            // Start spectrum analysis using AudioFileAnalyzer for playback
+            if let fileURL = audioFileURL {
+                do {
+                    // Load the audio file for spectrum analysis
+                    try audioFileAnalyzer.loadFile(url: fileURL)
+                    
+                    // Set up spectrum delegate to update frequency data
+                    audioFileAnalyzer.delegate = self
+                    
+                    // Start analysis synchronized with playback time
+                    audioFileAnalyzer.startAnalysis(playbackTimeProvider: { [weak self] in
+                        self?.currentTime ?? 0
+                    })
+                } catch {
+                    print("Error loading audio file for spectrum analysis: \(error)")
+                }
+            }
             isPlaying = true
             isPaused = false
             
@@ -166,6 +190,9 @@ class AudioPlaybackViewModel: ObservableObject {
             isPlaying = false
             isPaused = true
             
+            // Stop spectrum analysis
+            audioFileAnalyzer.stopAnalysis()
+            
             // Stop highlight update timer
             stopHighlightUpdateTimer()
         } catch {
@@ -179,6 +206,9 @@ class AudioPlaybackViewModel: ObservableObject {
             try playbackService.stop()
             isPlaying = false
             isPaused = false
+            
+            // Stop spectrum analysis
+            audioFileAnalyzer.stopAnalysis()
             
             // Stop highlight update timer
             stopHighlightUpdateTimer()
@@ -264,6 +294,7 @@ class AudioPlaybackViewModel: ObservableObject {
         currentHighlightRange = nil
         
         stopHighlightUpdateTimer()
+        audioFileAnalyzer.stopAnalysis()
     }
     
     // MARK: - Bookmark Management
@@ -490,6 +521,15 @@ class AudioPlaybackViewModel: ObservableObject {
 }
 
 // MARK: - Extensions
+
+extension AudioPlaybackViewModel: AudioSpectrumDelegate {
+    /// Implements AudioSpectrumDelegate to receive frequency data
+    nonisolated func didUpdateSpectrum(_ bars: [Float]) {
+        Task { @MainActor in
+            self.frequencyData = bars
+        }
+    }
+}
 
 extension AudioPlaybackViewModel {
     /// Get audio level for visualization (0.0 to 1.0)

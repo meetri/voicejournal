@@ -86,10 +86,8 @@ struct SpectrumAnalyzerView: View {
         }
         .frame(height: height)
         .onAppear {
-            // Start the spectrum analyzer if not already active
-            if !viewModel.isActive {
-                viewModel.start()
-            }
+            // Don't start the spectrum analyzer automatically
+            // Let the parent view model control when to start
         }
         .onDisappear {
             // Stop the spectrum analyzer when the view disappears

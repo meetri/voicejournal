@@ -38,8 +38,9 @@ struct EnhancedWaveformView: View {
     /// The view model for managing waveform state
     @StateObject private var viewModel: WaveformViewModel
     
-    /// The view model for spectrum analysis
-    @StateObject private var spectrumViewModel = SpectrumViewModel()
+    
+    /// External frequency data for spectrum visualization
+    var frequencyData: [Float] = []
     
     // MARK: - State
     
@@ -55,7 +56,8 @@ struct EnhancedWaveformView: View {
         barCount: Int = 30,
         spacing: CGFloat = 3,
         isActive: Bool = true,
-        style: WaveformStyle = .bars
+        style: WaveformStyle = .bars,
+        frequencyData: [Float] = []
     ) {
         self.audioLevel = audioLevel
         self.primaryColor = primaryColor
@@ -64,6 +66,7 @@ struct EnhancedWaveformView: View {
         self.spacing = spacing
         self.isActive = isActive
         self.style = style
+        self.frequencyData = frequencyData
         
         // Initialize the view model
         _viewModel = StateObject(wrappedValue: WaveformViewModel(barCount: barCount))
@@ -94,15 +97,33 @@ struct EnhancedWaveformView: View {
                 case .circles:
                     circlesWaveform
                 case .spectrum:
-                    // Use the new SpectrumAnalyzerView for spectrum visualization
+                    // Use the frequency data from parent for spectrum visualization
                     GeometryReader { geometry in
-                        SpectrumAnalyzerView(
-                            viewModel: spectrumViewModel,
-                            height: geometry.size.height,
-                            style: .bars,
-                            useHardwareAcceleration: true,
-                            visualAmplification: 2.0 // Amplify the bars to fill the view
-                        )
+                        if !frequencyData.isEmpty {
+                            // Use the frequency data directly
+                            Canvas { context, size in
+                                let barCount = frequencyData.count
+                                let barSpacing: CGFloat = 2
+                                let barWidth = (size.width - (barSpacing * CGFloat(barCount - 1))) / CGFloat(barCount)
+                                
+                                for i in 0..<barCount {
+                                    let level = frequencyData[i]
+                                    let barHeight = min(size.height, max(2, CGFloat(level) * size.height * 2.0))
+                                    let x = CGFloat(i) * (barWidth + barSpacing)
+                                    let y = size.height - barHeight
+                                    
+                                    let barRect = CGRect(x: x, y: y, width: barWidth, height: barHeight)
+                                    let barPath = Path(roundedRect: barRect, cornerRadius: 2)
+                                    
+                                    let color = primaryColor.opacity(Double(level * 0.8 + 0.2))
+                                    context.fill(barPath, with: .color(color))
+                                }
+                            }
+                        } else {
+                            // Fallback to empty spectrum if no data
+                            Rectangle()
+                                .fill(Color.clear)
+                        }
                     }
                 }
             }
@@ -124,46 +145,10 @@ struct EnhancedWaveformView: View {
         .onChange(of: audioLevel) { oldValue, newValue in
             // Update the view model with the new audio level
             viewModel.update(audioLevel: newValue, isActive: isActive)
-            
-            // Handle spectrum analyzer updates
-            if style == .spectrum {
-                // Only attempt to start the spectrum analyzer when needed
-                if isActive && audioLevel > 0.01 {
-                    // Start the analyzer if it's not already active
-                    if !spectrumViewModel.isActive {
-                        spectrumViewModel.start()
-                    }
-                } else {
-                    // If we're not active, stop the analyzer to save resources
-                    spectrumViewModel.stop()
-                }
-            } else {
-                // If we're not in spectrum mode, ensure the analyzer is stopped
-                spectrumViewModel.stop()
-            }
         }
         .onChange(of: isActive) { oldValue, newValue in
             // Update the view model with the new active state
             viewModel.update(audioLevel: audioLevel, isActive: newValue)
-            
-            // Handle spectrum analyzer when activity state changes
-            if style == .spectrum {
-                if newValue && audioLevel > 0.01 {
-                    spectrumViewModel.start()
-                } else {
-                    spectrumViewModel.stop()
-                }
-            }
-        }
-        .onChange(of: style) { oldValue, newValue in
-            // When changing to spectrum style, start the analyzer if active
-            if newValue == .spectrum && isActive && audioLevel > 0.01 {
-                spectrumViewModel.start()
-            } 
-            // When changing away from spectrum style, stop the analyzer
-            else if oldValue == .spectrum {
-                spectrumViewModel.stop()
-            }
         }
         // Add an efficient animation timer that only updates the visual state
         // without creating new arrays or doing heavy processing
@@ -177,9 +162,6 @@ struct EnhancedWaveformView: View {
         .onDisappear {
             // Ensure we clean up resources when the view disappears
             viewModel.stopTimer()
-            
-            // Always stop the spectrum analyzer when the view disappears
-            spectrumViewModel.stop()
         }
     }
     
@@ -371,7 +353,8 @@ enum WaveformStyle {
             primaryColor: .blue,
             secondaryColor: .purple,
             isActive: true,
-            style: .spectrum
+            style: .spectrum,
+            frequencyData: [0.3, 0.5, 0.7, 0.6, 0.4, 0.3, 0.5, 0.6, 0.7, 0.8, 0.6, 0.4, 0.3, 0.2, 0.3, 0.4, 0.5, 0.6, 0.5, 0.4, 0.3, 0.2, 0.3, 0.4, 0.5, 0.4, 0.3, 0.2, 0.1, 0.2]
         )
         .frame(height: 80)
         .padding()
