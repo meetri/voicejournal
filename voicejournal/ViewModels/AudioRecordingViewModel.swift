@@ -163,7 +163,12 @@ class AudioRecordingViewModel: ObservableObject {
             
             // Start spectrum analysis
             spectrumAnalyzerService.startMicrophoneAnalysis()
-            try? spectrumAnalyzerService.start()
+            do {
+                try spectrumAnalyzerService.start()
+                print("DEBUG: Spectrum analyzer started successfully")
+            } catch {
+                print("DEBUG: Failed to start spectrum analyzer: \(error)")
+            }
             
             isRecording = true
             isPaused = false
@@ -467,6 +472,9 @@ class AudioRecordingViewModel: ObservableObject {
         spectrumAnalyzerService.frequencyDataPublisher
             .receive(on: RunLoop.main)
             .sink { [weak self] data in
+                if !data.isEmpty {
+                    print("DEBUG: AudioRecordingViewModel received frequency data with \(data.count) bars")
+                }
                 self?.frequencyData = data
             }
             .store(in: &cancellables)

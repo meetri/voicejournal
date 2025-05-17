@@ -90,26 +90,63 @@ struct EnhancedWaveformView: View {
                     // Use the frequency data directly
                     Canvas { context, size in
                         let barCount = frequencyData.count
+                        guard barCount > 0 else { return }
+                        
                         let barSpacing: CGFloat = 2
-                        let barWidth = (size.width - (barSpacing * CGFloat(barCount - 1))) / CGFloat(barCount)
+                        let totalSpacing = barSpacing * CGFloat(barCount - 1)
+                        let availableWidth = size.width - totalSpacing
+                        
+                        // Ensure we have valid dimensions
+                        guard availableWidth > 0, size.height > 0 else { return }
+                        
+                        let barWidth = max(1, availableWidth / CGFloat(barCount))
                         
                         for i in 0..<barCount {
                             let level = frequencyData[i]
-                            let barHeight = min(size.height, max(2, CGFloat(level) * size.height * 2.0))
+                            
+                            // Check for NaN or invalid values
+                            let safeLevel = level.isNaN || level.isInfinite ? 0 : max(0, min(1, level))
+                            
+                            let barHeight = max(2, CGFloat(safeLevel) * size.height * 0.8)
                             let x = CGFloat(i) * (barWidth + barSpacing)
                             let y = size.height - barHeight
                             
-                            let barRect = CGRect(x: x, y: y, width: barWidth, height: barHeight)
+                            // Ensure valid rect
+                            let safeX = max(0, min(size.width - barWidth, x))
+                            let safeY = max(0, min(size.height - barHeight, y))
+                            
+                            let barRect = CGRect(x: safeX, y: safeY, width: barWidth, height: barHeight)
                             let barPath = Path(roundedRect: barRect, cornerRadius: 2)
                             
-                            let color = primaryColor.opacity(Double(level * 0.8 + 0.2))
+                            let opacity = Double(safeLevel * 0.7 + 0.3)
+                            let color = primaryColor.opacity(opacity)
                             context.fill(barPath, with: .color(color))
                         }
                     }
                 } else {
-                    // Fallback to empty spectrum if no data
-                    Rectangle()
-                        .fill(Color.clear)
+                    // Fallback visualization showing minimal bars when no data
+                    Canvas { context, size in
+                        let barCount = 30
+                        let barSpacing: CGFloat = 2
+                        let totalSpacing = barSpacing * CGFloat(barCount - 1)
+                        let availableWidth = size.width - totalSpacing
+                        
+                        guard availableWidth > 0, size.height > 0 else { return }
+                        
+                        let barWidth = max(1, availableWidth / CGFloat(barCount))
+                        
+                        for i in 0..<barCount {
+                            let minHeight: CGFloat = 2
+                            let x = CGFloat(i) * (barWidth + barSpacing)
+                            let y = size.height - minHeight
+                            
+                            let barRect = CGRect(x: x, y: y, width: barWidth, height: minHeight)
+                            let barPath = Path(roundedRect: barRect, cornerRadius: 1)
+                            
+                            let color = primaryColor.opacity(0.2)
+                            context.fill(barPath, with: .color(color))
+                        }
+                    }
                 }
             }
             .padding(8)
