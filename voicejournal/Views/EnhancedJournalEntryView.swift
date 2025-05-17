@@ -450,7 +450,7 @@ struct EnhancedJournalEntryView: View {
             try viewContext.save()
             dismiss()
         } catch {
-            print("Error deleting entry: \(error.localizedDescription)")
+            // Error occurred
         }
     }
     

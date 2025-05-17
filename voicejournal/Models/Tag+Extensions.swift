@@ -146,7 +146,7 @@ extension Tag {
             try self.managedObjectContext?.save()
             return true
         } catch {
-            print("Error removing encryption: \(error)")
+            // Error occurred
             return false
         }
     }
@@ -186,7 +186,7 @@ extension Tag {
                 try self.managedObjectContext?.save()
                 return true
             } catch {
-                print("Error changing PIN: \(error)")
+                // Error occurred
                 return false
             }
         }
@@ -204,7 +204,7 @@ extension Tag {
         do {
             return try context.fetch(request)
         } catch {
-            print("Error fetching all tags: \(error)")
+            // Error occurred
             return []
         }
     }
@@ -218,7 +218,7 @@ extension Tag {
         do {
             return try context.fetch(request)
         } catch {
-            print("Error fetching encrypted tags: \(error)")
+            // Error occurred
             return []
         }
     }
@@ -236,7 +236,7 @@ extension Tag {
                 return existingTag
             }
         } catch {
-            print("Error fetching tag with name '\(name)': \(error)")
+            // Error occurred
         }
         
         // Create a new tag if not found
@@ -246,7 +246,6 @@ extension Tag {
         newTag.color = colorHex ?? generateRandomHexColor() // Assign provided or random color
         newTag.isEncrypted = false // Default to not encrypted
         
-        print("Created new tag: \(newTag.name ?? "Unnamed")")
         return newTag
     }
     
@@ -272,7 +271,7 @@ extension Tag {
         do {
             return try context.fetch(request)
         } catch {
-            print("Error fetching tags matching query '\(query)': \(error)")
+            // Error occurred
             return []
         }
     }
@@ -295,7 +294,7 @@ extension Tag {
         do {
             try context.save()
         } catch {
-            print("Error saving tag '\(self.name ?? "Unnamed")': \(error)")
+            // Error saving tag
         }
     }
     
@@ -306,7 +305,6 @@ extension Tag {
             _ = EncryptionManager.deleteTagEncryptionKey(for: keyIdentifier)
         }
         
-        print("Deleting tag: \(self.name ?? "Unnamed")")
         context.delete(self)
         // Note: Saving the context should happen after deletion, typically higher up in the call stack.
     }

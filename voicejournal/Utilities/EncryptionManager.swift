@@ -96,13 +96,13 @@ class EncryptionManager {
                         // Return the root key on successful authentication
                         completion(getRootEncryptionKey())
                     } else {
-                        print("Biometric authentication failed: \(String(describing: authError))")
+                        // Error occurred)")
                         completion(nil)
                     }
                 }
             }
         } else {
-            print("Biometric authentication not available: \(String(describing: error))")
+            // Error occurred)")
             // Fall back to getting the key without biometrics
             completion(getRootEncryptionKey())
         }
@@ -249,7 +249,7 @@ class EncryptionManager {
             let sealedBox = try AES.GCM.seal(data, using: key)
             return sealedBox.combined
         } catch {
-            print("Encryption error: \(error.localizedDescription)")
+            // Error occurred")
             return nil
         }
     }
@@ -269,7 +269,7 @@ class EncryptionManager {
             let sealedBox = try AES.GCM.SealedBox(combined: encryptedData)
             return try AES.GCM.open(sealedBox, using: key)
         } catch {
-            print("Decryption error: \(error.localizedDescription)")
+            // Error occurred")
             return nil
         }
     }

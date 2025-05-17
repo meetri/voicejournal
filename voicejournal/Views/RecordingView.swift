@@ -92,7 +92,6 @@ struct RecordingView: View {
             )
             .padding()
             .onAppear {
-                print("DEBUG: RecordingView appeared - frequency data count: \(viewModel.frequencyData.count)")
             }
             
             // Timer display
@@ -295,7 +294,6 @@ struct RecordingView: View {
                     // Language indicator
                     if !viewModel.currentTranscriptionLanguage.isEmpty {
                         // Log the language being displayed
-                        let _ = print("DEBUG: Displaying language in UI: \(viewModel.currentTranscriptionLanguage)")
                         
                         // Determine color based on language status
                         let (displayText, textColor, bgColor) = getLanguageDisplayInfo(viewModel.currentTranscriptionLanguage)
@@ -308,10 +306,8 @@ struct RecordingView: View {
                             .background(bgColor)
                             .cornerRadius(4)
                             .onAppear {
-                                print("DEBUG: Language indicator appeared with: \(viewModel.currentTranscriptionLanguage)")
                             }
                     } else {
-                        let _ = print("DEBUG: Language is empty, not displaying indicator")
                     }
                     
                     Spacer()
@@ -457,7 +453,6 @@ struct RecordingSavedView: View {
                                    let locale = firstSegment.locale,
                                    !locale.isEmpty {
                                     // Log the language being displayed in saved view
-                                    let _ = print("DEBUG: Displaying language in saved view: \(locale)")
                                     
                                     // Get the language name
                                     let languageName = Locale(identifier: locale).localizedLanguageName ?? locale
@@ -551,7 +546,7 @@ struct RecordingSavedView: View {
         do {
             try viewContext.save()
         } catch {
-            print("Error saving transcription: \(error.localizedDescription)")
+            // Error occurred
         }
     }
     

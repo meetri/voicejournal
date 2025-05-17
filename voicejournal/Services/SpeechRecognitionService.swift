@@ -287,7 +287,6 @@ class SpeechRecognitionService: ObservableObject {
         languageStatus = checkLanguageStatus(locale: currentLocale)
         
         // Log the language status for debugging
-        print("DEBUG: Language status for \(currentLocale.identifier): \(languageStatus.description)")
     }
     
     /// Start real-time speech recognition from the microphone
@@ -378,8 +377,6 @@ class SpeechRecognitionService: ObservableObject {
                     self.state = .error(specificError)
                     
                     // Log the error for debugging
-                    print("DEBUG: Speech recognition error: \(error.localizedDescription)")
-                    print("DEBUG: Converted to: \(specificError.localizedDescription)")
                     
                     // If it's a language model issue, update the language status
                     if case .languageModelDownloadRequired = specificError {

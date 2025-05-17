@@ -79,7 +79,7 @@ extension Bookmark {
         do {
             return try context.fetch(request)
         } catch {
-            print("Error fetching bookmarks: \(error)")
+            // Error occurred
             return []
         }
     }

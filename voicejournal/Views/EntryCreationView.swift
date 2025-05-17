@@ -245,15 +245,12 @@ struct EntryCreationView: View {
         entry.title = entryTitle.isEmpty ? "Untitled Entry" : entryTitle
         
         // Process selected tags
-        print("DEBUG: Processing \(selectedTags.count) selected tags")
         
         // Find and process encrypted tags first
         for tag in selectedTags {
             if tag.isEncrypted, let tagName = tag.name {
-                print("DEBUG: Found encrypted tag: '\(tagName)'")
                 
                 if let pin = EntryCreationView.encryptedTagPINs[tagName] {
-                    print("DEBUG: Found PIN for encrypted tag '\(tagName)'")
                     // Store this encrypted tag for later application (after recording is saved)
                     encryptedTag = tag
                     
@@ -261,13 +258,10 @@ struct EntryCreationView: View {
                     // So we don't add it to tags here
                     continue
                 } else {
-                    print("DEBUG: No PIN found for encrypted tag '\(tagName)'")
-                    print("DEBUG: Available tag names in dictionary: \(EntryCreationView.encryptedTagPINs.keys)")
                 }
             }
             
             // Add regular tag
-            print("DEBUG: Adding regular tag: \(tag.name ?? "unnamed")")
             entry.addToTags(tag)
         }
         
@@ -279,7 +273,7 @@ struct EntryCreationView: View {
             // Show recording view
             showingRecordingView = true
         } catch {
-            print("Error creating journal entry: \(error.localizedDescription)")
+            // Error creating journal entry
         }
     }
     
@@ -294,22 +288,16 @@ struct EntryCreationView: View {
         
         // Apply encrypted tag if one was selected
         if let tag = encryptedTag, let tagName = tag.name {
-            print("DEBUG: Attempting to apply encrypted tag: '\(tagName)'")
-            print("DEBUG: All stored tag names with PINs: \(EntryCreationView.encryptedTagPINs.keys)")
             
             if let pin = EntryCreationView.encryptedTagPINs[tagName] {
-                print("DEBUG: Found PIN for '\(tagName)', applying encrypted tag")
                 // Apply tag with PIN to encrypt content
                 if entry.applyEncryptedTagWithPin(tag, pin: pin) {
-                    print("DEBUG: Successfully applied encrypted tag and encrypted content")
                 } else {
-                    print("ERROR: Failed to apply encrypted tag")
                 }
                 
                 // Remove from local storage after use
                 EntryCreationView.encryptedTagPINs.removeValue(forKey: tagName)
             } else {
-                print("ERROR: No PIN found for encrypted tag: '\(tagName)'")
             }
         }
         
@@ -345,7 +333,7 @@ struct EntryCreationView: View {
             try viewContext.save()
             isPresented = false
         } catch {
-            print("Error saving journal entry: \(error.localizedDescription)")
+            // Error saving journal entry
         }
     }
     
@@ -360,7 +348,7 @@ struct EntryCreationView: View {
         do {
             try viewContext.save()
         } catch {
-            print("Error saving transcription: \(error.localizedDescription)")
+            // Error saving transcription
         }
     }
     
@@ -372,7 +360,7 @@ struct EntryCreationView: View {
             do {
                 try viewContext.save()
             } catch {
-                print("Error deleting entry: \(error.localizedDescription)")
+                // Error deleting entry
             }
         }
         
@@ -718,7 +706,7 @@ struct TagSelectionView: View {
             newTagName = ""
             showingColorPicker = false
         } catch {
-            print("Error creating tag: \(error.localizedDescription)")
+            // Error creating tag
         }
     }
     
@@ -777,9 +765,7 @@ struct TagSelectionView: View {
                 // Save the pin in temporary storage for later application
                 if let tagName = tag.name {
                     EntryCreationView.encryptedTagPINs[tagName] = pin
-                    print("DEBUG: Stored PIN for tag '\(tagName)' using name as key")
                 } else {
-                    print("ERROR: Cannot store PIN - tag has no name")
                 }
                 
                 // Show feedback that the PIN was correct and tag was selected after dialog dismisses

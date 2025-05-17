@@ -273,7 +273,7 @@ extension View {
         title: "Enter PIN",
         message: "Please enter your PIN to access encrypted content",
         onSubmit: { pin in
-            print("PIN submitted: \(pin)")
+            // PIN submitted
         }
     )
 }

@@ -39,7 +39,7 @@ extension AudioRecording {
                     try fileManager.removeItem(atPath: path)
                 }
             } catch {
-                print("Error removing temporary decrypted file: \(error)")
+                // Error occurred
             }
         }
         
@@ -65,10 +65,10 @@ extension AudioRecording {
                 let fileManager = FileManager.default
                 if fileManager.fileExists(atPath: filePath) {
                     try fileManager.removeItem(atPath: filePath)
-                    print("Successfully deleted audio file at \(filePath)")
+                    // Successfully deleted audio file
                 }
             } catch {
-                print("Error deleting audio file: \(error.localizedDescription)")
+                // Error occurred
             }
         }
         
@@ -78,10 +78,10 @@ extension AudioRecording {
                 let fileManager = FileManager.default
                 if fileManager.fileExists(atPath: originalPath) {
                     try fileManager.removeItem(atPath: originalPath)
-                    print("Successfully deleted original audio file at \(originalPath)")
+                    // Successfully deleted original audio file
                 }
             } catch {
-                print("Error deleting original audio file: \(error.localizedDescription)")
+                // Error occurred
             }
         }
         
@@ -91,11 +91,11 @@ extension AudioRecording {
                 let fileManager = FileManager.default
                 if fileManager.fileExists(atPath: tempPath) {
                     try fileManager.removeItem(atPath: tempPath)
-                    print("Successfully deleted temporary decrypted file at \(tempPath)")
+                    // Successfully deleted temporary decrypted file
                 }
                 self.tempDecryptedPath = nil
             } catch {
-                print("Error deleting temporary decrypted file: \(error.localizedDescription)")
+                // Error occurred
             }
         }
     }
@@ -125,7 +125,7 @@ extension AudioRecording {
         do {
             try context.save()
         } catch {
-            print("Error saving bookmark: \(error.localizedDescription)")
+            // Error occurred
         }
         
         return bookmark
@@ -142,7 +142,7 @@ extension AudioRecording {
         do {
             try context.save()
         } catch {
-            print("Error deleting bookmark: \(error.localizedDescription)")
+            // Error occurred
         }
     }
     

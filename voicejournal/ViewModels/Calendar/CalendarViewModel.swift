@@ -92,7 +92,7 @@ class CalendarViewModel: ObservableObject {
     
     /// Move to today's date
     func moveToToday() {
-        print("Move to today")
+        // Move to today
         displayDate = Date()
         selectedDate = Date()
     }
@@ -423,7 +423,7 @@ class CalendarViewModel: ObservableObject {
             let encryptedTags = try viewContext.fetch(request)
             return encryptedTags.filter { !EncryptedTagsAccessManager.shared.hasAccess(to: $0) }
         } catch {
-            print("Error fetching encrypted tags: \(error)")
+            // Error fetching encrypted tags
             return []
         }
     }

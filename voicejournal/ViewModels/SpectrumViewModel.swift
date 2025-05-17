@@ -79,7 +79,7 @@ class SpectrumViewModel: ObservableObject, SpectrumAnalyzerDelegate {
             try spectrumAnalyzerService.start()
             isActive = true
         } catch {
-            print("Failed to start spectrum analyzer: \(error.localizedDescription)")
+            // Failed to start spectrum analyzer
             // If we can't start the spectrum analyzer, we'll just not show any data
             // but we won't crash the app
         }

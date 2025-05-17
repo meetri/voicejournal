@@ -171,7 +171,7 @@ extension JournalEntry {
     /// This method is kept for backward compatibility but should not be used directly.
     @available(*, deprecated, message: "Use applyEncryptedTagWithPin instead")
     func applyEncryptedTag(_ tag: Tag) -> Bool {
-        print("Warning: Using deprecated applyEncryptedTag method without PIN. Content will not be encrypted.")
+        // Warning: Using deprecated applyEncryptedTag method without PIN
         guard tag.isEncrypted else { return false }
         
         // Add the tag to the regular tags collection if not already there
@@ -198,7 +198,7 @@ extension JournalEntry {
         
         // Verify the PIN first
         guard tag.verifyPin(pin) else {
-            print("PIN verification failed for encrypted tag")
+            // PIN verification failed for encrypted tag
             return false
         }
         
@@ -285,7 +285,7 @@ extension JournalEntry {
                     encryptionSuccess = false
                 }
             } catch {
-                print("Error encrypting audio file: \(error)")
+                // Error occurred
                 encryptionSuccess = false
             }
         }
@@ -354,7 +354,7 @@ extension JournalEntry {
                     decryptionSuccess = false
                 }
             } catch {
-                print("Error decrypting audio file: \(error)")
+                // Error occurred
                 decryptionSuccess = false
             }
         }
@@ -443,7 +443,7 @@ extension JournalEntry {
                     encryptionSuccess = false
                 }
             } catch {
-                print("Error base encrypting audio file: \(error)")
+                // Error occurred
                 encryptionSuccess = false
             }
         }
@@ -515,7 +515,7 @@ extension JournalEntry {
                     decryptionSuccess = false
                 }
             } catch {
-                print("Error decrypting base encrypted audio file: \(error)")
+                // Error occurred
                 decryptionSuccess = false
             }
         }
@@ -562,7 +562,7 @@ extension JournalEntry {
         do {
             return try context.fetch(request)
         } catch {
-            print("Error fetching journal entries: \(error)")
+            // Error occurred
             return []
         }
     }
@@ -576,7 +576,7 @@ extension JournalEntry {
         do {
             return try context.fetch(request)
         } catch {
-            print("Error fetching journal entries with tag: \(error)")
+            // Error occurred
             return []
         }
     }
@@ -594,7 +594,7 @@ extension JournalEntry {
         do {
             return try context.fetch(request)
         } catch {
-            print("Error fetching journal entries by date: \(error)")
+            // Error occurred
             return []
         }
     }
@@ -608,7 +608,7 @@ extension JournalEntry {
         do {
             return try context.fetch(request)
         } catch {
-            print("Error searching journal entries: \(error)")
+            // Error occurred
             return []
         }
     }
@@ -622,7 +622,7 @@ extension JournalEntry {
         do {
             return try context.fetch(request)
         } catch {
-            print("Error fetching encrypted journal entries: \(error)")
+            // Error occurred
             return []
         }
     }
@@ -636,7 +636,7 @@ extension JournalEntry {
         do {
             return try context.fetch(request)
         } catch {
-            print("Error fetching base encrypted journal entries: \(error)")
+            // Error occurred
             return []
         }
     }
@@ -650,7 +650,7 @@ extension JournalEntry {
         do {
             return try context.fetch(request)
         } catch {
-            print("Error fetching any encrypted journal entries: \(error)")
+            // Error occurred
             return []
         }
     }
@@ -664,7 +664,7 @@ extension JournalEntry {
         do {
             return try context.fetch(request)
         } catch {
-            print("Error fetching journal entries with encrypted tag: \(error)")
+            // Error occurred
             return []
         }
     }

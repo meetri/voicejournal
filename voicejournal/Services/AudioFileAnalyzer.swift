@@ -59,7 +59,7 @@ class AudioFileAnalyzer {
                     try file.read(into: buffer, frameCount: frameCount)
                     self.processBuffer(buffer)
                 } catch {
-                    print("Error reading audio file: \(error)")
+                    // // Error occurred
                 }
             }
         }

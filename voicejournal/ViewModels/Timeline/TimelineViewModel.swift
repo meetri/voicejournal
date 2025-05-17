@@ -96,7 +96,6 @@ class TimelineViewModel: ObservableObject {
         registerForCoreDataNotifications()
         
         // Debug print the database state before filtering
-        print("🔍 DEBUG: TimelineViewModel initialization")
         debugPrintAllEntries()
         debugPrintPredicates()
         
@@ -430,7 +429,6 @@ class TimelineViewModel: ObservableObject {
         }
         
         let finalPredicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
-        print("🔍 DEBUG: Final predicate: \(finalPredicate)")
         
         return finalPredicate
     }
@@ -444,7 +442,7 @@ class TimelineViewModel: ObservableObject {
             let encryptedTags = try viewContext.fetch(request)
             return encryptedTags.filter { !EncryptedTagsAccessManager.shared.hasAccess(to: $0) }
         } catch {
-            print("Error fetching encrypted tags: \(error)")
+            // Error fetching encrypted tags
             return []
         }
     }

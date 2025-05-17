@@ -174,9 +174,7 @@ class AudioRecordingViewModel: ObservableObject {
             spectrumAnalyzerService.startMicrophoneAnalysis()
             do {
                 try spectrumAnalyzerService.start()
-                print("DEBUG: Spectrum analyzer started successfully")
             } catch {
-                print("DEBUG: Failed to start spectrum analyzer: \(error)")
             }
             
             isRecording = true
@@ -190,7 +188,7 @@ class AudioRecordingViewModel: ObservableObject {
                     try await startSpeechRecognition()
                 } catch {
                     // Handle speech recognition errors but continue recording
-                    print("Speech recognition failed to start: \(error.localizedDescription)")
+                    // Handle speech recognition errors but continue recording
                 }
             } else {
                 // Request permission for future recordings
@@ -222,10 +220,6 @@ class AudioRecordingViewModel: ObservableObject {
             }
             
             // Log the language being used for debugging
-            print("DEBUG: Speech recognition starting with language: \(currentTranscriptionLanguage)")
-            print("DEBUG: Locale identifier: \(locale.identifier)")
-            print("DEBUG: Locale language code: \(locale.languageCode ?? "unknown")")
-            print("DEBUG: Language status: \(status.description)")
             
             // Start live recognition
             try await speechRecognitionService.startLiveRecognition()
@@ -244,19 +238,16 @@ class AudioRecordingViewModel: ObservableObject {
             case .languageNotAvailable, .languageNotSupported:
                 currentTranscriptionLanguage = "\(speechRecognitionService.currentLocale.localizedLanguageName ?? speechRecognitionService.currentLocale.identifier) (Unavailable)"
             default:
-                // Keep the current language name but show error
-                print("DEBUG: Speech recognition error: \(error.localizedDescription)")
+                break // Keep the current language name but show error
             }
             
             // Show error message
             errorMessage = error.localizedDescription
             showErrorAlert = true
             
-            print("DEBUG: Speech recognition failed to start: \(error.localizedDescription)")
         } catch {
             // Handle other errors
             isTranscribing = false
-            print("DEBUG: Unknown speech recognition error: \(error.localizedDescription)")
         }
     }
     
@@ -360,7 +351,7 @@ class AudioRecordingViewModel: ObservableObject {
             transcriptionProgress = 0.0
             // Don't show error alert for transcription failures
             // This is a background task and shouldn't interrupt the user
-            print("Transcription failed: \(error.localizedDescription)")
+            // Transcription failed
         }
     }
     
@@ -482,7 +473,6 @@ class AudioRecordingViewModel: ObservableObject {
             .receive(on: RunLoop.main)
             .sink { [weak self] data in
                 if !data.isEmpty {
-                    print("DEBUG: AudioRecordingViewModel received frequency data with \(data.count) bars")
                 }
                 self?.frequencyData = data
             }
@@ -559,7 +549,7 @@ class AudioRecordingViewModel: ObservableObject {
                 journalEntry = entry
                 hasRecordingSaved = true
             } catch {
-                print("Failed to save managed object context: \(error.localizedDescription)")
+                // Failed to save managed object context
                 throw error
             }
         } catch {
@@ -596,7 +586,7 @@ class AudioRecordingViewModel: ObservableObject {
             // Save the context
             try managedObjectContext.save()
         } catch {
-            print("Failed to update journal entry with transcription: \(error.localizedDescription)")
+            // Failed to update journal entry with transcription
             // Don't throw the error up to the caller as this is a background operation
         }
     }

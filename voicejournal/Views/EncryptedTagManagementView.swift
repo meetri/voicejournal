@@ -434,7 +434,7 @@ struct EncryptedTagManagementView: View {
         do {
             try viewContext.save()
         } catch {
-            print("Error saving context in EncryptedTagManagementView: \(error)")
+            // Error occurred
             showAlert(title: "Error", message: "An error occurred while saving changes.")
         }
     }
@@ -606,7 +606,7 @@ struct CreateEncryptedTagView: View {
                 try viewContext.save()
                 dismiss()
             } catch {
-                print("Error creating encrypted tag: \(error)")
+                // Error occurred
                 errorMessage = "Error creating encrypted tag: \(error.localizedDescription)"
                 showingErrorAlert = true
             }

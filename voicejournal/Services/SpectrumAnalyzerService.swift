@@ -120,7 +120,6 @@ class SpectrumAnalyzerService: AudioSpectrumDelegate {
         
         // Debug log to check if we're getting data
         if processedData.contains(where: { $0 > 0 }) {
-            print("DEBUG: Spectrum data received with \(processedData.count) bars, max: \(processedData.max() ?? 0)")
         }
         
         // Notify delegate and publisher

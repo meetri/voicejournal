@@ -44,7 +44,7 @@ class AudioSpectrumManager {
     func startMicrophoneAnalysis() {
         // For microphone analysis during recording, we'll use external buffer processing
         // since the AudioRecordingService already has a tap on the input
-        print("Microphone analysis ready - using external buffer processing")
+        // Microphone analysis ready - using external buffer processing
         
         // We don't need to stop or start our own engine for microphone analysis
         // The recording service will provide us with audio buffers
@@ -59,7 +59,7 @@ class AudioSpectrumManager {
         self.playerNode = player
         
         guard let file = try? AVAudioFile(forReading: fileURL) else {
-            print("Failed to open audio file")
+            // Failed to open audio file
             return
         }
         
@@ -81,9 +81,9 @@ class AudioSpectrumManager {
             player.volume = 0.0  // Mute this player to avoid echo
             player.play()
             
-            print("Audio engine started for playback analysis.")
+            // Audio engine started for playback analysis
         } catch {
-            print("Failed to start audio engine: \(error)")
+            // print("Failed to start audio engine: \(error)")
         }
     }
     
@@ -102,7 +102,7 @@ class AudioSpectrumManager {
         
         engine.mainMixerNode.removeTap(onBus: 0)
         engine.stop()
-        print("Audio engine stopped.")
+        // Audio engine stopped
     }
     
     // MARK: - Public Methods
@@ -118,7 +118,6 @@ class AudioSpectrumManager {
         guard let fftSetup = fftSetup,
               let channelData = buffer.floatChannelData?[0],
               buffer.frameLength > 0 else { 
-            print("DEBUG: Process failed - fftSetup: \(fftSetup != nil), channelData: \(buffer.floatChannelData != nil), frameLength: \(buffer.frameLength)")
             return 
         }
         
@@ -198,7 +197,6 @@ class AudioSpectrumManager {
                 let bars = self.reduceToBars(magnitudes: scaledMagnitudes)
                 
                 if bars.contains(where: { $0 > 0 }) {
-                    print("DEBUG: Spectrum bars generated with max: \(bars.max() ?? 0)")
                 }
                 
                 DispatchQueue.main.async {

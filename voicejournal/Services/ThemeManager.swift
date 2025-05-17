@@ -18,7 +18,7 @@ class ThemeManager {
         let id = ThemeID(rawValue: saved ?? "") ?? .light
         self.themeID = id
         self.theme = id.theme
-        print("🎨 Theme loaded: \(id.rawValue)")
+        // Theme update
     }
     
     func setTheme(_ id: ThemeID) {
@@ -26,7 +26,7 @@ class ThemeManager {
             self.themeID = id
             self.theme = id.theme
             UserDefaults.standard.setValue(id.rawValue, forKey: "selectedThemeID")
-            print("🔄 Theme updated to: \(id.rawValue)")
+            // Theme update
         }
     }
 }

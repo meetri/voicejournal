@@ -214,7 +214,6 @@ struct TimelineView: View {
                 Menu {
                     ForEach(SortOrder.allCases) { order in
                         Button(action: {
-                            print("🔄 Sort order selected: \(order.rawValue)")
                             // Use the direct method to apply sort order and force immediate fetch
                             viewModel.applySortOrder(order)
                         }) {
@@ -306,7 +305,6 @@ struct TimelineView: View {
                     
                     // In a real app, we would scroll to this date
                     // This would require a ScrollViewReader and id-based views
-                    print("Would scroll to date: \(closestDate)")
                 }
             }
         }

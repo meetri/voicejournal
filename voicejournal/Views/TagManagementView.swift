@@ -145,7 +145,7 @@ struct TagManagementView: View {
         do {
             try viewContext.save()
         } catch {
-            print("Error saving context in TagManagementView: \(error)")
+            // Error occurred
             // Handle the error appropriately
         }
     }
@@ -281,12 +281,12 @@ struct TagEditorView: View {
                 let results = try viewContext.fetch(fetchRequest)
                 if let duplicateTag = results.first, duplicateTag != tagToEdit {
                     // Handle duplicate tag name error (e.g., show an alert)
-                    print("Error: Tag with name '\(trimmedName)' already exists.")
+                    // Error occurred
                     // Optionally show an alert to the user here
                     return
                 }
             } catch {
-                print("Error checking for duplicate tag: \(error)")
+                // Error occurred
                 // Proceed with caution or show error
             }
             
@@ -302,7 +302,7 @@ struct TagEditorView: View {
             try viewContext.save()
             dismiss()
         } catch {
-            print("Error saving tag: \(error)")
+            // Error occurred
             // Handle save error (e.g., show an alert)
         }
     }

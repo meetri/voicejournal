@@ -129,14 +129,12 @@ struct TranscriptionEditView: View {
                 }
                 
                 // Log for debugging
-                print("DEBUG: TranscriptionEditView appeared")
             }
             .onDisappear {
                 // Ensure keyboard is dismissed when view disappears
                 isTextEditorFocused = false
                 
                 // Log for debugging
-                print("DEBUG: TranscriptionEditView disappeared")
             }
         }
     }
@@ -158,7 +156,7 @@ struct TranscriptionEditView: View {
                     } catch {
                         errorMessage = "Error capitalizing text: \(error.localizedDescription)"
                         showErrorAlert = true
-                        print("Error capitalizing text: \(error.localizedDescription)")
+                        // Error occurred
                     }
                 }) {
                     VStack {
@@ -180,7 +178,7 @@ struct TranscriptionEditView: View {
                     } catch {
                         errorMessage = "Error adding periods: \(error.localizedDescription)"
                         showErrorAlert = true
-                        print("Error adding periods: \(error.localizedDescription)")
+                        // Error occurred
                     }
                 }) {
                     VStack {
@@ -202,7 +200,7 @@ struct TranscriptionEditView: View {
                     } catch {
                         errorMessage = "Error fixing text: \(error.localizedDescription)"
                         showErrorAlert = true
-                        print("Error fixing text: \(error.localizedDescription)")
+                        // Error occurred
                     }
                 }) {
                     VStack {
@@ -224,7 +222,7 @@ struct TranscriptionEditView: View {
                     } catch {
                         errorMessage = "Error cleaning text: \(error.localizedDescription)"
                         showErrorAlert = true
-                        print("Error cleaning text: \(error.localizedDescription)")
+                        // Error occurred
                     }
                 }) {
                     VStack {
@@ -275,7 +273,7 @@ struct TranscriptionEditView: View {
             // Handle any errors during save
             errorMessage = "Error saving transcription: \(error.localizedDescription)"
             showErrorAlert = true
-            print("Error saving transcription: \(error.localizedDescription)")
+            // Error occurred
         }
     }
     

@@ -168,7 +168,7 @@ class AudioPlaybackViewModel: ObservableObject {
                         self?.currentTime ?? 0
                     })
                 } catch {
-                    print("Error loading audio file for spectrum analysis: \(error)")
+                    // Error loading audio file for spectrum analysis
                 }
             }
             isPlaying = true

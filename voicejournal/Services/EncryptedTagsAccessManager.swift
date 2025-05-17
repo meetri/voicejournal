@@ -182,7 +182,7 @@ extension JournalEntry {
                     decryptionSuccess = false
                 }
             } catch {
-                print("Error decrypting audio file: \(error)")
+                // // Error occurred
                 decryptionSuccess = false
             }
         }

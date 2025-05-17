@@ -73,7 +73,7 @@ class PersistenceController {
         Task {
             let migratedCount = MigrationUtility.migrateAudioFilePaths(in: container.viewContext)
             if migratedCount > 0 {
-                print("Successfully migrated \(migratedCount) audio file paths")
+                // Migration successful
             }
             
             // Migrate existing entries to base encryption if needed
@@ -103,7 +103,7 @@ class PersistenceController {
                 return
             }
             
-            print("Migrating \(entries.count) journal entries to base encryption...")
+            // Starting migration
             
             // Apply base encryption to each entry
             var encryptedCount = 0
@@ -116,12 +116,12 @@ class PersistenceController {
             // Save the context
             try context.save()
             
-            print("Successfully migrated \(encryptedCount)/\(entries.count) journal entries to base encryption")
+            // Migration successful
             
             // Mark migration as complete
             UserDefaults.standard.set(true, forKey: "baseEncryptionMigrationComplete")
         } catch {
-            print("Error migrating to base encryption: \(error)")
+            // Migration error
         }
     }
 }

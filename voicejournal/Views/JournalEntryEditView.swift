@@ -345,7 +345,7 @@ struct JournalEntryEditView: View {
             try viewContext.save()
             dismiss()
         } catch {
-            print("Error saving journal entry: \(error.localizedDescription)")
+            // Error occurred
         }
     }
     
@@ -362,7 +362,7 @@ struct JournalEntryEditView: View {
             // Regenerate suggestions after saving new transcription text
             generateTagSuggestions()
         } catch {
-            print("Error saving transcription: \(error.localizedDescription)")
+            // Error occurred
         }
     }
     
@@ -398,7 +398,7 @@ struct JournalEntryEditView: View {
             try viewContext.save()
             dismiss()
         } catch {
-            print("Error deleting entry: \(error.localizedDescription)")
+            // Error occurred
         }
     }
     
