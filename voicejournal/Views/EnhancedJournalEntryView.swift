@@ -44,10 +44,34 @@ struct EnhancedJournalEntryView: View {
         _entryTitle = State(initialValue: journalEntry.title ?? "Untitled Entry")
     }
     
+    // MARK: - Computed Properties
+    
+    private var shareItems: [Any] {
+        var items: [Any] = [entryTitle]
+        print("DEBUG: Preparing share items for entry: \(entryTitle)")
+        
+        // Add transcription text if available
+        if let text = journalEntry.transcription?.text {
+            print("DEBUG: Adding transcription text to share items")
+            items.append(text)
+        }
+        
+        // Add audio file if available
+        if let audioURL = prepareAudioForSharing() {
+            print("DEBUG: Adding audio URL to share items: \(audioURL)")
+            items.append(audioURL)
+        } else {
+            print("DEBUG: No audio URL available for sharing")
+        }
+        
+        print("DEBUG: Total share items: \(items.count)")
+        return items
+    }
+    
     // MARK: - Body
     
     var body: some View {
-        ScrollView {
+        ScrollView(.vertical, showsIndicators: true) {
             VStack(spacing: 0) {
                 // Header with title and date
                 headerSection
@@ -81,42 +105,31 @@ struct EnhancedJournalEntryView: View {
         }
         .background(Color(.systemGroupedBackground))
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                if scrollOffset > 20 {
-                    Text(entryTitle)
-                        .font(.headline)
-                        .lineLimit(1)
-                        .transition(.opacity)
+        .navigationBarItems(
+            trailing: Menu {
+                Button(action: {
+                    showingEditView = true
+                }) {
+                    Label("Edit Entry", systemImage: "pencil")
                 }
-            }
-            
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Menu {
-                    Button(action: {
-                        showingEditView = true
-                    }) {
-                        Label("Edit Entry", systemImage: "pencil")
-                    }
-                    
-                    Button(action: {
-                        showingShareSheet = true
-                    }) {
-                        Label("Share", systemImage: "square.and.arrow.up")
-                    }
-                    
-                    Divider()
-                    
-                    Button(role: .destructive, action: {
-                        showDeleteConfirmation = true
-                    }) {
-                        Label("Delete Entry", systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
+                
+                Button(action: {
+                    shareEntry()
+                }) {
+                    Label("Share", systemImage: "square.and.arrow.up")
                 }
+                
+                Divider()
+                
+                Button(role: .destructive, action: {
+                    showDeleteConfirmation = true
+                }) {
+                    Label("Delete Entry", systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
             }
-        }
+        )
         .sheet(isPresented: $showingEditView) {
             JournalEntryEditView(journalEntry: journalEntry)
                 .environment(\.managedObjectContext, viewContext)
@@ -130,11 +143,7 @@ struct EnhancedJournalEntryView: View {
             Text("Are you sure you want to delete this journal entry? This action cannot be undone.")
         }
         .sheet(isPresented: $showingShareSheet) {
-            if let text = journalEntry.transcription?.text {
-                ActivityViewController(activityItems: [entryTitle, text])
-            } else {
-                ActivityViewController(activityItems: [entryTitle])
-            }
+            ActivityViewController(activityItems: shareItems)
         }
         .onAppear {
             loadAudio()
@@ -500,6 +509,102 @@ struct EnhancedJournalEntryView: View {
         byteCountFormatter.countStyle = .file
         
         return byteCountFormatter.string(fromByteCount: size)
+    }
+    
+    /// Handle share action by ensuring entry is decrypted first
+    private func shareEntry() {
+        // If the entry has encrypted content and isn't decrypted, handle it
+        if journalEntry.hasEncryptedContent && !journalEntry.isDecrypted {
+            // Try global access first
+            if journalEntry.hasGlobalAccess {
+                _ = journalEntry.decryptWithGlobalAccess()
+            }
+            // If still not decrypted, we can't share the audio
+        }
+        
+        // If the entry has base encryption and isn't decrypted, handle it
+        if journalEntry.isBaseEncrypted && !journalEntry.isBaseDecrypted {
+            _ = journalEntry.decryptBaseContent()
+        }
+        
+        // Show the share sheet
+        showingShareSheet = true
+    }
+    
+    /// Prepare audio file for sharing by ensuring we have an unencrypted version
+    private func prepareAudioForSharing() -> URL? {
+        guard let audioRecording = journalEntry.audioRecording else { 
+            print("DEBUG: No audio recording found")
+            return nil 
+        }
+        
+        print("DEBUG: Audio recording found")
+        print("DEBUG: - filePath: \(audioRecording.filePath ?? "nil")")
+        print("DEBUG: - originalFilePath: \(audioRecording.originalFilePath ?? "nil")")
+        print("DEBUG: - tempDecryptedPath: \(audioRecording.tempDecryptedPath ?? "nil")")
+        print("DEBUG: - effectiveFilePath: \(audioRecording.effectiveFilePath ?? "nil")")
+        print("DEBUG: - isEncrypted: \(audioRecording.isEncrypted)")
+        
+        let fileManager = FileManager.default
+        
+        // Check all possible paths
+        if let effectivePath = audioRecording.effectiveFilePath {
+            // Convert relative path to absolute path
+            let absoluteURL = FilePathUtility.toAbsolutePath(from: effectivePath)
+            let exists = fileManager.fileExists(atPath: absoluteURL.path)
+            print("DEBUG: effectiveFilePath exists: \(exists) at: \(absoluteURL.path)")
+            
+            if exists {
+                // Skip if this is an encrypted file
+                if absoluteURL.pathExtension == "encrypted" || absoluteURL.pathExtension == "baseenc" {
+                    print("DEBUG: Audio file is still encrypted: \(absoluteURL.path)")
+                    
+                    // Try to use the original file if available
+                    if let originalPath = audioRecording.originalFilePath {
+                        let originalURL = FilePathUtility.toAbsolutePath(from: originalPath)
+                        let originalExists = fileManager.fileExists(atPath: originalURL.path)
+                        print("DEBUG: originalFilePath exists: \(originalExists) at: \(originalURL.path)")
+                        
+                        if originalExists {
+                            print("DEBUG: Using original file path: \(originalURL.path)")
+                            return originalURL
+                        }
+                    }
+                    
+                    return nil
+                }
+                
+                print("DEBUG: Using effective file path: \(absoluteURL.path)")
+                return absoluteURL
+            }
+        }
+        
+        // Fallback to original file path if available
+        if let originalPath = audioRecording.originalFilePath {
+            let originalURL = FilePathUtility.toAbsolutePath(from: originalPath)
+            let originalExists = fileManager.fileExists(atPath: originalURL.path)
+            print("DEBUG: originalFilePath exists (fallback): \(originalExists) at: \(originalURL.path)")
+            
+            if originalExists {
+                print("DEBUG: Using original file path (fallback): \(originalURL.path)")
+                return originalURL
+            }
+        }
+        
+        // Last resort - try the main filePath
+        if let filePath = audioRecording.filePath {
+            let fileURL = FilePathUtility.toAbsolutePath(from: filePath)
+            let fileExists = fileManager.fileExists(atPath: fileURL.path)
+            print("DEBUG: Main filePath exists: \(fileExists) at: \(fileURL.path)")
+            
+            if fileExists {
+                print("DEBUG: Using main file path: \(fileURL.path)")
+                return fileURL
+            }
+        }
+        
+        print("DEBUG: No valid audio file path found")
+        return nil
     }
     
 }
