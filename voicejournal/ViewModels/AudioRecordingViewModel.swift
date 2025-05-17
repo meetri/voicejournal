@@ -98,6 +98,9 @@ class AudioRecordingViewModel: ObservableObject {
     private var processingTask: Task<Void, Never>?
     private var timingDataFromLiveRecognition: String?
     
+    // Audio buffer processing
+    private var audioBufferCancellable: AnyCancellable?
+    
     // MARK: - Initialization
     
     init(context: NSManagedObjectContext, recordingService: AudioRecordingService, speechRecognitionService: SpeechRecognitionService = SpeechRecognitionService(), existingEntry: JournalEntry? = nil) {
@@ -160,6 +163,11 @@ class AudioRecordingViewModel: ObservableObject {
             
             // Start recording
             try await recordingService.startRecording()
+            
+            // Set up audio buffer callback to share with spectrum analyzer
+            recordingService.audioBufferCallback = { [weak self] buffer in
+                self?.spectrumAnalyzerService.processAudioBuffer(buffer)
+            }
             
             // Start spectrum analysis
             spectrumAnalyzerService.startMicrophoneAnalysis()

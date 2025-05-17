@@ -120,6 +120,9 @@ class AudioRecordingService: ObservableObject {
     private let audioSession = AVAudioSession.sharedInstance()
     private let processingQueue = DispatchQueue(label: "com.voicejournal.audioprocessing", qos: .userInitiated)
     
+    // Audio buffer callback for sharing with spectrum analyzer
+    var audioBufferCallback: ((AVAudioPCMBuffer) -> Void)?
+    
     // Use the shared recordings directory from FilePathUtility
     internal var recordingsDirectory: URL {
         return FilePathUtility.recordingsDirectory
@@ -240,6 +243,9 @@ class AudioRecordingService: ObservableObject {
             } catch {
                 // Error handling without debug logs
             }
+            
+            // Share buffer with spectrum analyzer
+            self.audioBufferCallback?(buffer)
             
             // Calculate audio level
             Task { [buffer] in

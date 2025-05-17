@@ -75,6 +75,12 @@ class SpectrumAnalyzerService: AudioSpectrumDelegate {
         }
     }
     
+    /// Process audio buffer directly (for use with shared audio engine)
+    func processAudioBuffer(_ buffer: AVAudioPCMBuffer) {
+        guard isActive else { return }
+        audioSpectrumManager.processExternalBuffer(buffer)
+    }
+    
     /// Starts microphone analysis
     func startMicrophoneAnalysis() {
         // Stop any existing analysis first

@@ -35,37 +35,12 @@ class AudioSpectrumManager {
     // MARK: - Public Methods
     
     func startMicrophoneAnalysis() {
-        stopAnalysis()
+        // For microphone analysis during recording, we'll use external buffer processing
+        // since the AudioRecordingService already has a tap on the input
+        print("Microphone analysis ready - using external buffer processing")
         
-        // Configure audio session for recording
-        let session = AVAudioSession.sharedInstance()
-        do {
-            try session.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker])
-            try session.setPreferredIOBufferDuration(0.005)
-            try session.setActive(true)
-        } catch {
-            print("Failed to setup audio session: \(error)")
-            return
-        }
-        
-        let inputNode = engine.inputNode
-        let format = inputNode.outputFormat(forBus: 0)
-        
-        guard format.sampleRate > 0 && format.channelCount > 0 else {
-            print("Invalid audio format from input node")
-            return
-        }
-        
-        inputNode.installTap(onBus: 0, bufferSize: AVAudioFrameCount(fftSize), format: format) { [weak self] buffer, _ in
-            self?.process(buffer: buffer)
-        }
-        
-        do {
-            try engine.start()
-            print("Audio engine started for microphone.")
-        } catch {
-            print("Failed to start audio engine: \(error)")
-        }
+        // We don't need to stop or start our own engine for microphone analysis
+        // The recording service will provide us with audio buffers
     }
     
     func startPlaybackAnalysis(fileURL: URL) {
@@ -123,12 +98,22 @@ class AudioSpectrumManager {
         print("Audio engine stopped.")
     }
     
+    // MARK: - Public Methods
+    
+    /// Process external buffer (for use with shared audio tap)
+    func processExternalBuffer(_ buffer: AVAudioPCMBuffer) {
+        process(buffer: buffer)
+    }
+    
     // MARK: - Private Methods
     
     private func process(buffer: AVAudioPCMBuffer) {
         guard let fftSetup = fftSetup,
               let channelData = buffer.floatChannelData?[0],
-              buffer.frameLength > 0 else { return }
+              buffer.frameLength > 0 else { 
+            print("DEBUG: Process failed - fftSetup: \(fftSetup != nil), channelData: \(buffer.floatChannelData != nil), frameLength: \(buffer.frameLength)")
+            return 
+        }
         
         let frameCount = Int(buffer.frameLength)
         
@@ -204,6 +189,10 @@ class AudioSpectrumManager {
                 }
                 
                 let bars = self.reduceToBars(magnitudes: scaledMagnitudes)
+                
+                if bars.contains(where: { $0 > 0 }) {
+                    print("DEBUG: Spectrum bars generated with max: \(bars.max() ?? 0)")
+                }
                 
                 DispatchQueue.main.async {
                     self.delegate?.didUpdateSpectrum(bars)

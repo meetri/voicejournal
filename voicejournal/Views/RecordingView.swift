@@ -93,6 +93,9 @@ struct RecordingView: View {
             .padding()
             .background(Color(.systemGray6))
             .cornerRadius(16)
+            .onAppear {
+                print("DEBUG: RecordingView appeared - frequency data count: \(viewModel.frequencyData.count)")
+            }
             
             // Timer display
             Text(viewModel.formattedDuration)
