@@ -20,7 +20,7 @@ struct ContentView: View {
             // Timeline tab
             NavigationView {
                 TimelineView(context: viewContext)
-                    .navigationTitle("Voice Journal")
+                    .navigationTitle("Vox Cipher")
                     .themedNavigation()
             }
             .tabItem {

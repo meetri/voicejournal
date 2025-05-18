@@ -27,7 +27,7 @@ struct AuthenticationView: View {
                     .frame(width: 100, height: 100)
                     .foregroundColor(.blue)
                 
-                Text("Voice Journal")
+                Text("Vox Cipher")
                     .font(.largeTitle)
                     .fontWeight(.bold)
                 

@@ -103,7 +103,7 @@ class AuthenticationService: ObservableObject {
     }
     
     // Authenticate using biometrics
-    func authenticateWithBiometrics(reason: String = "Unlock Voice Journal") async -> Bool {
+    func authenticateWithBiometrics(reason: String = "Unlock Vox Cipher") async -> Bool {
         guard canUseBiometrics() else {
             return await authenticateWithPIN()
         }

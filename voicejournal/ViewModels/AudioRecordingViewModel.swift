@@ -518,7 +518,7 @@ class AudioRecordingViewModel: ObservableObject {
                 entry = existingEntry
             } else {
                 entry = JournalEntry.create(in: managedObjectContext)
-                entry.title = "Voice Journal - \(Date().formatted(date: .abbreviated, time: .shortened))"
+                entry.title = "Vox Cipher - \(Date().formatted(date: .abbreviated, time: .shortened))"
             }
             
             // Convert absolute path to relative path before storing
