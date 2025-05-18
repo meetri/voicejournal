@@ -14,6 +14,8 @@ struct voicejournalApp: App {
     let persistenceController = PersistenceController.shared
     @StateObject private var authService = AuthenticationService()
     @State private var themeManager = ThemeManager()
+    @State private var showingRestoreAlert = false
+    @State private var missingFilesCount = 0
     
     // Create a UIApplicationDelegateAdaptor to handle app lifecycle events
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
@@ -30,6 +32,15 @@ struct voicejournalApp: App {
                     .onAppear {
                         themeManager.setContext(persistenceController.container.viewContext)
                         ThemeUtility.updateSystemAppearance(with: themeManager.theme)
+                        checkForRestore()
+                    }
+                    .alert("Audio Files Missing", isPresented: $showingRestoreAlert) {
+                        Button("OK") { }
+                        Button("View Details") {
+                            // Navigate to backup settings
+                        }
+                    } message: {
+                        Text("\(missingFilesCount) audio files could not be restored from iCloud backup. These entries will show a missing audio indicator.")
                     }
             } else {
                 AuthenticationView()
@@ -65,6 +76,25 @@ struct voicejournalApp: App {
         }
         // For custom themes, default to automatic
         return nil
+    }
+    
+    private func checkForRestore() {
+        if BackupRecoveryManager.shared.checkForRestore() {
+            let missingFiles = BackupRecoveryManager.shared.findMissingAudioFiles()
+            if !missingFiles.isEmpty {
+                missingFilesCount = missingFiles.count
+                showingRestoreAlert = true
+                
+                // Handle the missing files in background
+                Task {
+                    BackupRecoveryManager.shared.handleMissingFiles { success in
+                        if !success {
+                            // Log error
+                        }
+                    }
+                }
+            }
+        }
     }
     
 }

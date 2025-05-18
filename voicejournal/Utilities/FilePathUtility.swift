@@ -77,4 +77,28 @@ struct FilePathUtility {
         let exists = FileManager.default.fileExists(atPath: absolutePath)
         return exists
     }
+    
+    // MARK: - iCloud Backup Management
+    
+    /// Exclude recordings directory from iCloud backup if needed
+    static func configureBackupSettings(backupAudioFiles: Bool) {
+        do {
+            var url = recordingsDirectory
+            var resourceValues = URLResourceValues()
+            resourceValues.isExcludedFromBackup = !backupAudioFiles
+            try url.setResourceValues(resourceValues)
+        } catch {
+            // Error setting backup configuration
+        }
+    }
+    
+    /// Get backup status for recordings directory
+    static func getBackupStatus() -> Bool {
+        do {
+            let resourceValues = try recordingsDirectory.resourceValues(forKeys: [.isExcludedFromBackupKey])
+            return !(resourceValues.isExcludedFromBackup ?? false)
+        } catch {
+            return true // Default to backing up if we can't determine status
+        }
+    }
 }

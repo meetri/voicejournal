@@ -48,6 +48,7 @@ struct ContentView: View {
         }
         .accentColor(themeManager.theme.accent)
         .themed()
+        .navigationThemeUpdater()
         .onAppear {
             ThemeUtility.updateSystemAppearance(with: themeManager.theme)
         }
@@ -173,6 +174,62 @@ struct SettingsTabView: View {
                         .padding(.bottom, 4)
                 }
                 
+                // MARK: - Data & Backup Section
+                Section {
+                    NavigationLink {
+                        BackupSettingsView()
+                            .environment(\.managedObjectContext, viewContext)
+                    } label: {
+                        SettingsRow(
+                            icon: "icloud.fill",
+                            iconColor: .blue,
+                            title: "Backup Settings",
+                            value: nil,
+                            showDisclosure: false
+                        )
+                    }
+                } header: {
+                    Text("Data & Backup")
+                        .textCase(nil)
+                        .font(.headline)
+                        .foregroundColor(themeManager.theme.text)
+                        .padding(.bottom, 4)
+                }
+                
+                // MARK: - Debug Section (Temporary)
+                Section {
+                    NavigationLink {
+                        AudioFileDebugView()
+                            .environment(\.managedObjectContext, viewContext)
+                    } label: {
+                        SettingsRow(
+                            icon: "ant.circle.fill",
+                            iconColor: .red,
+                            title: "Audio File Debug",
+                            value: nil,
+                            showDisclosure: false
+                        )
+                    }
+                    
+                    NavigationLink {
+                        PathTestView()
+                    } label: {
+                        SettingsRow(
+                            icon: "folder.circle.fill",
+                            iconColor: .orange,
+                            title: "Path Test",
+                            value: nil,
+                            showDisclosure: false
+                        )
+                    }
+                } header: {
+                    Text("Debug")
+                        .textCase(nil)
+                        .font(.headline)
+                        .foregroundColor(themeManager.theme.text)
+                        .padding(.bottom, 4)
+                }
+                
                 // MARK: - About Section
                 Section {
                     HStack {
@@ -231,6 +288,7 @@ struct SettingsTabView: View {
             }
         }
         .navigationViewStyle(StackNavigationViewStyle())
+        .navigationThemeUpdater()
     }
     
     private func getCurrentThemeName() -> String {

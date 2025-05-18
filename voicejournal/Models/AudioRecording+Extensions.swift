@@ -23,6 +23,8 @@ extension AudioRecording {
             guard let filePath = self.filePath else { return }
             if let newValue = newValue {
                 AudioRecording.decryptedPaths[filePath] = newValue
+                // Exclude temporary decrypted file from iCloud backup
+                excludeFromBackup(at: newValue)
             } else {
                 AudioRecording.decryptedPaths.removeValue(forKey: filePath)
             }
@@ -47,12 +49,39 @@ extension AudioRecording {
         decryptedPaths.removeAll()
     }
     
+    // MARK: - iCloud Backup Management
+    
+    /// Exclude a file from iCloud backup
+    /// - Parameter path: The file path to exclude from backup
+    private func excludeFromBackup(at path: String) {
+        var url = URL(fileURLWithPath: path)
+        do {
+            var resourceValues = URLResourceValues()
+            resourceValues.isExcludedFromBackup = true
+            try url.setResourceValues(resourceValues)
+        } catch {
+            // Error setting backup exclusion: \(error)
+        }
+    }
+    
     // Get the effective file path (either encrypted or decrypted if available)
     var effectiveFilePath: String? {
         if let tempPath = tempDecryptedPath {
             return tempPath
         }
         return filePath
+    }
+    
+    /// Check if the audio file exists on disk
+    var fileExists: Bool {
+        guard let path = filePath else { return false }
+        let absoluteURL = FilePathUtility.toAbsolutePath(from: path)
+        return FileManager.default.fileExists(atPath: absoluteURL.path)
+    }
+    
+    /// Check if the audio file is missing (useful after restore)
+    var isMissingFile: Bool {
+        return filePath != nil && !fileExists
     }
     
     // MARK: - File Management

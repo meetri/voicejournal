@@ -26,12 +26,26 @@ struct JournalEntryRow: View {
                 }
                 
                 if let recording = entry.audioRecording {
-                    Text("•")
-                        .foregroundColor(.secondary)
-                    
-                    Text(formatDuration(recording.duration))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    if recording.isMissingFile {
+                        Text("•")
+                            .foregroundColor(.secondary)
+                        
+                        HStack(spacing: 2) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                            Text("Missing")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                        }
+                    } else {
+                        Text("•")
+                            .foregroundColor(.secondary)
+                        
+                        Text(formatDuration(recording.duration))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
                 
                 Spacer()

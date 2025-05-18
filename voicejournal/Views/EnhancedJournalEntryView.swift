@@ -202,14 +202,23 @@ struct EnhancedJournalEntryView: View {
                 Spacer()
                 
                 if let recording = journalEntry.audioRecording {
-                    Text(formatDuration(recording.duration))
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                    if recording.isMissingFile {
+                        MissingAudioIndicator()
+                    } else {
+                        Text(formatDuration(recording.duration))
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
             
-            // Playback view
-            EnhancedPlaybackView(viewModel: playbackViewModel)
+            // Check if audio file is missing
+            if let recording = journalEntry.audioRecording, recording.isMissingFile {
+                MissingAudioView()
+            } else {
+                // Playback view
+                EnhancedPlaybackView(viewModel: playbackViewModel)
+            }
         }
         .padding()
         .background(
