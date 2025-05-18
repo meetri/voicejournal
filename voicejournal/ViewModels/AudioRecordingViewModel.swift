@@ -91,7 +91,7 @@ class AudioRecordingViewModel: ObservableObject {
     // MARK: - Private Properties
     
     private let recordingService: AudioRecordingService
-    private let speechRecognitionService: SpeechRecognitionService
+    private var speechRecognitionService: SpeechRecognitionService
     private let spectrumAnalyzerService: SpectrumAnalyzerService
     private var cancellables = Set<AnyCancellable>()
     private var managedObjectContext: NSManagedObjectContext
@@ -103,21 +103,38 @@ class AudioRecordingViewModel: ObservableObject {
     
     // MARK: - Initialization
     
-    init(context: NSManagedObjectContext, recordingService: AudioRecordingService, speechRecognitionService: SpeechRecognitionService = SpeechRecognitionService(), existingEntry: JournalEntry? = nil) {
+    init(context: NSManagedObjectContext, recordingService: AudioRecordingService, speechRecognitionService: SpeechRecognitionService? = nil, existingEntry: JournalEntry? = nil) {
         self.managedObjectContext = context
         self.recordingService = recordingService
-        self.speechRecognitionService = speechRecognitionService
+        self.speechRecognitionService = speechRecognitionService ?? SpeechRecognitionService()
         // Use 30 frequency bins to match the playback view bar count
         self.spectrumAnalyzerService = SpectrumAnalyzerService(frequencyBinCount: 30)
         self.journalEntry = existingEntry
         
+        // Will set locale when speech recognition service is provided
+        if speechRecognitionService == nil {
+            // Create a new instance with the correct locale
+            let locale = LanguageSettings.shared.selectedLocale
+            self.speechRecognitionService = SpeechRecognitionService(locale: locale)
+        }
+        
         // Set the speech recognition locale from settings
         let locale = LanguageSettings.shared.selectedLocale
-        speechRecognitionService.setRecognitionLocale(locale)
+        self.speechRecognitionService.setRecognitionLocale(locale)
         currentTranscriptionLanguage = locale.localizedLanguageName ?? locale.identifier
         
         // Set up publishers
         setupPublishers()
+    }
+    
+    /// Update the speech recognition service from environment
+    func updateSpeechRecognitionService(_ service: SpeechRecognitionService) {
+        self.speechRecognitionService = service
+        
+        // Ensure the correct locale is set
+        let locale = LanguageSettings.shared.selectedLocale
+        service.setRecognitionLocale(locale)
+        currentTranscriptionLanguage = locale.localizedLanguageName ?? locale.identifier
     }
     
     // MARK: - Public Methods

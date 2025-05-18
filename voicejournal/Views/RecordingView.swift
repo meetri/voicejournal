@@ -15,6 +15,7 @@ struct RecordingView: View {
     
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var speechRecognitionService: SpeechRecognitionService
     
     // MARK: - View Model
     
@@ -58,6 +59,7 @@ struct RecordingView: View {
         _viewModel = StateObject(wrappedValue: AudioRecordingViewModel(
             context: ctx,
             recordingService: recordingService,
+            speechRecognitionService: nil,
             existingEntry: existingEntry
         ))
     }
@@ -146,6 +148,9 @@ struct RecordingView: View {
             }
         }
         .onAppear {
+            // Update the view model with the environment speech recognition service
+            viewModel.updateSpeechRecognitionService(speechRecognitionService)
+            
             Task {
                 await checkPermissions()
                 
