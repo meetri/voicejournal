@@ -27,6 +27,7 @@ struct BackupSettingsView: View {
     @State private var restoreError: Error?
     @State private var restoredCount = 0
     @StateObject private var recoveryManager = BackupRecoveryManager.shared
+    @State private var debugMessage = ""
     
     enum BackupCheckResult {
         case found(Int, Date) // number of entries, backup date
@@ -75,12 +76,23 @@ struct BackupSettingsView: View {
             
             Section(header: Text("Restore")) {
                 Button(action: {
+                    print("=== Check for Backup Data button tapped ===")
+                    debugMessage = "Button tapped at \(Date())"
+                    
+                    // Immediately show some visual feedback
+                    isCheckingBackup = true
+                    backupCheckResult = nil
+                    
                     // Dismiss keyboard and unfocus any text fields
                     isTextFieldFocused = false
                     UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                     
+                    print("Keyboard dismissed, starting backup check...")
+                    
                     // Small delay to ensure keyboard is fully dismissed
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        print("Calling checkForBackupData() function")
+                        debugMessage = "Calling checkForBackupData..."
                         checkForBackupData()
                     }
                 }) {
@@ -88,6 +100,7 @@ struct BackupSettingsView: View {
                         Label("Check for Backup Data", systemImage: "arrow.down.circle")
                         Spacer()
                         if isCheckingBackup {
+                            let _ = print("Showing progress indicator")
                             ProgressView()
                                 .scaleEffect(0.8)
                         }
@@ -96,6 +109,7 @@ struct BackupSettingsView: View {
                 .disabled(isCheckingBackup)
                 
                 if let result = backupCheckResult {
+                    let _ = print("=== Displaying backup check result: \(result) ===")
                     switch result {
                     case .found(let count, let date):
                         VStack(alignment: .leading, spacing: 8) {
@@ -132,6 +146,14 @@ struct BackupSettingsView: View {
                             .foregroundColor(.red)
                             .padding(.vertical, 4)
                     }
+                }
+                
+                // Debug message for troubleshooting
+                if !debugMessage.isEmpty {
+                    Text("Debug: \(debugMessage)")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                        .padding(.vertical, 4)
                 }
             }
             
@@ -197,74 +219,125 @@ struct BackupSettingsView: View {
     }
     
     private func checkForBackupData() {
+        print("=== checkForBackupData() function called ===")
+        debugMessage = "checkForBackupData() called"
+        print("Setting isCheckingBackup to true")
         isCheckingBackup = true
         backupCheckResult = nil
         
+        print("Starting async Task...")
         Task {
             do {
+                print("Task started, checking iCloud availability...")
+                
                 // Check if iCloud is available
                 if FileManager.default.ubiquityIdentityToken == nil {
+                    print("ERROR: iCloud is not available")
                     DispatchQueue.main.async {
+                        print("Setting error result for no iCloud")
                         self.backupCheckResult = .error("iCloud is not available. Please sign in to iCloud in Settings.")
                         self.isCheckingBackup = false
                     }
                     return
                 }
                 
+                print("iCloud is available, checking for container...")
+                
                 // Get iCloud container
-                guard let containerURL = FileManager.default.url(forUbiquityContainerIdentifier: nil) else {
+                let containerIdentifier = "iCloud.com.ztwoi.voicejournal"
+                print("Attempting to access container: \(containerIdentifier)")
+                
+                var containerURL: URL?
+                
+                // Try with specific identifier first
+                containerURL = FileManager.default.url(forUbiquityContainerIdentifier: containerIdentifier)
+                
+                if containerURL == nil {
+                    print("Could not access specific container, trying default...")
+                    containerURL = FileManager.default.url(forUbiquityContainerIdentifier: nil)
+                }
+                
+                guard let finalContainerURL = containerURL else {
+                    print("ERROR: Could not access any iCloud container")
+                    print("Make sure iCloud is enabled and the app has proper entitlements")
                     DispatchQueue.main.async {
-                        self.backupCheckResult = .error("Could not access iCloud container")
+                        print("Setting error result for no container")
+                        self.backupCheckResult = .error("Could not access iCloud container. Make sure iCloud is enabled in Settings and the app has iCloud permissions.")
                         self.isCheckingBackup = false
                     }
                     return
                 }
                 
-                let backupDir = containerURL.appendingPathComponent("backup", isDirectory: true)
+                print("Got iCloud container URL: \(finalContainerURL)")
+                
+                let backupDir = finalContainerURL.appendingPathComponent("backup", isDirectory: true)
+                print("Checking for backup directory at: \(backupDir.path)")
                 
                 // Check if backup directory exists
                 if !FileManager.default.fileExists(atPath: backupDir.path) {
+                    print("Backup directory does not exist")
                     DispatchQueue.main.async {
+                        print("Setting result to notFound")
                         self.backupCheckResult = .notFound
                         self.isCheckingBackup = false
                     }
                     return
                 }
                 
+                print("Backup directory exists, looking for metadata...")
+                
                 // Look for backup metadata file
                 let metadataURL = backupDir.appendingPathComponent("backup_metadata.json")
+                print("Checking for metadata file at: \(metadataURL.path)")
                 
                 if FileManager.default.fileExists(atPath: metadataURL.path) {
+                    print("Metadata file exists, reading data...")
                     let data = try Data(contentsOf: metadataURL)
+                    print("Read \(data.count) bytes from metadata file")
+                    
                     if let metadata = try? JSONDecoder().decode(BackupMetadata.self, from: data) {
+                        print("Successfully decoded metadata: \(metadata.entryCount) entries from \(metadata.backupDate)")
                         DispatchQueue.main.async {
+                            print("Setting found result with \(metadata.entryCount) entries")
                             self.backupCheckResult = .found(metadata.entryCount, metadata.backupDate)
                             self.isCheckingBackup = false
                             self.showingBackupCheckResult = true
                         }
                     } else {
+                        print("ERROR: Failed to decode metadata")
                         DispatchQueue.main.async {
+                            print("Setting error result for decode failure")
                             self.backupCheckResult = .error("Could not read backup metadata")
                             self.isCheckingBackup = false
                         }
                     }
                 } else {
+                    print("No metadata file found, falling back to counting JSON files...")
                     // Try to count backup files as fallback
                     let files = try FileManager.default.contentsOfDirectory(at: backupDir, 
                                                                            includingPropertiesForKeys: [.creationDateKey])
+                    print("Found \(files.count) total files in backup directory")
+                    
                     let jsonFiles = files.filter { $0.pathExtension == "json" && $0.lastPathComponent != "backup_metadata.json" }
+                    print("Found \(jsonFiles.count) JSON backup files")
                     
                     if jsonFiles.isEmpty {
+                        print("No JSON backup files found")
                         DispatchQueue.main.async {
+                            print("Setting result to notFound (no JSON files)")
                             self.backupCheckResult = .notFound
                             self.isCheckingBackup = false
                         }
                     } else {
+                        print("Calculating oldest backup date...")
                         let oldestDate = try jsonFiles.map { try $0.resourceValues(forKeys: [.creationDateKey]).creationDate }
                             .compactMap { $0 }
                             .min() ?? Date()
                         
+                        print("Found \(jsonFiles.count) backups, oldest from \(oldestDate)")
+                        
                         DispatchQueue.main.async {
+                            print("Setting found result with \(jsonFiles.count) files")
                             self.backupCheckResult = .found(jsonFiles.count, oldestDate)
                             self.isCheckingBackup = false
                             self.showingBackupCheckResult = true
@@ -272,12 +345,18 @@ struct BackupSettingsView: View {
                     }
                 }
             } catch {
+                print("ERROR: Exception caught: \(error)")
+                print("Error details: \(error.localizedDescription)")
+                
                 DispatchQueue.main.async {
+                    print("Setting error result for exception")
                     self.backupCheckResult = .error("Failed to check backup: \(error.localizedDescription)")
                     self.isCheckingBackup = false
                 }
             }
         }
+        
+        print("checkForBackupData() function complete")
     }
     
     private var dateFormatter: DateFormatter {
