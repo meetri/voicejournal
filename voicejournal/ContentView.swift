@@ -66,59 +66,155 @@ struct SettingsTabView: View {
     
     @State private var showTagManagement = false
     @State private var showEncryptedTagManagement = false
+    @State private var showingLanguageSettings = false
     
     var body: some View {
         NavigationView {
             List {
-                Section(header: Text("Appearance")) {
+                // MARK: - General Section
+                Section {
+                    // Language settings
+                    NavigationLink {
+                        LanguageSelectionView()
+                    } label: {
+                        SettingsRow(
+                            icon: "globe",
+                            iconColor: .blue,
+                            title: "Language",
+                            value: getCurrentLanguageName(),
+                            showDisclosure: false
+                        )
+                    }
+                } header: {
+                    Text("General")
+                        .textCase(nil)
+                        .font(.headline)
+                        .foregroundColor(themeManager.theme.text)
+                        .padding(.bottom, 4)
+                }
+                
+                // MARK: - Appearance Section
+                Section {
                     NavigationLink {
                         ThemeSelectorView()
                             .environment(\.managedObjectContext, viewContext)
                             .environmentObject(themeManager)
                     } label: {
-                        HStack {
-                            Label("Themes", systemImage: "paintbrush")
-                            Spacer()
-                            Text(getCurrentThemeName())
-                                .foregroundColor(.secondary)
-                        }
+                        SettingsRow(
+                            icon: "paintbrush.fill",
+                            iconColor: .purple,
+                            title: "Theme",
+                            value: getCurrentThemeName(),
+                            showDisclosure: false
+                        )
                     }
+                } header: {
+                    Text("Appearance")
+                        .textCase(nil)
+                        .font(.headline)
+                        .foregroundColor(themeManager.theme.text)
+                        .padding(.bottom, 4)
                 }
                 
-                Section(header: Text("Organization")) {
+                // MARK: - Organization Section
+                Section {
                     NavigationLink {
                         TagManagementView()
                             .environment(\.managedObjectContext, viewContext)
                     } label: {
-                        Label("Manage Tags", systemImage: "tag")
+                        SettingsRow(
+                            icon: "tag.fill",
+                            iconColor: .green,
+                            title: "Tags",
+                            value: nil,
+                            showDisclosure: false
+                        )
                     }
+                } header: {
+                    Text("Organization")
+                        .textCase(nil)
+                        .font(.headline)
+                        .foregroundColor(themeManager.theme.text)
+                        .padding(.bottom, 4)
                 }
                 
-                Section(header: Text("Security")) {
-                    Button {
-                        authService.lock()
-                    } label: {
-                        Label("Lock App", systemImage: "lock")
-                    }
-                    
+                // MARK: - Privacy & Security Section
+                Section {
                     NavigationLink {
                         EncryptedTagManagementView()
                             .environment(\.managedObjectContext, viewContext)
                     } label: {
-                        Label("Encrypted Tags", systemImage: "lock.shield")
+                        SettingsRow(
+                            icon: "lock.shield.fill",
+                            iconColor: .red,
+                            title: "Encrypted Tags",
+                            value: nil,
+                            showDisclosure: false
+                        )
                     }
+                    
+                    Button {
+                        authService.lock()
+                    } label: {
+                        SettingsRow(
+                            icon: "lock.fill",
+                            iconColor: .orange,
+                            title: "Lock App",
+                            value: nil,
+                            showDisclosure: false
+                        )
+                    }
+                    .buttonStyle(.plain)
+                } header: {
+                    Text("Privacy & Security")
+                        .textCase(nil)
+                        .font(.headline)
+                        .foregroundColor(themeManager.theme.text)
+                        .padding(.bottom, 4)
                 }
                 
-                Section(header: Text("About")) {
+                // MARK: - About Section
+                Section {
                     HStack {
+                        SettingsIcon(systemName: "info.circle.fill", color: .blue)
                         Text("Version")
                         Spacer()
-                        Text("1.0.0")
-                            .foregroundColor(.secondary)
+                        Text(getAppVersion())
+                            .foregroundColor(themeManager.theme.textSecondary)
                     }
+                    
+                    Link(destination: URL(string: "https://github.com/voicejournal/privacy")!) {
+                        SettingsRow(
+                            icon: "hand.raised.fill",
+                            iconColor: .indigo,
+                            title: "Privacy Policy",
+                            value: nil,
+                            showDisclosure: false
+                        )
+                    }
+                    
+                    Link(destination: URL(string: "https://github.com/voicejournal/terms")!) {
+                        SettingsRow(
+                            icon: "doc.text.fill",
+                            iconColor: .cyan,
+                            title: "Terms of Service",
+                            value: nil,
+                            showDisclosure: false
+                        )
+                    }
+                } header: {
+                    Text("About")
+                        .textCase(nil)
+                        .font(.headline)
+                        .foregroundColor(themeManager.theme.text)
+                        .padding(.bottom, 4)
                 }
             }
+            .listStyle(InsetGroupedListStyle())
+            .background(themeManager.theme.background)
+            .scrollContentBackground(.hidden)
             .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.large)
             .themedNavigation()
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -129,10 +225,12 @@ struct SettingsTabView: View {
                         }
                     } label: {
                         Image(systemName: "lock.fill")
+                            .foregroundColor(themeManager.theme.accent)
                     }
                 }
             }
         }
+        .navigationViewStyle(StackNavigationViewStyle())
     }
     
     private func getCurrentThemeName() -> String {
@@ -158,6 +256,69 @@ struct SettingsTabView: View {
         }
         
         return "Custom"
+    }
+    
+    private func getCurrentLanguageName() -> String {
+        let locale = LanguageSettings.shared.selectedLocale
+        return LanguageSettings.shared.localizedName(for: locale)
+    }
+    
+    private func getAppVersion() -> String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+        return "\(version) (\(build))"
+    }
+}
+
+// MARK: - Settings Components
+
+/// A reusable settings row component
+struct SettingsRow: View {
+    let icon: String
+    let iconColor: Color
+    let title: String
+    let value: String?
+    var showDisclosure: Bool = true
+    
+    @Environment(\.themeManager) var themeManager
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            SettingsIcon(systemName: icon, color: iconColor)
+            
+            Text(title)
+                .foregroundColor(themeManager.theme.text)
+            
+            Spacer()
+            
+            if let value = value {
+                Text(value)
+                    .foregroundColor(themeManager.theme.textSecondary)
+                    .font(.callout)
+            }
+            
+            if showDisclosure {
+                Image(systemName: "chevron.right")
+                    .foregroundColor(themeManager.theme.textSecondary)
+                    .font(.caption)
+            }
+        }
+        .padding(.vertical, 6)
+    }
+}
+
+/// A settings icon component
+struct SettingsIcon: View {
+    let systemName: String
+    let color: Color
+    
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.system(size: 20))
+            .foregroundColor(.white)
+            .frame(width: 30, height: 30)
+            .background(color)
+            .cornerRadius(8)
     }
 }
 
