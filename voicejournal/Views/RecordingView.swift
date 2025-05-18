@@ -55,7 +55,8 @@ struct RecordingView: View {
         // Create the AudioRecordingService on the main actor
         let recordingService = AudioRecordingService()
         
-        // Initialize the view model with the existing entry if in edit mode
+        // Initialize the view model without speech recognition service
+        // The environment service will be provided in onAppear
         _viewModel = StateObject(wrappedValue: AudioRecordingViewModel(
             context: ctx,
             recordingService: recordingService,

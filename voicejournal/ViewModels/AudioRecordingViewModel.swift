@@ -61,7 +61,11 @@ class AudioRecordingViewModel: ObservableObject {
     @Published private(set) var hasRecordingSaved = false
     
     /// Current transcription text (from speech recognition)
-    @Published private(set) var transcriptionText: String = ""
+    @Published private(set) var transcriptionText: String = "" {
+        didSet {
+            print("[AudioRecording] TranscriptionText updated: '\(transcriptionText)'")
+        }
+    }
     
     /// Whether transcription is in progress
     @Published private(set) var isTranscribing = false
@@ -106,13 +110,14 @@ class AudioRecordingViewModel: ObservableObject {
     init(context: NSManagedObjectContext, recordingService: AudioRecordingService, speechRecognitionService: SpeechRecognitionService? = nil, existingEntry: JournalEntry? = nil) {
         self.managedObjectContext = context
         self.recordingService = recordingService
-        self.speechRecognitionService = speechRecognitionService ?? SpeechRecognitionService()
         // Use 30 frequency bins to match the playback view bar count
         self.spectrumAnalyzerService = SpectrumAnalyzerService(frequencyBinCount: 30)
         self.journalEntry = existingEntry
         
-        // Will set locale when speech recognition service is provided
-        if speechRecognitionService == nil {
+        // Always create a speech recognition service 
+        if let service = speechRecognitionService {
+            self.speechRecognitionService = service
+        } else {
             // Create a new instance with the correct locale
             let locale = LanguageSettings.shared.selectedLocale
             print("[AudioRecording] Creating speech recognizer with locale: \(locale.identifier)")
@@ -126,7 +131,7 @@ class AudioRecordingViewModel: ObservableObject {
         currentTranscriptionLanguage = locale.localizedLanguageName ?? locale.identifier
         print("[AudioRecording] Current transcription language: \(currentTranscriptionLanguage)")
         
-        // Set up publishers
+        // Always set up publishers in the init
         setupPublishers()
     }
     
@@ -141,6 +146,11 @@ class AudioRecordingViewModel: ObservableObject {
         service.setRecognitionLocale(locale)
         currentTranscriptionLanguage = locale.localizedLanguageName ?? locale.identifier
         print("[AudioRecording] Updated transcription language: \(currentTranscriptionLanguage)")
+        
+        // Re-setup publishers with the new service
+        cancellables.removeAll()
+        setupPublishers()
+        print("[AudioRecording] Re-setup publishers for new speech recognition service")
     }
     
     // MARK: - Public Methods
@@ -207,13 +217,15 @@ class AudioRecordingViewModel: ObservableObject {
         
             // Start speech recognition if permission is granted
             if checkSpeechRecognitionPermission() {
+                print("[AudioRecording] Speech recognition permission granted - starting recognition")
                 do {
                     try await startSpeechRecognition()
                 } catch {
-                    // Handle speech recognition errors but continue recording
+                    print("[AudioRecording] Speech recognition error: \(error)")
                     // Handle speech recognition errors but continue recording
                 }
             } else {
+                print("[AudioRecording] Speech recognition permission not granted - requesting")
                 // Request permission for future recordings
                 await requestSpeechRecognitionPermission()
             }
@@ -243,11 +255,29 @@ class AudioRecordingViewModel: ObservableObject {
                 currentTranscriptionLanguage = "\(locale.localizedLanguageName ?? locale.identifier) (Downloading...)"
             } else if status == .unavailable {
                 currentTranscriptionLanguage = "\(locale.localizedLanguageName ?? locale.identifier) (Unavailable)"
+                
+                // Try to fall back to English if the selected language is unavailable
+                if locale.identifier != "en-US" {
+                    print("[AudioRecording] Attempting fallback to English")
+                    speechRecognitionService.setRecognitionLocale(Locale(identifier: "en-US"))
+                    speechRecognitionService.updateLanguageStatus()
+                    
+                    if speechRecognitionService.languageStatus == .available {
+                        currentTranscriptionLanguage = "English (Fallback)"
+                        print("[AudioRecording] Fallback to English successful")
+                    } else {
+                        print("[AudioRecording] English fallback also unavailable")
+                        throw SpeechRecognitionError.languageNotAvailable
+                    }
+                } else {
+                    throw SpeechRecognitionError.languageNotAvailable
+                }
             } else {
                 currentTranscriptionLanguage = locale.localizedLanguageName ?? locale.identifier
             }
             
             // Log the language being used for debugging
+            print("[AudioRecording] Using language: \(currentTranscriptionLanguage)")
             
             // Start live recognition
             try await speechRecognitionService.startLiveRecognition()
@@ -324,12 +354,15 @@ class AudioRecordingViewModel: ObservableObject {
             
             // Stop speech recognition if active
             if isTranscribing {
+                // Get the complete transcription (including interim) before stopping
+                let completeTranscription = speechRecognitionService.currentTranscription
+                print("[AudioRecording] Complete transcription on stop: '\(completeTranscription)'")
+                
                 speechRecognitionService.stopRecognition()
                 isTranscribing = false
                 
-                // Get final transcription and timing data
-                let finalTranscription = speechRecognitionService.transcription
-                transcriptionText = finalTranscription
+                // Use the complete transcription that includes both final and interim parts
+                transcriptionText = completeTranscription
                 
                 // Get timing data if available
                 if let timingDataJSON = speechRecognitionService.getTimingDataJSON() {
@@ -447,6 +480,8 @@ class AudioRecordingViewModel: ObservableObject {
     // MARK: - Private Methods
     
     private func setupPublishers() {
+        print("[AudioRecording] Setting up publishers")
+        
         // Subscribe to audio level changes
         recordingService.$audioLevel
             .receive(on: RunLoop.main)
@@ -468,6 +503,7 @@ class AudioRecordingViewModel: ObservableObject {
         speechRecognitionService.$transcription
             .receive(on: RunLoop.main)
             .sink { [weak self] text in
+                print("[AudioRecording] Final transcription update: '\(text)'")
                 if !text.isEmpty {
                     self?.transcriptionText = text
                 }
@@ -478,11 +514,15 @@ class AudioRecordingViewModel: ObservableObject {
         speechRecognitionService.$interimTranscription
             .receive(on: RunLoop.main)
             .sink { [weak self] text in
-                if let self = self, !text.isEmpty && self.isTranscribing {
-                    // Combine final and interim transcriptions for display
+                print("[AudioRecording] Interim transcription update: '\(text)'")
+                print("[AudioRecording] isTranscribing: \(self?.isTranscribing ?? false)")
+                if let self = self {
+                    // Always update transcription text when we receive interim updates
                     let currentText = self.speechRecognitionService.currentTranscription
-                    if !currentText.isEmpty {
+                    print("[AudioRecording] Combined transcription: '\(currentText)'")
+                    if self.isTranscribing || !currentText.isEmpty {
                         self.transcriptionText = currentText
+                        print("[AudioRecording] Updated transcriptionText to: '\(self.transcriptionText)'")
                     }
                 }
             }
@@ -559,7 +599,9 @@ class AudioRecordingViewModel: ObservableObject {
             
             // Add transcription if available
             if !transcriptionText.isEmpty {
+                print("[AudioRecording] Creating transcription with text: '\(transcriptionText)'")
                 let transcription = entry.createTranscription(text: transcriptionText)
+                print("[AudioRecording] Transcription created: \(transcription)")
                 
                 // Enhance transcription if enabled and AI is configured
                 if TranscriptionSettings.shared.autoEnhanceNewTranscriptions,
@@ -608,7 +650,10 @@ class AudioRecordingViewModel: ObservableObject {
                 try managedObjectContext.save()
                 journalEntry = entry
                 hasRecordingSaved = true
+                print("[AudioRecording] Journal entry saved successfully")
+                print("[AudioRecording] Transcription text: '\(entry.transcription?.text ?? "none")'")
             } catch {
+                print("[AudioRecording] Failed to save journal entry: \(error)")
                 // Failed to save managed object context
                 throw error
             }

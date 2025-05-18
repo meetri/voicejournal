@@ -288,8 +288,15 @@ class SpeechRecognitionService: ObservableObject {
             if recognizer.isAvailable {
                 return .available
             } else {
-                // If the recognizer exists but isn't available, it might be downloading
-                return .downloading
+                // Check if the locale is supported
+                let supportedLocales = SFSpeechRecognizer.supportedLocales()
+                if supportedLocales.contains(where: { $0.identifier == locale.identifier }) {
+                    // Supported but not available - likely downloading or needs download
+                    return .downloading
+                } else {
+                    // Not supported at all
+                    return .unavailable
+                }
             }
         } else {
             // If the recognizer is nil, the language might not be supported
@@ -302,6 +309,15 @@ class SpeechRecognitionService: ObservableObject {
         languageStatus = checkLanguageStatus(locale: currentLocale)
         
         // Log the language status for debugging
+        print("[SpeechRecognition] Language status for \(currentLocale.identifier): \(languageStatus.description)")
+        
+        // Additional diagnostics
+        if languageStatus != .available {
+            let supportedLocales = SFSpeechRecognizer.supportedLocales()
+            let isSupported = supportedLocales.contains(where: { $0.identifier == currentLocale.identifier })
+            print("[SpeechRecognition] Locale \(currentLocale.identifier) is \(isSupported ? "supported" : "not supported")")
+            print("[SpeechRecognition] Total supported locales: \(supportedLocales.count)")
+        }
     }
     
     /// Start real-time speech recognition from the microphone
@@ -331,11 +347,26 @@ class SpeechRecognitionService: ObservableObject {
         
         // Check availability
         guard speechRecognizer?.isAvailable == true else {
-            if languageStatus == .downloading {
-                errorMessage = "Language model is downloading. Please try again in a moment."
-                throw SpeechRecognitionError.languageModelDownloadRequired
+            print("[SpeechRecognition] Speech recognizer not available for locale: \(currentLocale.identifier)")
+            
+            // Check if it's a language model issue
+            if let recognizer = speechRecognizer {
+                print("[SpeechRecognition] Recognizer exists but not available")
+                print("[SpeechRecognition] Supported locales: \(SFSpeechRecognizer.supportedLocales().map { $0.identifier })")
+                
+                // Update language status based on availability
+                if languageStatus == .downloading {
+                    errorMessage = "Language model is downloading. Please try again in a moment."
+                    throw SpeechRecognitionError.languageModelDownloadRequired
+                } else {
+                    languageStatus = .unavailable
+                    errorMessage = SpeechRecognitionError.languageNotAvailable.localizedDescription
+                    state = .error(SpeechRecognitionError.languageNotAvailable)
+                    throw SpeechRecognitionError.languageNotAvailable
+                }
             } else {
                 errorMessage = SpeechRecognitionError.noRecognitionAvailable.localizedDescription
+                state = .unavailable
                 throw SpeechRecognitionError.noRecognitionAvailable
             }
         }
@@ -391,29 +422,40 @@ class SpeechRecognitionService: ObservableObject {
             
             if let error = error {
                 Task { @MainActor in
+                    print("[SpeechRecognition] Recognition error: \(error)")
+                    let nsError = error as NSError
+                    print("[SpeechRecognition] Error domain: \(nsError.domain), code: \(nsError.code)")
+                    
                     // Convert the error to a more specific SpeechRecognitionError
                     let specificError = SpeechRecognitionError.fromSystemError(error)
                     self.errorMessage = specificError.localizedDescription
                     self.state = .error(specificError)
                     
-                    // Log the error for debugging
-                    
                     // If it's a language model issue, update the language status
                     if case .languageModelDownloadRequired = specificError {
                         self.languageStatus = .downloading
+                    } else if case .languageNotAvailable = specificError {
+                        self.languageStatus = .unavailable
                     }
+                    
+                    // Stop the recognition
+                    self.stopRecognition()
                 }
                 return
             }
             
             if let result = result {
                 Task { @MainActor in
+                    print("[SpeechRecognition] Recognition result - isFinal: \(result.isFinal), text: '\(result.bestTranscription.formattedString)'")
+                    
                     // Update interim transcription with partial results
                     self.interimTranscription = result.bestTranscription.formattedString
+                    print("[SpeechRecognition] Updated interim transcription: '\(self.interimTranscription)'")
                     
                     // If final result, update the main transcription
                     if result.isFinal {
                         self.transcription += result.bestTranscription.formattedString + " "
+                        print("[SpeechRecognition] Updated final transcription: '\(self.transcription)'")
                     }
                     
                     // Update progress
