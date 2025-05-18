@@ -594,6 +594,47 @@ class AudioRecordingViewModel: ObservableObject {
         return String(format: "%02d:%02d", minutes, seconds)
     }
     
+    // MARK: - Timing Data Scaling
+    
+    /// Scale timing data to match the actual audio duration
+    private func scaleTimingDataToAudioDuration(segments: [TranscriptionSegment], audioDuration: TimeInterval) -> [TranscriptionSegment] {
+        guard !segments.isEmpty, audioDuration > 0 else { return segments }
+        
+        // Find the current range of the timing data
+        let minTime = segments.map(\.startTime).min() ?? 0
+        let maxTime = segments.map(\.endTime).max() ?? 1
+        let currentDuration = maxTime - minTime
+        
+        // If duration is already reasonable, don't scale
+        if currentDuration > audioDuration * 0.8 {
+            return segments
+        }
+        
+        // Calculate scaling factor to distribute segments across actual duration
+        // Leave some buffer at the end (95% of duration)
+        let targetDuration = audioDuration * 0.95
+        let scaleFactor = targetDuration / currentDuration
+        
+        // Scale and adjust segments
+        var scaledSegments: [TranscriptionSegment] = []
+        for segment in segments {
+            let scaledStartTime = (segment.startTime - minTime) * scaleFactor
+            let scaledEndTime = (segment.endTime - minTime) * scaleFactor
+            
+            let scaledSegment = TranscriptionSegment(
+                text: segment.text,
+                startTime: scaledStartTime,
+                endTime: scaledEndTime,
+                range: segment.textRange,
+                locale: segment.locale
+            )
+            scaledSegments.append(scaledSegment)
+        }
+        
+        print("[AudioRecording] Scaled \(segments.count) segments from \(currentDuration)s to \(targetDuration)s")
+        return scaledSegments
+    }
+    
     private func handleError(_ error: Error) {
         if let recordingError = error as? AudioRecordingError {
             errorMessage = recordingError.localizedDescription
@@ -679,8 +720,31 @@ class AudioRecordingViewModel: ObservableObject {
                 // Store timing data if available - first try from live recognition, then from file processing
                 let timingData = timingDataFromLiveRecognition ?? speechRecognitionService.getTimingDataJSON()
                 if let timingDataJSON = timingData {
-                    transcription.timingData = timingDataJSON
-                    print("[AudioRecording] Stored timing data in transcription: \(timingDataJSON.prefix(200))...")
+                    // Convert string to data for JSON decoding
+                    if let jsonData = timingDataJSON.data(using: .utf8),
+                       let segments = try? JSONDecoder().decode([TranscriptionSegment].self, from: jsonData) {
+                        // Check if all segments have very short durations (indicating interim results)
+                        let allInterim = segments.allSatisfy { $0.endTime - $0.startTime <= 0.15 }
+                        
+                        if allInterim && duration > 0 {
+                            // Scale segments to distribute evenly across the audio duration
+                            let scaledSegments = scaleTimingDataToAudioDuration(segments: segments, audioDuration: duration)
+                            if let scaledData = try? JSONEncoder().encode(scaledSegments),
+                               let scaledJSON = String(data: scaledData, encoding: .utf8) {
+                                transcription.timingData = scaledJSON
+                                print("[AudioRecording] Stored scaled timing data to match audio duration: \(duration)s")
+                            } else {
+                                transcription.timingData = timingDataJSON
+                                print("[AudioRecording] Failed to scale timing data, using original")
+                            }
+                        } else {
+                            transcription.timingData = timingDataJSON
+                            print("[AudioRecording] Stored timing data in transcription (appears to have final results)")
+                        }
+                    } else {
+                        transcription.timingData = timingDataJSON
+                        print("[AudioRecording] Stored timing data in transcription: \(timingDataJSON.prefix(200))...")
+                    }
                 } else {
                     print("[AudioRecording] No timing data available to store")
                 }

@@ -423,8 +423,18 @@ class SpeechRecognitionService: ObservableObject {
             
             if let error = error {
                 Task { @MainActor in
-                    print("[SpeechRecognition] Recognition error: \(error)")
                     let nsError = error as NSError
+                    
+                    // Check if it's the expected "No speech detected" timeout (code 1110)
+                    if nsError.code == 1110 && nsError.domain == "kAFAssistantErrorDomain" {
+                        print("[SpeechRecognition] Recognition ended with expected timeout - processing complete")
+                        // This is normal when audio ends and recognition times out
+                        self.state = .finished
+                        // Don't treat this as an error - we already have our results
+                        return
+                    }
+                    
+                    print("[SpeechRecognition] Recognition error: \(error)")
                     print("[SpeechRecognition] Error domain: \(nsError.domain), code: \(nsError.code)")
                     
                     // Convert the error to a more specific SpeechRecognitionError
@@ -581,13 +591,24 @@ class SpeechRecognitionService: ObservableObject {
     
     /// Stop speech recognition
     func stopRecognition() {
-        // Stop audio engine
+        // Stop audio engine first
         audioEngine?.stop()
         audioEngine?.inputNode.removeTap(onBus: 0)
         
-        // Stop recognition task
+        // Finish the recognition request to trigger final results
+        recognitionRequest?.endAudio()
+        
+        // Give the recognizer a moment to process final results
+        // We'll use a completion handler for when recognition is truly done
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.finalizeRecognition()
+        }
+    }
+    
+    /// Finalize recognition after giving time for final results
+    private func finalizeRecognition() {
+        // Cancel and clean up recognition task
         recognitionTask?.cancel()
-        recognitionTask?.finish()
         recognitionTask = nil
         
         // Clean up recognition request
