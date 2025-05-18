@@ -488,6 +488,16 @@ class TimelineViewModel: ObservableObject {
         var newEntriesByDate: [Date: [JournalEntry]] = [:]
         var newSortedDates: [Date] = []
         
+        if entries.isEmpty {
+            // No entries - keep arrays empty
+            DispatchQueue.main.async {
+                self.entriesByDate = newEntriesByDate
+                self.sortedDates = newSortedDates
+                self.isLoading = false
+            }
+            return
+        }
+        
         // Use a single date key for all entries to avoid grouping by day
         let globalDateKey = Date.distantPast
         newSortedDates = [globalDateKey]

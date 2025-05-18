@@ -387,6 +387,13 @@ struct TimelineView: View {
                         .foregroundColor(.white)
                         .cornerRadius(8)
                 }
+            } else if viewModel.dateRange == .allTime {
+                // No entries exist at all
+                Text("No journal entries yet. Tap the microphone button to create your first entry.")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
             } else {
                 Text("No entries found for the selected date range.")
                     .font(.body)
