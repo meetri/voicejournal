@@ -256,6 +256,18 @@ struct SettingsTabView: View {
                             showDisclosure: false
                         )
                     }
+                    
+                    NavigationLink {
+                        LanguageDiagnosticsView()
+                    } label: {
+                        SettingsRow(
+                            icon: "globe.americas.fill",
+                            iconColor: .blue,
+                            title: "Language Diagnostics",
+                            value: nil,
+                            showDisclosure: false
+                        )
+                    }
                 } header: {
                     Text("Debug")
                         .textCase(nil)

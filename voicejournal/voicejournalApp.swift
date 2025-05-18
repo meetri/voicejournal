@@ -13,7 +13,7 @@ import CoreData
 struct voicejournalApp: App {
     let persistenceController = PersistenceController.shared
     @StateObject private var authService = AuthenticationService()
-    @StateObject private var speechRecognitionService = SpeechRecognitionService()
+    @StateObject private var speechRecognitionService = SpeechRecognitionService(locale: LanguageSettings.shared.selectedLocale)
     @State private var themeManager = ThemeManager()
     @State private var showingRestoreAlert = false
     @State private var missingFilesCount = 0
