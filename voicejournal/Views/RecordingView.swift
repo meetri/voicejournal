@@ -148,6 +148,10 @@ struct RecordingView: View {
             }
         }
         .onAppear {
+            print("[RecordingView] View appeared")
+            print("[RecordingView] Environment speech service locale: \(speechRecognitionService.currentLocale.identifier)")
+            print("[RecordingView] Language settings locale: \(LanguageSettings.shared.selectedLocale.identifier)")
+            
             // Update the view model with the environment speech recognition service
             viewModel.updateSpeechRecognitionService(speechRecognitionService)
             

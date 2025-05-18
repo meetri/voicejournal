@@ -19,6 +19,8 @@ class LanguageSettings: ObservableObject {
     
     @Published var selectedLocale: Locale {
         didSet {
+            print("[LanguageSettings] Locale changed from \(oldValue.identifier) to \(selectedLocale.identifier)")
+            
             // Save the selected locale identifier to UserDefaults
             UserDefaults.standard.set(selectedLocale.identifier, forKey: "selectedLocaleIdentifier")
             
@@ -32,6 +34,8 @@ class LanguageSettings: ObservableObject {
     private init() {
         // Load saved locale or use system default
         if let savedIdentifier = UserDefaults.standard.string(forKey: "selectedLocaleIdentifier") {
+            print("[LanguageSettings] Loading saved locale: \(savedIdentifier)")
+            
             // Create locale from saved identifier
             selectedLocale = Locale(identifier: savedIdentifier)
             
@@ -44,15 +48,20 @@ class LanguageSettings: ObservableObject {
             })
             
             if !isSupported {
+                print("[LanguageSettings] Saved locale not supported, falling back to current locale")
                 // Fall back to current locale if saved locale is not supported
                 selectedLocale = Locale.current
+            } else {
+                print("[LanguageSettings] Saved locale is supported")
             }
         } else {
+            print("[LanguageSettings] No saved locale, using system default: \(Locale.current.identifier)")
             selectedLocale = Locale.current
         }
         
         // Load available locales
         loadAvailableLocales()
+        print("[LanguageSettings] Initialized with locale: \(selectedLocale.identifier)")
     }
     
     // Cache for supported locales

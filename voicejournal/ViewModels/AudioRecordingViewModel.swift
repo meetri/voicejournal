@@ -115,13 +115,16 @@ class AudioRecordingViewModel: ObservableObject {
         if speechRecognitionService == nil {
             // Create a new instance with the correct locale
             let locale = LanguageSettings.shared.selectedLocale
+            print("[AudioRecording] Creating speech recognizer with locale: \(locale.identifier)")
             self.speechRecognitionService = SpeechRecognitionService(locale: locale)
         }
         
         // Set the speech recognition locale from settings
         let locale = LanguageSettings.shared.selectedLocale
+        print("[AudioRecording] Setting recognition locale to: \(locale.identifier)")
         self.speechRecognitionService.setRecognitionLocale(locale)
         currentTranscriptionLanguage = locale.localizedLanguageName ?? locale.identifier
+        print("[AudioRecording] Current transcription language: \(currentTranscriptionLanguage)")
         
         // Set up publishers
         setupPublishers()
@@ -129,12 +132,15 @@ class AudioRecordingViewModel: ObservableObject {
     
     /// Update the speech recognition service from environment
     func updateSpeechRecognitionService(_ service: SpeechRecognitionService) {
+        print("[AudioRecording] Updating speech recognition service from environment")
         self.speechRecognitionService = service
         
         // Ensure the correct locale is set
         let locale = LanguageSettings.shared.selectedLocale
+        print("[AudioRecording] Updating service locale to: \(locale.identifier)")
         service.setRecognitionLocale(locale)
         currentTranscriptionLanguage = locale.localizedLanguageName ?? locale.identifier
+        print("[AudioRecording] Updated transcription language: \(currentTranscriptionLanguage)")
     }
     
     // MARK: - Public Methods
@@ -220,9 +226,14 @@ class AudioRecordingViewModel: ObservableObject {
     /// Start speech recognition
     private func startSpeechRecognition() async throws {
         do {
+            print("[AudioRecording] Starting speech recognition")
+            print("[AudioRecording] Language Settings locale: \(LanguageSettings.shared.selectedLocale.identifier)")
+            print("[AudioRecording] Speech service current locale: \(speechRecognitionService.currentLocale.identifier)")
+            
             // Check language status before starting
             speechRecognitionService.updateLanguageStatus()
             let status = speechRecognitionService.languageStatus
+            print("[AudioRecording] Language status: \(status.description)")
             
             // Update the language display based on status
             let locale = speechRecognitionService.currentLocale

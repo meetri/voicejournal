@@ -62,6 +62,7 @@ struct ContentView: View {
 /// Settings tab view
 struct SettingsTabView: View {
     @EnvironmentObject private var authService: AuthenticationService
+    @EnvironmentObject private var speechRecognitionService: SpeechRecognitionService
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.themeManager) var themeManager
     
@@ -264,6 +265,19 @@ struct SettingsTabView: View {
                             icon: "globe.americas.fill",
                             iconColor: .blue,
                             title: "Language Diagnostics",
+                            value: nil,
+                            showDisclosure: false
+                        )
+                    }
+                    
+                    NavigationLink {
+                        LanguageDebugView()
+                            .environmentObject(speechRecognitionService)
+                    } label: {
+                        SettingsRow(
+                            icon: "ant.circle.fill",
+                            iconColor: .green,
+                            title: "Language Debug",
                             value: nil,
                             showDisclosure: false
                         )

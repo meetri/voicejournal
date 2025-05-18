@@ -180,8 +180,13 @@ class SpeechRecognitionService: ObservableObject {
     nonisolated init(locale: Locale = Locale(identifier: "en-US")) {
         // Move any main actor work to a separate method
         Task { @MainActor in
+            print("[SpeechRecognition] Initializing with locale: \(locale.identifier)")
             self.currentLocale = locale
             self.speechRecognizer = SFSpeechRecognizer(locale: locale)
+            print("[SpeechRecognition] Created recognizer: \(self.speechRecognizer != nil ? "Success" : "Failed")")
+            if let recognizer = self.speechRecognizer {
+                print("[SpeechRecognition] Recognizer locale: \(recognizer.locale.identifier)")
+            }
             await self.checkAvailability()
         }
     }
@@ -204,9 +209,19 @@ class SpeechRecognitionService: ObservableObject {
     
     /// Set the locale for speech recognition
     func setRecognitionLocale(_ locale: Locale) {
+        print("[SpeechRecognition] Setting locale to: \(locale.identifier)")
+        print("[SpeechRecognition] Previous locale was: \(currentLocale.identifier)")
+        
         currentLocale = locale
         // Update the speech recognizer with the new locale
         speechRecognizer = SFSpeechRecognizer(locale: locale)
+        
+        print("[SpeechRecognition] Created recognizer: \(speechRecognizer != nil ? "Success" : "Failed")")
+        if let recognizer = speechRecognizer {
+            print("[SpeechRecognition] Recognizer locale: \(recognizer.locale.identifier)")
+            print("[SpeechRecognition] Recognizer available: \(recognizer.isAvailable)")
+        }
+        
         checkAvailability()
     }
     
@@ -291,6 +306,8 @@ class SpeechRecognitionService: ObservableObject {
     
     /// Start real-time speech recognition from the microphone
     func startLiveRecognition() async throws {
+        print("[SpeechRecognition] Starting live recognition with locale: \(currentLocale.identifier)")
+        
         // Reset error message
         errorMessage = ""
         
@@ -303,8 +320,11 @@ class SpeechRecognitionService: ObservableObject {
         
         // Ensure recognizer is using the current locale
         if speechRecognizer == nil || speechRecognizer?.locale != currentLocale {
+            print("[SpeechRecognition] Creating new recognizer for locale: \(currentLocale.identifier)")
             speechRecognizer = SFSpeechRecognizer(locale: currentLocale)
         }
+        
+        print("[SpeechRecognition] Current recognizer locale: \(speechRecognizer?.locale.identifier ?? "nil")")
         
         // Update and check language status
         updateLanguageStatus()
@@ -410,6 +430,8 @@ class SpeechRecognitionService: ObservableObject {
     
     /// Start speech recognition from an audio file
     func recognizeFromFile(url: URL) async throws -> String {
+        print("[SpeechRecognition] Recognizing file with locale: \(currentLocale.identifier)")
+        
         // Check authorization
         let permission = checkAuthorization()
         guard permission == .granted else {
@@ -418,8 +440,11 @@ class SpeechRecognitionService: ObservableObject {
         
         // Ensure recognizer is using the current locale
         if speechRecognizer == nil || speechRecognizer?.locale != currentLocale {
+            print("[SpeechRecognition] Creating new recognizer for file with locale: \(currentLocale.identifier)")
             speechRecognizer = SFSpeechRecognizer(locale: currentLocale)
         }
+        
+        print("[SpeechRecognition] Recognizer locale for file: \(speechRecognizer?.locale.identifier ?? "nil")")
         
         // Check availability
         guard speechRecognizer?.isAvailable == true else {
