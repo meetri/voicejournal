@@ -427,11 +427,19 @@ class SpeechRecognitionService: ObservableObject {
                     
                     // Check if it's the expected "No speech detected" timeout (code 1110)
                     if nsError.code == 1110 && nsError.domain == "kAFAssistantErrorDomain" {
-                        print("[SpeechRecognition] Recognition ended with expected timeout - processing complete")
-                        // This is normal when audio ends and recognition times out
-                        self.state = .finished
-                        // Don't treat this as an error - we already have our results
-                        return
+                        print("[SpeechRecognition] Recognition timeout - code 1110")
+                        // Only treat this as finished if we're not actively recognizing
+                        if self.state != .recognizing {
+                            print("[SpeechRecognition] Recognition ended with expected timeout - processing complete")
+                            self.state = .finished
+                            // Don't treat this as an error - we already have our results
+                            return
+                        } else {
+                            print("[SpeechRecognition] Ignoring timeout during active recognition")
+                            // During active recognition, this might just be a pause in speech
+                            // Continue normally without changing state
+                            return
+                        }
                     }
                     
                     print("[SpeechRecognition] Recognition error: \(error)")
