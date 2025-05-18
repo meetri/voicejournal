@@ -44,7 +44,7 @@ class ThemeManager: ObservableObject {
         withAnimation(.easeInOut(duration: 0.3)) {
             self.currentThemeID = id.rawValue
             self.theme = id.theme
-            UserDefaults.standard.setValue(id.rawValue, forKey: "selectedThemeID")
+                UserDefaults.standard.setValue(id.rawValue, forKey: "selectedThemeID")
             clearCustomThemeSelection()
         }
     }

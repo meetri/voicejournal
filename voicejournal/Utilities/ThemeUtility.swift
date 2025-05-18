@@ -7,7 +7,7 @@ struct ThemeUtility {
         let appearance = UINavigationBarAppearance()
         appearance.configureWithTransparentBackground()
         appearance.backgroundColor = UIColor(theme.surface)
-        // appearance.backgroundEffect = UIBlurEffect(style: .systemMaterial)
+        appearance.backgroundEffect = UIBlurEffect(style: .systemMaterial)
         appearance.titleTextAttributes = [.foregroundColor: UIColor(theme.text)]
         appearance.largeTitleTextAttributes = [.foregroundColor: UIColor(theme.text)]
         
@@ -18,8 +18,8 @@ struct ThemeUtility {
         // Apply theme to tab bar with transparency
         let tabBarAppearance = UITabBarAppearance()
         tabBarAppearance.configureWithTransparentBackground()
-        tabBarAppearance.backgroundColor = UIColor(theme.tabBarBackground.opacity(0.7))
-        tabBarAppearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterial)
+        tabBarAppearance.backgroundColor = UIColor(theme.tabBarBackground)
+        tabBarAppearance.backgroundEffect = UIBlurEffect(style: .systemMaterial)
         
         UITabBar.appearance().standardAppearance = tabBarAppearance
         UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance

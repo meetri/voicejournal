@@ -140,7 +140,8 @@ extension Color {
         if a == 255 {
             return String(format: "#%02lX%02lX%02lX", r, g, b)
         } else {
-            return String(format: "#%02lX%02lX%02lX%02lX", r, g, b, a)
+            // Return in ARGB format to match Color(hex:) init expectations
+            return String(format: "#%02lX%02lX%02lX%02lX", a, r, g, b)
         }
     }
 }
