@@ -13,6 +13,7 @@ import CoreData
 struct voicejournalApp: App {
     let persistenceController = PersistenceController.shared
     @StateObject private var authService = AuthenticationService()
+    @StateObject private var speechRecognitionService = SpeechRecognitionService()
     @State private var themeManager = ThemeManager()
     @State private var showingRestoreAlert = false
     @State private var missingFilesCount = 0
@@ -27,6 +28,7 @@ struct voicejournalApp: App {
                 ContentView()
                     .environment(\.managedObjectContext, persistenceController.container.viewContext)
                     .environmentObject(authService)
+                    .environmentObject(speechRecognitionService)
                     .environment(\.themeManager, themeManager)
                     .preferredColorScheme(colorScheme(for: themeManager.currentThemeID))
                     .onAppear {
@@ -45,6 +47,7 @@ struct voicejournalApp: App {
             } else {
                 AuthenticationView()
                     .environmentObject(authService)
+                    .environmentObject(speechRecognitionService)
                     .environment(\.themeManager, themeManager)
                     .preferredColorScheme(colorScheme(for: themeManager.currentThemeID))
                     .onAppear {
