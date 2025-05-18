@@ -95,9 +95,11 @@ class TimelineViewModel: ObservableObject {
         // Register for Core Data change notifications
         registerForCoreDataNotifications()
         
+        #if DEBUG
         // Debug print the database state before filtering
         debugPrintAllEntries()
         debugPrintPredicates()
+        #endif
         
         // Initial data fetch
         fetchEntriesForDateRange()
