@@ -533,6 +533,38 @@ class AudioRecordingViewModel: ObservableObject {
             if !transcriptionText.isEmpty {
                 let transcription = entry.createTranscription(text: transcriptionText)
                 
+                // Enhance transcription if enabled and AI is configured
+                if TranscriptionSettings.shared.autoEnhanceNewTranscriptions,
+                   AIConfigurationManager.shared.activeConfiguration != nil {
+                    let aiService = AITranscriptionService.shared
+                    let enabledFeatures = TranscriptionSettings.shared.enabledFeatures
+                    
+                    // Perform enhancement asynchronously
+                    Task {
+                        do {
+                            let enhanced = try await aiService.enhanceTranscription(
+                                text: transcriptionText,
+                                features: enabledFeatures,
+                                context: managedObjectContext
+                            )
+                            
+                            // Update the transcription with enhanced text
+                            await MainActor.run {
+                                transcription.text = enhanced.enhancedText
+                                transcription.modifiedAt = Date()
+                                do {
+                                    try managedObjectContext.save()
+                                } catch {
+                                    print("Failed to save enhanced transcription: \(error)")
+                                }
+                            }
+                        } catch {
+                            // Enhancement failed, continue with original text
+                            print("Transcription enhancement failed: \(error.localizedDescription)")
+                        }
+                    }
+                }
+                
                 // Store timing data if available - first try from live recognition, then from file processing
                 let timingData = timingDataFromLiveRecognition ?? speechRecognitionService.getTimingDataJSON()
                 if let timingDataJSON = timingData {
@@ -560,10 +592,13 @@ class AudioRecordingViewModel: ObservableObject {
     /// Update journal entry with transcription
     private func updateJournalEntryWithTranscription(_ entry: JournalEntry, text: String) async {
         do {
+            let transcription: Transcription
+            
             // Check if entry already has a transcription
             if let existingTranscription = entry.transcription {
                 existingTranscription.text = text
                 existingTranscription.modifiedAt = Date()
+                transcription = existingTranscription
                 
                 // Update timing data if available
                 if let timingDataJSON = speechRecognitionService.getTimingDataJSON() {
@@ -573,7 +608,7 @@ class AudioRecordingViewModel: ObservableObject {
                 // Update the modified date (locale is not available on Transcription)
             } else {
                 // Create new transcription
-                let transcription = entry.createTranscription(text: text)
+                transcription = entry.createTranscription(text: text)
                 
                 // Store timing data if available
                 if let timingDataJSON = speechRecognitionService.getTimingDataJSON() {
@@ -583,8 +618,40 @@ class AudioRecordingViewModel: ObservableObject {
                 // Note: Transcription model doesn't have a locale property
             }
             
-            // Save the context
+            // Save the context first
             try managedObjectContext.save()
+            
+            // Enhance transcription if enabled and AI is configured
+            if TranscriptionSettings.shared.autoEnhanceNewTranscriptions,
+               AIConfigurationManager.shared.activeConfiguration != nil {
+                let aiService = AITranscriptionService.shared
+                let enabledFeatures = TranscriptionSettings.shared.enabledFeatures
+                
+                // Perform enhancement asynchronously
+                Task {
+                    do {
+                        let enhanced = try await aiService.enhanceTranscription(
+                            text: text,
+                            features: enabledFeatures,
+                            context: managedObjectContext
+                        )
+                        
+                        // Update the transcription with enhanced text
+                        await MainActor.run {
+                            transcription.text = enhanced.enhancedText
+                            transcription.modifiedAt = Date()
+                            do {
+                                try managedObjectContext.save()
+                            } catch {
+                                print("Failed to save enhanced transcription: \(error)")
+                            }
+                        }
+                    } catch {
+                        // Enhancement failed, continue with original text
+                        print("Transcription enhancement failed: \(error.localizedDescription)")
+                    }
+                }
+            }
         } catch {
             // Failed to update journal entry with transcription
             // Don't throw the error up to the caller as this is a background operation

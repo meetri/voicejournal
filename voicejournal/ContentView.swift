@@ -188,6 +188,18 @@ struct SettingsTabView: View {
                             showDisclosure: false
                         )
                     }
+                    
+                    NavigationLink {
+                        TranscriptionSettingsView()
+                    } label: {
+                        SettingsRow(
+                            icon: "waveform.badge.plus",
+                            iconColor: .green,
+                            title: "Transcription Settings",
+                            value: nil,
+                            showDisclosure: false
+                        )
+                    }
                 } header: {
                     Text("AI Settings")
                         .textCase(nil)
