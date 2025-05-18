@@ -374,10 +374,11 @@ class SpeechRecognitionService: ObservableObject {
         // Stop any ongoing recognition
         stopRecognition()
         
-        // Reset transcription
+        // Reset transcription and timing data
         transcription = ""
         interimTranscription = ""
         progress = 0.0
+        timingData = []
         
         // Create audio engine if needed
         if audioEngine == nil {
@@ -452,11 +453,19 @@ class SpeechRecognitionService: ObservableObject {
                     self.interimTranscription = result.bestTranscription.formattedString
                     print("[SpeechRecognition] Updated interim transcription: '\(self.interimTranscription)'")
                     
+                    // For both interim and final results, extract timing data
+                    // This ensures we capture timing even if we never get final results
+                    let previousLength = self.transcription.count
+                    
                     // If final result, update the main transcription
                     if result.isFinal {
                         self.transcription += result.bestTranscription.formattedString + " "
                         print("[SpeechRecognition] Updated final transcription: '\(self.transcription)'")
                     }
+                    
+                    // Extract timing data for all results (both interim and final)
+                    self.extractTimingDataForCurrentState(from: result.bestTranscription, transcriptionOffset: previousLength, isFinal: result.isFinal)
+                    print("[SpeechRecognition] Total timing segments: \(self.timingData.count)")
                     
                     // Update progress
                     if self.recognitionRequest != nil {
@@ -610,40 +619,236 @@ class SpeechRecognitionService: ObservableObject {
         }
     }
 
-    /// Extract timing data from a transcription
-    private func extractTimingData(from transcription: SFTranscription) {
-        var segments: [TranscriptionSegment] = []
+    /// Extract timing data for the current recognition state
+    private func extractTimingDataForCurrentState(from transcription: SFTranscription, transcriptionOffset: Int, isFinal: Bool) {
+        // For interim results, we'll store them temporarily and replace them when we get the final result
+        // This handles the case where we never get final results due to errors
+        
+        print("[SpeechRecognition] Extracting timing data - isFinal: \(isFinal), transcriptionOffset: \(transcriptionOffset)")
+        print("[SpeechRecognition] Transcription text: '\(transcription.formattedString)'")
+        print("[SpeechRecognition] Number of segments: \(transcription.segments.count)")
+        
+        if !isFinal {
+            // For interim results, we need to be more careful about timing data
+            // Only process new segments that we haven't seen before
+            let fullText = transcription.formattedString
+            var currentPosition = 0
+            
+            // Track the highest timestamp we've seen to ensure continuity
+            let highestExistingTime = self.timingData.last?.endTime ?? 0
+            
+            // Process all segments in the interim transcription
+            for (index, segment) in transcription.segments.enumerated() {
+                let segmentText = segment.substring
+                let timestamp = segment.timestamp
+                let duration = segment.duration
+                
+                print("[SpeechRecognition] Processing interim segment \(index): '\(segmentText)'")
+                print("[SpeechRecognition]   - timestamp: \(timestamp), duration: \(duration)")
+                print("[SpeechRecognition]   - highest existing time: \(highestExistingTime)")
+                
+                // Only process segments with timestamps higher than what we already have
+                // BUT also process if this is a new word that's not in our existing segments
+                let isNewWord = !self.timingData.contains { existing in
+                    existing.text == segmentText || existing.text.contains(segmentText)
+                }
+                
+                if timestamp > highestExistingTime - 0.1 || isNewWord { // small overlap tolerance or new word
+                    // Find the segment in the full text to get accurate positioning
+                    if let range = fullText.range(of: segmentText, range: fullText.index(fullText.startIndex, offsetBy: currentPosition)..<fullText.endIndex) {
+                        let nsRange = NSRange(range, in: fullText)
+                        
+                        // Check if we already have this exact segment to avoid duplicates
+                        let isDuplicate = self.timingData.contains { existing in
+                            existing.text == segmentText
+                        }
+                        
+                        if !isDuplicate {
+                            // For segments with identical timestamps to existing ones, 
+                            // calculate a more realistic timestamp based on position
+                            var adjustedTimestamp = timestamp
+                            var adjustedDuration = duration
+                            
+                            // If this segment has the same timestamp as the last one, 
+                            // adjust it to follow the previous segment
+                            if let lastSegment = self.timingData.last,
+                               abs(timestamp - lastSegment.startTime) < 0.001 {
+                                adjustedTimestamp = lastSegment.endTime
+                                // Use a more realistic duration if the provided one is too small
+                                adjustedDuration = max(duration, 0.2) // Minimum 200ms per word
+                            } else if duration < 0.05 {
+                                // If duration is unrealistically small, use a default
+                                adjustedDuration = 0.2
+                            }
+                            
+                            let transcriptionSegment = TranscriptionSegment(
+                                text: segmentText,
+                                startTime: adjustedTimestamp,
+                                endTime: adjustedTimestamp + adjustedDuration,
+                                range: nsRange,
+                                locale: currentLocale.identifier
+                            )
+                            
+                            self.timingData.append(transcriptionSegment)
+                            print("[SpeechRecognition] Added new interim segment: '\(segmentText)' at \(adjustedTimestamp)-\(adjustedTimestamp + adjustedDuration)s (original: \(timestamp))")
+                        } else {
+                            print("[SpeechRecognition] Skipping duplicate segment: '\(segmentText)'")
+                        }
+                    } else {
+                        print("[SpeechRecognition] WARNING: Could not find segment '\(segmentText)' in full text")
+                    }
+                }
+                
+                // Update position for next search
+                if let range = fullText.range(of: segmentText, range: fullText.index(fullText.startIndex, offsetBy: currentPosition)..<fullText.endIndex) {
+                    let nsRange = NSRange(range, in: fullText)
+                    currentPosition = nsRange.location + nsRange.length
+                }
+            }
+            
+            print("[SpeechRecognition] Total timing segments after interim update: \(self.timingData.count)")
+            print("[SpeechRecognition] Duration range: \(self.timingData.first?.startTime ?? 0) - \(self.timingData.last?.endTime ?? 0) seconds")
+            
+        } else {
+            // For final results, use the accumulation method
+            print("[SpeechRecognition] Using accumulation method for final results")
+            self.extractAndAccumulateTimingData(from: transcription, withOffset: transcriptionOffset)
+        }
+    }
+    
+    /// Extract timing data from a transcription and accumulate it with existing data
+    private func extractAndAccumulateTimingData(from transcription: SFTranscription, withOffset offset: Int) {
+        var newSegments: [TranscriptionSegment] = []
+        
+        // Get the full transcription text to calculate proper ranges
+        let fullText = transcription.formattedString
+        var currentOffset = 0
+        
+        print("[SpeechRecognition] Extracting and accumulating timing data")
+        print("[SpeechRecognition] - Full text: '\(fullText)' with offset \(offset)")
+        print("[SpeechRecognition] - Number of segments: \(transcription.segments.count)")
+        
+        // Track the highest timestamp we already have to ensure continuity
+        let highestExistingTime = self.timingData.last?.endTime ?? 0
+        print("[SpeechRecognition] Highest existing timestamp: \(highestExistingTime)")
         
         // Process each segment in the transcription
         for i in 0..<transcription.segments.count {
             let segment = transcription.segments[i]
+            let segmentText = segment.substring
+            let timestamp = segment.timestamp
+            let duration = segment.duration
             
-            // Create a segment with timing information and locale
-            let transcriptionSegment = TranscriptionSegment(
-                text: segment.substring,
-                startTime: segment.timestamp,
-                endTime: segment.timestamp + segment.duration,
-                range: segment.substringRange,
-                locale: currentLocale.identifier
-            )
+            print("[SpeechRecognition] Processing segment \(i): '\(segmentText)'")
+            print("[SpeechRecognition]   - SF timestamp: \(timestamp), duration: \(duration)")
+            print("[SpeechRecognition]   - SF segment range: \(segment.substringRange)")
             
-            segments.append(transcriptionSegment)
+            // Only process segments we haven't seen before (based on timestamp)
+            if timestamp > highestExistingTime - 0.1 { // small overlap tolerance
+                // Check if we already have this exact segment to avoid duplicates
+                let isDuplicate = self.timingData.contains { existing in
+                    existing.text == segmentText && 
+                    abs(existing.startTime - timestamp) < 0.05 // 50ms tolerance
+                }
+                
+                if !isDuplicate {
+                    // Find this segment's position in the full text
+                    if let range = fullText.range(of: segmentText, range: fullText.index(fullText.startIndex, offsetBy: currentOffset)..<fullText.endIndex) {
+                        let nsRange = NSRange(range, in: fullText)
+                        
+                        // Adjust the range to account for the offset in the accumulated transcription
+                        let adjustedRange = NSRange(location: nsRange.location + offset, length: nsRange.length)
+                        
+                        print("[SpeechRecognition] Adding new segment: '\(segmentText)' at time \(timestamp)-\(timestamp + duration)s")
+                        print("[SpeechRecognition]   - Original range: \(nsRange), adjusted range: \(adjustedRange)")
+                        
+                        // Create a segment with timing information and locale
+                        let transcriptionSegment = TranscriptionSegment(
+                            text: segmentText,
+                            startTime: timestamp,
+                            endTime: timestamp + duration,
+                            range: adjustedRange,
+                            locale: currentLocale.identifier
+                        )
+                        
+                        newSegments.append(transcriptionSegment)
+                    }
+                } else {
+                    print("[SpeechRecognition] Skipping duplicate segment: '\(segmentText)' at \(timestamp)")
+                }
+            } else {
+                print("[SpeechRecognition] Skipping old segment: '\(segmentText)' at \(timestamp) (before \(highestExistingTime))")
+            }
+            
+            // Update offset for next search
+            if let range = fullText.range(of: segmentText, range: fullText.index(fullText.startIndex, offsetBy: currentOffset)..<fullText.endIndex) {
+                let nsRange = NSRange(range, in: fullText)
+                currentOffset = nsRange.location + nsRange.length
+            }
+        }
+        
+        // Append new segments to existing timing data
+        timingData.append(contentsOf: newSegments)
+        print("[SpeechRecognition] Added \(newSegments.count) timing segments, total: \(timingData.count)")
+        print("[SpeechRecognition] Full transcription so far: '\(self.transcription)'")
+    }
+    
+    /// Extract timing data from a transcription (used for file recognition)
+    private func extractTimingData(from transcription: SFTranscription) {
+        var segments: [TranscriptionSegment] = []
+        
+        // Get the full transcription text to calculate proper ranges
+        let fullText = transcription.formattedString
+        var currentOffset = 0
+        
+        // Process each segment in the transcription
+        for i in 0..<transcription.segments.count {
+            let segment = transcription.segments[i]
+            let segmentText = segment.substring
+            
+            // Find this segment's position in the full text
+            if let range = fullText.range(of: segmentText, range: fullText.index(fullText.startIndex, offsetBy: currentOffset)..<fullText.endIndex) {
+                let nsRange = NSRange(range, in: fullText)
+                
+                // Create a segment with timing information and locale
+                let transcriptionSegment = TranscriptionSegment(
+                    text: segmentText,
+                    startTime: segment.timestamp,
+                    endTime: segment.timestamp + segment.duration,
+                    range: nsRange,
+                    locale: currentLocale.identifier
+                )
+                
+                segments.append(transcriptionSegment)
+                currentOffset = nsRange.location + nsRange.length
+            }
         }
         
         // Store the timing data
         timingData = segments
+        print("[SpeechRecognition] Extracted \(segments.count) timing segments")
     }
 
     /// Get the timing data as a JSON string
     func getTimingDataJSON() -> String? {
-        guard !timingData.isEmpty else { return nil }
+        guard !timingData.isEmpty else {
+            print("[SpeechRecognition] No timing data to encode")
+            return nil
+        }
+        
+        print("[SpeechRecognition] Encoding \(timingData.count) timing segments")
         
         do {
             let encoder = JSONEncoder()
+            encoder.outputFormatting = .prettyPrinted
             let data = try encoder.encode(timingData)
-            return String(data: data, encoding: .utf8)
+            if let json = String(data: data, encoding: .utf8) {
+                print("[SpeechRecognition] Encoded timing data: \(json.prefix(200))...")
+                return json
+            }
+            return nil
         } catch {
-            // Error handling without debug logs
+            print("[SpeechRecognition] Error encoding timing data: \(error)")
             return nil
         }
     }
