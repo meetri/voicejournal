@@ -174,6 +174,28 @@ struct SettingsTabView: View {
                         .padding(.bottom, 4)
                 }
                 
+                // MARK: - AI Configuration Section
+                Section {
+                    NavigationLink {
+                        AIConfigurationView()
+                            .environment(\.managedObjectContext, viewContext)
+                    } label: {
+                        SettingsRow(
+                            icon: "brain",
+                            iconColor: .purple,
+                            title: "AI Configuration",
+                            value: nil,
+                            showDisclosure: false
+                        )
+                    }
+                } header: {
+                    Text("AI Settings")
+                        .textCase(nil)
+                        .font(.headline)
+                        .foregroundColor(themeManager.theme.text)
+                        .padding(.bottom, 4)
+                }
+                
                 // MARK: - Data & Backup Section
                 Section {
                     NavigationLink {
