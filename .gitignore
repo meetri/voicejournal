@@ -1,5 +1,6 @@
 .aider*
 
+.mcp.json
 errors.log
 backup/*
 
