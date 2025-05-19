@@ -94,13 +94,6 @@ struct LanguageRowView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     languageNameView
-                    
-                    if language.nativeName != language.name {
-                        Text(language.nativeName)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                    
                     additionalDetailsView
                 }
                 
@@ -111,24 +104,15 @@ struct LanguageRowView: View {
                         .foregroundColor(.blue)
                 }
             }
-            .padding(.vertical, 2)
+            .padding(.vertical, 4)
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
     }
     
     private var languageNameView: some View {
-        HStack {
-            Text(language.name)
-                .foregroundColor(.primary)
-                .fontWeight(.medium)
-            
-            if let countryName = getCountryName(for: language.locale) {
-                Text("(\(countryName))")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-        }
+        Text(LanguageSettings.shared.localizedName(for: language.locale))
+            .foregroundColor(.primary)
     }
     
     private var additionalDetailsView: some View {
