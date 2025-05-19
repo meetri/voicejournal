@@ -146,12 +146,26 @@ struct EnhancedJournalEntryView: View {
             
             // Debug logging for transcription state
             if let transcription = journalEntry.transcription {
-                print("📊 [EnhancedJournalEntryView] Transcription state:")
+                print("📊 [EnhancedJournalEntryView.onAppear] Transcription state:")
                 print("  - Raw text: \(transcription.rawText?.count ?? 0) characters")
                 print("  - Enhanced text: \(transcription.enhancedText?.count ?? 0) characters")
                 print("  - AI analysis: \(transcription.aiAnalysis?.count ?? 0) characters")
                 print("  - Encrypted enhanced: \(transcription.encryptedEnhancedText?.count ?? 0) bytes")
                 print("  - Encrypted AI: \(transcription.encryptedAIAnalysis?.count ?? 0) bytes")
+                print("  - Entry has encrypted content: \(journalEntry.hasEncryptedContent)")
+                print("  - Entry is decrypted: \(journalEntry.isDecrypted)")
+                print("  - Entry is base encrypted: \(journalEntry.isBaseEncrypted)")
+                print("  - Entry is base decrypted: \(journalEntry.isBaseDecrypted)")
+                
+                // Try to decrypt if needed
+                if journalEntry.hasEncryptedContent && transcription.encryptedEnhancedText != nil && transcription.enhancedText == nil {
+                    print("  - Attempting to decrypt enhanced text...")
+                    if journalEntry.decryptWithGlobalAccess() {
+                        print("  - Decryption succeeded")
+                    } else {
+                        print("  - Decryption failed")
+                    }
+                }
             }
         }
         .onDisappear {
@@ -572,9 +586,40 @@ struct EnhancedJournalEntryView: View {
     
     /// Load the audio file for playback
     private func loadAudio() {
+        print("🎵 [EnhancedJournalEntryView] loadAudio called")
         guard let recording = journalEntry.audioRecording else {
+            print("⚠️ [EnhancedJournalEntryView] No audio recording found")
             return
         }
+        
+        print("  - Audio exists: \(recording.filePath ?? "nil")")
+        print("  - Is encrypted: \(recording.isEncrypted)")
+        print("  - Entry has encrypted content: \(journalEntry.hasEncryptedContent)")
+        print("  - Entry is decrypted: \(journalEntry.isDecrypted)")
+        print("  - Entry is base encrypted: \(journalEntry.isBaseEncrypted)")
+        print("  - Entry is base decrypted: \(journalEntry.isBaseDecrypted)")
+        
+        // Ensure entry is decrypted before loading audio
+        if journalEntry.hasEncryptedContent && !journalEntry.isDecrypted {
+            print("🔐 [EnhancedJournalEntryView] Attempting to decrypt entry for audio playback")
+            if !journalEntry.decryptWithGlobalAccess() {
+                print("❌ [EnhancedJournalEntryView] Failed to decrypt entry for audio playback")
+                return
+            }
+            print("✅ [EnhancedJournalEntryView] Entry decrypted successfully")
+        }
+        
+        // Check if base encryption needs decryption
+        if journalEntry.isBaseEncrypted && !journalEntry.isBaseDecrypted {
+            print("🔐 [EnhancedJournalEntryView] Attempting to decrypt base content for audio playback")
+            if !journalEntry.decryptBaseContent() {
+                print("❌ [EnhancedJournalEntryView] Failed to decrypt base content for audio playback")
+                return
+            }
+            print("✅ [EnhancedJournalEntryView] Base content decrypted successfully")
+        }
+        
+        print("🎵 [EnhancedJournalEntryView] Loading audio after decryption checks")
         
         // Use the AudioPlaybackViewModel's method which properly handles path conversion
         Task {

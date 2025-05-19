@@ -31,18 +31,36 @@ struct FilePathUtility {
     }
     
     /// Convert a relative file path to an absolute path
-    /// - Parameter relativePath: The relative file path (filename only)
+    /// - Parameter relativePath: The relative file path (filename or relative path with subdirectories)
     /// - Returns: An absolute path that can be used to access the file
     static func toAbsolutePath(from relativePath: String) -> URL {
-        // If the path already contains directory components, assume it's already an absolute path
-        // This is for backward compatibility with existing data
-        if relativePath.contains("/") {
+        print("🔧 [FilePathUtility] Converting path: \(relativePath)")
+        
+        // Check if it's already an absolute path
+        // Absolute paths will start with "/" or contain the app's container path markers
+        if relativePath.hasPrefix("/") || 
+           relativePath.contains("/var/mobile/") || 
+           relativePath.contains("/Users/") ||
+           relativePath.contains("/private/var/") {
+            print("  - Detected as absolute path")
             return URL(fileURLWithPath: relativePath)
         }
         
-        // Otherwise, treat it as a filename and append it to the recordings directory
-        let absoluteURL = recordingsDirectory.appendingPathComponent(relativePath)
-        return absoluteURL
+        // For relative paths, we need to determine the base directory
+        let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        
+        // If it's just a filename (no directory separators), put it in the recordings directory
+        if !relativePath.contains("/") {
+            let result = recordingsDirectory.appendingPathComponent(relativePath)
+            print("  - Simple filename, using recordings dir: \(result.path)")
+            return result
+        }
+        
+        // If it has subdirectories (like "EncryptedFiles/filename" or "BaseEncrypted/filename")
+        // Use documents directory as base since encrypted files are stored there
+        let result = documentsDir.appendingPathComponent(relativePath)
+        print("  - Relative path with subdirs, using documents dir: \(result.path)")
+        return result
     }
     
     /// Create the recordings directory if it doesn't exist
@@ -64,17 +82,9 @@ struct FilePathUtility {
     /// - Parameter path: The path to check (can be relative or absolute)
     /// - Returns: True if the file exists, false otherwise
     static func fileExists(at path: String) -> Bool {
-        let absolutePath: String
-        
-        if path.contains("/") {
-            // Assume it's an absolute path
-            absolutePath = path
-        } else {
-            // Assume it's a relative path (filename only)
-            absolutePath = recordingsDirectory.appendingPathComponent(path).path
-        }
-        
-        let exists = FileManager.default.fileExists(atPath: absolutePath)
+        // Use the same logic as toAbsolutePath to determine the full path
+        let absoluteURL = toAbsolutePath(from: path)
+        let exists = FileManager.default.fileExists(atPath: absoluteURL.path)
         return exists
     }
     

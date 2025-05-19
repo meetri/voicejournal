@@ -131,19 +131,30 @@ class AudioPlaybackViewModel: ObservableObject {
     
     /// Load an audio file from an AudioRecording entity
     func loadAudio(from recording: AudioRecording) async {
+        print("🎵 [AudioPlaybackViewModel] loadAudio from recording")
+        print("  - Is encrypted: \(recording.isEncrypted)")
+        print("  - Original file path: \(recording.filePath ?? "nil")")
+        print("  - Temp decrypted path: \(recording.tempDecryptedPath ?? "nil")")
+        
         // Use effectiveFilePath which will return decrypted path if available
         guard let filePath = recording.effectiveFilePath else {
+            print("❌ [AudioPlaybackViewModel] No effective file path available")
             handleError(AudioPlaybackError.fileNotFound)
             return
         }
         
+        print("  - Using effective path: \(filePath)")
+        
         // Convert relative path to absolute path
         let url = FilePathUtility.toAbsolutePath(from: filePath)
+        print("  - Absolute URL: \(url.path)")
         
         // Check if file exists before attempting to load
         let fileExists = FileManager.default.fileExists(atPath: url.path)
+        print("  - File exists: \(fileExists)")
         
         if !fileExists {
+            print("❌ [AudioPlaybackViewModel] File not found at path: \(url.path)")
             handleError(AudioPlaybackError.fileNotFound)
             return
         }

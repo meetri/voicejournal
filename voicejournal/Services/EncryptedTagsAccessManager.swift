@@ -143,10 +143,36 @@ extension JournalEntry {
     /// Decrypt this entry's content using global access
     /// - Returns: True if decryption succeeded, false otherwise
     func decryptWithGlobalAccess() -> Bool {
-        guard let encryptedTag = self.encryptedTag,
-              let key = encryptedTag.globalAccessKey else {
+        guard let encryptedTag = self.encryptedTag else {
+            print("🔐 [JournalEntry.decryptWithGlobalAccess] No encrypted tag found")
             return false
         }
+        
+        print("🔐 [JournalEntry.decryptWithGlobalAccess] Attempting to decrypt entry with tag '\(encryptedTag.name ?? "Unknown")'")
+        
+        // First check if we have the key from the access manager (temporary access)
+        var key: SymmetricKey? = EncryptedTagsAccessManager.shared.getEncryptionKey(for: encryptedTag)
+        if key != nil {
+            print("🔐 [JournalEntry.decryptWithGlobalAccess] Found key in EncryptedTagsAccessManager")
+        }
+        
+        // Fallback to global access key if available
+        if key == nil {
+            key = encryptedTag.globalAccessKey
+            if key != nil {
+                print("🔐 [JournalEntry.decryptWithGlobalAccess] Found globalAccessKey on tag")
+            }
+        }
+        
+        guard let encryptionKey = key else {
+            print("❌ [JournalEntry.decryptWithGlobalAccess] No encryption key available for tag '\(encryptedTag.name ?? "Unknown")'")
+            print("  - Key in EncryptedTagsAccessManager: \(EncryptedTagsAccessManager.shared.getEncryptionKey(for: encryptedTag) != nil)")
+            print("  - Global access key on tag: \(encryptedTag.globalAccessKey != nil)")
+            print("  - Tag has global access: \(encryptedTag.hasGlobalAccess)")
+            return false
+        }
+        
+        print("✅ [JournalEntry.decryptWithGlobalAccess] Encryption key found")
         
         var decryptionSuccess = true
         
@@ -155,9 +181,16 @@ extension JournalEntry {
            let encryptedFilePath = audioRecording.filePath,
            audioRecording.isEncrypted == true {
             
+            print("🔐 [JournalEntry.decryptWithGlobalAccess] Starting audio decryption...")
+            print("  - Encrypted file path: \(encryptedFilePath)")
+            print("  - Is encrypted: \(audioRecording.isEncrypted)")
+            
             do {
-                // Read the encrypted file
-                let encryptedData = try Data(contentsOf: URL(fileURLWithPath: encryptedFilePath))
+                // Convert relative path to absolute path
+                let absoluteEncryptedURL = FilePathUtility.toAbsolutePath(from: encryptedFilePath)
+                print("🔐 [JournalEntry.decryptWithGlobalAccess] Reading encrypted file from: \(absoluteEncryptedURL.path)")
+                let encryptedData = try Data(contentsOf: absoluteEncryptedURL)
+                print("  - Encrypted data size: \(encryptedData.count) bytes")
                 
                 // Create a directory for temporary decrypted files
                 let fileManager = FileManager.default
@@ -166,37 +199,77 @@ extension JournalEntry {
                 
                 if !fileManager.fileExists(atPath: tempDirectory.path) {
                     try fileManager.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+                    print("  - Created temp directory: \(tempDirectory.path)")
                 }
                 
                 // Generate a unique temporary file path
                 let tempFilePath = tempDirectory.appendingPathComponent(UUID().uuidString + ".m4a").path
+                print("  - Temp file path: \(tempFilePath)")
                 
                 // Decrypt the data
-                if let decryptedData = EncryptionManager.decrypt(encryptedData, using: key) {
+                if let decryptedData = EncryptionManager.decrypt(encryptedData, using: encryptionKey) {
                     // Write decrypted data to temporary file
                     try decryptedData.write(to: URL(fileURLWithPath: tempFilePath))
+                    print("✅ [JournalEntry.decryptWithGlobalAccess] Audio decrypted and written to: \(tempFilePath)")
                     
                     // Store temporary path in memory (not persisted)
                     audioRecording.tempDecryptedPath = tempFilePath
                 } else {
+                    print("❌ [JournalEntry.decryptWithGlobalAccess] Failed to decrypt audio data")
                     decryptionSuccess = false
                 }
             } catch {
-                // // Error occurred
+                print("❌ [JournalEntry.decryptWithGlobalAccess] Error during audio decryption: \(error)")
                 decryptionSuccess = false
+            }
+        } else {
+            print("⚠️ [JournalEntry.decryptWithGlobalAccess] No audio to decrypt or not encrypted")
+            if let audioRecording = self.audioRecording {
+                print("  - Audio exists: true")
+                print("  - File path: \(audioRecording.filePath ?? "nil")")
+                print("  - Is encrypted: \(audioRecording.isEncrypted)")
             }
         }
         
         // Decrypt the transcription if it exists and is encrypted
-        if let transcription = self.transcription,
-           let encryptedData = transcription.encryptedText,
-           transcription.text == nil {
+        if let transcription = self.transcription {
+            print("🔐 [JournalEntry.decryptWithGlobalAccess] Starting transcription decryption...")
             
-            if let decryptedText = EncryptionManager.decryptToString(encryptedData, using: key) {
-                // Store decrypted text temporarily (in memory)
-                transcription.text = decryptedText
-            } else {
-                decryptionSuccess = false
+            // Decrypt main text
+            if let encryptedData = transcription.encryptedText,
+               transcription.text == nil {
+                if let decryptedText = EncryptionManager.decryptToString(encryptedData, using: encryptionKey) {
+                    transcription.text = decryptedText
+                    print("✅ [JournalEntry.decryptWithGlobalAccess] Main text decrypted successfully")
+                } else {
+                    decryptionSuccess = false
+                    print("❌ [JournalEntry.decryptWithGlobalAccess] Failed to decrypt main text")
+                }
+            }
+            
+            // Decrypt enhanced text
+            if let encryptedData = transcription.encryptedEnhancedText,
+               transcription.enhancedText == nil {
+                print("🔐 [JournalEntry.decryptWithGlobalAccess] Decrypting enhanced text (\(encryptedData.count) bytes)")
+                if let decryptedText = EncryptionManager.decryptToString(encryptedData, using: encryptionKey) {
+                    transcription.enhancedText = decryptedText
+                    print("✅ [JournalEntry.decryptWithGlobalAccess] Enhanced text decrypted successfully (\(decryptedText.count) characters)")
+                } else {
+                    decryptionSuccess = false
+                    print("❌ [JournalEntry.decryptWithGlobalAccess] Failed to decrypt enhanced text")
+                }
+            }
+            
+            // Decrypt AI analysis
+            if let encryptedData = transcription.encryptedAIAnalysis,
+               transcription.aiAnalysis == nil {
+                if let decryptedText = EncryptionManager.decryptToString(encryptedData, using: encryptionKey) {
+                    transcription.aiAnalysis = decryptedText
+                    print("✅ [JournalEntry.decryptWithGlobalAccess] AI analysis decrypted successfully")
+                } else {
+                    decryptionSuccess = false
+                    print("❌ [JournalEntry.decryptWithGlobalAccess] Failed to decrypt AI analysis")
+                }
             }
         }
         

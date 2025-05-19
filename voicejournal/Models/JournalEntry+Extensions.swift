@@ -102,8 +102,9 @@ extension JournalEntry {
         transcription.journalEntry = self
         self.transcription = transcription
         
-        // Auto-encrypt if base encryption is enabled
-        if self.isBaseEncrypted {
+        // Auto-encrypt if base encryption is enabled AND no encrypted tag is present
+        // Tag encryption takes precedence over base encryption
+        if self.isBaseEncrypted && !self.hasEncryptedContent {
             _ = applyBaseEncryption()
         }
         
@@ -213,6 +214,11 @@ extension JournalEntry {
         // Set as the encrypted tag (this automatically updates the inverse relationship)
         self.encryptedTag = tag
         
+        // Disable base encryption when applying tag encryption
+        // Tag encryption takes precedence over base encryption
+        self.isBaseEncrypted = false
+        print("🔐 [JournalEntry] Disabling base encryption in favor of tag encryption")
+        
         // Manually add to the tag's encryptedEntries set to ensure the relationship
         // is properly established in both directions
         tag.addToEncryptedEntries(self)
@@ -269,7 +275,8 @@ extension JournalEntry {
                 // Convert relative path to absolute path
                 let absoluteURL = FilePathUtility.toAbsolutePath(from: filePath)
                 let fileName = absoluteURL.lastPathComponent
-                let encryptedFilePath = encryptedDirectory.appendingPathComponent("\(fileName).encrypted").path
+                let encryptedFileName = "\(fileName).encrypted"
+                let encryptedFileURL = encryptedDirectory.appendingPathComponent(encryptedFileName)
                 
                 print("🔐 [JournalEntry] Reading audio file from: \(absoluteURL.path)")
                 // Read the audio file data
@@ -278,17 +285,18 @@ extension JournalEntry {
                 
                 // Encrypt the data
                 if let encryptedData = EncryptionManager.encrypt(audioData, using: key) {
-                    print("🔐 [JournalEntry] Audio encrypted successfully, writing to: \(encryptedFilePath)")
+                    print("🔐 [JournalEntry] Audio encrypted successfully, writing to: \(encryptedFileURL.path)")
                     // Write encrypted data to the encrypted file path
-                    try encryptedData.write(to: URL(fileURLWithPath: encryptedFilePath))
+                    try encryptedData.write(to: encryptedFileURL)
                     
                     // Store original path in a separate attribute for later
                     audioRecording.originalFilePath = filePath
                     
-                    // Update file path to point to encrypted file
-                    audioRecording.filePath = encryptedFilePath
+                    // Update file path to point to encrypted file using relative path
+                    let relativePath = "EncryptedFiles/\(encryptedFileName)"
+                    audioRecording.filePath = relativePath
                     audioRecording.isEncrypted = true
-                    print("✅ [JournalEntry] Audio encryption completed successfully")
+                    print("✅ [JournalEntry] Audio encryption completed successfully, relative path: \(relativePath)")
                 } else {
                     encryptionSuccess = false
                     print("❌ [JournalEntry] Failed to encrypt audio data")
@@ -397,8 +405,13 @@ extension JournalEntry {
            audioRecording.isEncrypted == true {
             
             do {
+                // Convert relative path to absolute path
+                let encryptedURL = FilePathUtility.toAbsolutePath(from: encryptedFilePath)
+                
+                print("🔓 [JournalEntry] Decrypting audio from: \(encryptedURL.path)")
+                
                 // Read the encrypted file
-                let encryptedData = try Data(contentsOf: URL(fileURLWithPath: encryptedFilePath))
+                let encryptedData = try Data(contentsOf: encryptedURL)
                 
                 // Create a directory for temporary decrypted files
                 let fileManager = FileManager.default
@@ -419,12 +432,15 @@ extension JournalEntry {
                     
                     // Store temporary path in memory (not persisted)
                     audioRecording.tempDecryptedPath = tempFilePath
+                    print("✅ [JournalEntry] Audio decrypted successfully")
                 } else {
                     decryptionSuccess = false
+                    print("❌ [JournalEntry] Failed to decrypt audio data")
                 }
             } catch {
                 // Error occurred
                 decryptionSuccess = false
+                print("❌ [JournalEntry] Audio decryption error: \(error)")
             }
         }
         
@@ -543,10 +559,11 @@ extension JournalEntry {
                     try fileManager.createDirectory(at: baseEncryptedDirectory, withIntermediateDirectories: true)
                 }
                 
-                // Construct encrypted file path
-                let originalURL = URL(fileURLWithPath: filePath)
+                // Convert relative path to absolute path if needed
+                let originalURL = FilePathUtility.toAbsolutePath(from: filePath)
                 let fileName = originalURL.lastPathComponent
-                let encryptedFilePath = baseEncryptedDirectory.appendingPathComponent("\(fileName).baseenc").path
+                let encryptedFileName = "\(fileName).baseenc"
+                let encryptedFileURL = baseEncryptedDirectory.appendingPathComponent(encryptedFileName)
                 
                 // Read the audio file data
                 let audioData = try Data(contentsOf: originalURL)
@@ -554,16 +571,17 @@ extension JournalEntry {
                 // Encrypt the data
                 if let encryptedData = EncryptionManager.encrypt(audioData, using: rootKey) {
                     // Write encrypted data to the encrypted file path
-                    try encryptedData.write(to: URL(fileURLWithPath: encryptedFilePath))
+                    try encryptedData.write(to: encryptedFileURL)
                     
                     // Store original path and encrypted path
                     if audioRecording.originalFilePath == nil {
                         audioRecording.originalFilePath = filePath
                     }
-                    self.baseEncryptedAudioPath = encryptedFilePath
                     
-                    // Update file path to point to encrypted file
-                    audioRecording.filePath = encryptedFilePath
+                    // Store relative paths in Core Data
+                    let relativePath = "BaseEncrypted/\(encryptedFileName)"
+                    self.baseEncryptedAudioPath = relativePath
+                    audioRecording.filePath = relativePath
                 } else {
                     encryptionSuccess = false
                 }
@@ -648,8 +666,11 @@ extension JournalEntry {
            let encryptedFilePath = self.baseEncryptedAudioPath {
             
             do {
+                // Convert relative path to absolute path
+                let encryptedURL = FilePathUtility.toAbsolutePath(from: encryptedFilePath)
+                
                 // Read the encrypted file
-                let encryptedData = try Data(contentsOf: URL(fileURLWithPath: encryptedFilePath))
+                let encryptedData = try Data(contentsOf: encryptedURL)
                 
                 // Create a directory for temporary decrypted files
                 let fileManager = FileManager.default

@@ -8,5 +8,10 @@
    Copyright (c) 2025 ___ORGANIZATIONNAME___. All rights reserved.
 -->
 <plist version="1.0">
-<dict/>
+<dict>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Voice Journal needs access to your microphone to record audio notes.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Voice Journal needs speech recognition to transcribe your audio recordings.</string>
+</dict>
 </plist>

@@ -790,17 +790,25 @@ class AudioRecordingViewModel: ObservableObject {
                                 print("  - Raw text: \(transcription.rawText?.count ?? 0) characters")
                                 print("  - Enhanced text: \(transcription.enhancedText?.count ?? 0) characters")
                                 print("  - Main text: \(transcription.text?.count ?? 0) characters")
+                                print("  - Entry has encrypted tag: \(entry.hasEncryptedContent)")
+                                print("  - Entry is base encrypted: \(entry.isBaseEncrypted)")
                                 
                                 // Check if entry needs encryption after enhancement
+                                // Priority: Tag encryption > Base encryption
                                 if entry.hasEncryptedContent {
                                     print("🔐 [AudioRecordingViewModel] Entry has encrypted tag, checking encryption status")
+                                    
+                                    // Note: Base encryption should already be disabled when tag is applied
+                                    if entry.isBaseEncrypted {
+                                        print("⚠️ [AudioRecordingViewModel] Warning: Entry has both base and tag encryption - this shouldn't happen")
+                                    }
                                     
                                     // Check if tag is globally accessible (has decryption key available)
                                     if let encryptedTag = entry.encryptedTag {
                                         print("🔐 [AudioRecordingViewModel] Encrypted tag: \(encryptedTag.name ?? "Unknown")")
                                         
                                         if let key = EncryptedTagsAccessManager.shared.getEncryptionKey(for: encryptedTag) {
-                                            print("🔐 [AudioRecordingViewModel] Encryption key available, re-encrypting enhanced content")
+                                            print("🔐 [AudioRecordingViewModel] Encryption key available, encrypting enhanced content with tag key")
                                             
                                             // Encrypt the enhanced text with the tag's key
                                             if let encryptedData = EncryptionManager.encrypt(processedText, using: key) {
@@ -816,7 +824,7 @@ class AudioRecordingViewModel: ObservableObject {
                                         }
                                     }
                                 } else if entry.isBaseEncrypted {
-                                    // Apply base encryption
+                                    // Apply base encryption only if no tag encryption
                                     print("🔐 [AudioRecordingViewModel] Applying base encryption to enhanced content")
                                     _ = entry.applyBaseEncryption()
                                 }
@@ -836,6 +844,14 @@ class AudioRecordingViewModel: ObservableObject {
                                 enhancementManager.completeEnhancement(for: entryID, result: enhancementResult!)
                                 
                                 do {
+                                    // Final state check before save
+                                    print("📊 [AudioRecordingViewModel] Final transcription state before save:")
+                                    print("  - Raw text: \(transcription.rawText?.count ?? 0) characters")
+                                    print("  - Enhanced text: \(transcription.enhancedText?.count ?? 0) characters")
+                                    print("  - Encrypted enhanced: \(transcription.encryptedEnhancedText?.count ?? 0) bytes")
+                                    print("  - Entry has encrypted tag: \(entry.hasEncryptedContent)")
+                                    print("  - Entry is base encrypted: \(entry.isBaseEncrypted)")
+                                    
                                     try managedObjectContext.save()
                                     print("✅ [AudioRecordingViewModel] Enhanced transcription saved successfully")
                                 } catch {

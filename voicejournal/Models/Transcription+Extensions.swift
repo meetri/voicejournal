@@ -20,12 +20,17 @@ extension Transcription {
         // Only process if we have changes
         guard self.hasChanges else { return }
         
+        print("🔐 [Transcription.willSave] Called with changes")
+        
         // Check if the journal entry has encrypted content
         guard let entry = journalEntry,
               entry.hasEncryptedContent,
               let encryptedTag = entry.encryptedTag else {
+            print("  - No encrypted tag, skipping encryption hook")
             return
         }
+        
+        print("  - Entry has encrypted tag: \(encryptedTag.name ?? "Unknown")")
         
         // Check if we have the encryption key available
         guard let key = EncryptedTagsAccessManager.shared.getEncryptionKey(for: encryptedTag) else {
@@ -39,14 +44,16 @@ extension Transcription {
         // Check for unencrypted enhanced text
         if let enhancedText = self.enhancedText,
            self.encryptedEnhancedText == nil {
-            print("🔐 [Transcription] Encrypting enhanced text on save")
+            print("🔐 [Transcription.willSave] Encrypting enhanced text on save (\(enhancedText.count) characters)")
             if let encryptedData = EncryptionManager.encrypt(enhancedText, using: key) {
                 self.encryptedEnhancedText = encryptedData
                 self.enhancedText = nil
-                print("✅ [Transcription] Enhanced text encrypted successfully")
+                print("✅ [Transcription.willSave] Enhanced text encrypted successfully (\(encryptedData.count) bytes)")
             } else {
-                print("❌ [Transcription] Failed to encrypt enhanced text")
+                print("❌ [Transcription.willSave] Failed to encrypt enhanced text")
             }
+        } else {
+            print("  - Enhanced text: \(self.enhancedText?.count ?? 0) chars, encrypted: \(self.encryptedEnhancedText?.count ?? 0) bytes")
         }
         
         // Check for unencrypted AI analysis
