@@ -72,5 +72,9 @@
         <attribute name="name" attributeType="String"/>
         <attribute name="systemPrompt" optional="YES" attributeType="String"/>
         <attribute name="vendor" attributeType="String" defaultValueString="openai"/>
+        <attribute name="totalInputTokens" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="totalOutputTokens" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="totalRequests" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="lastUsedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
     </entity>
 </model>

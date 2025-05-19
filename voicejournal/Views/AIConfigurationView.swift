@@ -157,6 +157,11 @@ struct ConfigurationRow: View {
                 }
             }
             
+            // Token Usage Metrics
+            TokenMetricsView(configuration: configuration)
+                .font(.caption2)
+                .foregroundColor(themeManager.theme.textSecondary)
+            
             HStack(spacing: 16) {
                 Button {
                     onEdit(configuration)
@@ -368,6 +373,75 @@ struct EditAIConfigurationView: View {
             systemPrompt: systemPrompt.isEmpty ? nil : systemPrompt
         )
         dismiss()
+    }
+}
+
+// MARK: - Token Metrics View
+
+struct TokenMetricsView: View {
+    let configuration: AIConfiguration
+    
+    @Environment(\.themeManager) var themeManager
+    
+    private var totalTokens: Int64 {
+        configuration.totalInputTokens + configuration.totalOutputTokens
+    }
+    
+    private var formattedLastUsed: String {
+        if let lastUsed = configuration.lastUsedAt {
+            let formatter = RelativeDateTimeFormatter()
+            formatter.unitsStyle = .abbreviated
+            return formatter.localizedString(for: lastUsed, relativeTo: Date())
+        }
+        return "Never"
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            // Token usage row
+            HStack(spacing: 12) {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.up.circle")
+                        .font(.system(size: 10))
+                    Text("\(configuration.totalInputTokens.formatted()) in")
+                }
+                
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.down.circle")
+                        .font(.system(size: 10))
+                    Text("\(configuration.totalOutputTokens.formatted()) out")
+                }
+                
+                HStack(spacing: 4) {
+                    Image(systemName: "sum")
+                        .font(.system(size: 10))
+                    Text("\(totalTokens.formatted()) total")
+                }
+                
+                Spacer()
+            }
+            
+            // Request count and last used
+            HStack(spacing: 12) {
+                HStack(spacing: 4) {
+                    Image(systemName: "network")
+                        .font(.system(size: 10))
+                    Text("\(configuration.totalRequests) requests")
+                }
+                
+                HStack(spacing: 4) {
+                    Image(systemName: "clock")
+                        .font(.system(size: 10))
+                    Text(formattedLastUsed)
+                }
+                
+                Spacer()
+            }
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 8)
+        .background(themeManager.theme.surface)
+        .cornerRadius(6)
     }
 }
 

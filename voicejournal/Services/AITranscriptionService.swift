@@ -272,12 +272,42 @@ class AITranscriptionService: ObservableObject {
             throw AITranscriptionError.invalidResponse
         }
         
+        // Extract token usage information if available
+        if let usage = json?["usage"] as? [String: Any],
+           let inputTokens = usage["prompt_tokens"] as? Int,
+           let outputTokens = usage["completion_tokens"] as? Int {
+            // Update token metrics for the active configuration
+            await updateTokenMetrics(inputTokens: inputTokens, outputTokens: outputTokens)
+        }
+        
         let result = content.trimmingCharacters(in: .whitespacesAndNewlines)
         
         return result
     }
     
     // MARK: - Helper Functions
+    
+    /// Update token metrics for the active configuration
+    private func updateTokenMetrics(inputTokens: Int, outputTokens: Int) async {
+        await MainActor.run {
+            guard let config = aiManager.activeConfiguration else { return }
+            
+            // Update the configuration's token counts
+            config.totalInputTokens += Int64(inputTokens)
+            config.totalOutputTokens += Int64(outputTokens)
+            config.totalRequests += 1
+            config.lastUsedAt = Date()
+            
+            // Save the context
+            if let context = config.managedObjectContext {
+                do {
+                    try context.save()
+                } catch {
+                    // Failed to save token metrics
+                }
+            }
+        }
+    }
     
     /// Extract speaker names from diarized text
     private func extractSpeakers(from text: String) -> [String] {
