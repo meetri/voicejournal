@@ -599,24 +599,13 @@ class SpeechRecognitionService: ObservableObject {
     
     /// Stop speech recognition
     func stopRecognition() {
-        // Stop audio engine first
+        // Stop audio engine
         audioEngine?.stop()
         audioEngine?.inputNode.removeTap(onBus: 0)
         
-        // Finish the recognition request to trigger final results
-        recognitionRequest?.endAudio()
-        
-        // Give the recognizer a moment to process final results
-        // We'll use a completion handler for when recognition is truly done
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.finalizeRecognition()
-        }
-    }
-    
-    /// Finalize recognition after giving time for final results
-    private func finalizeRecognition() {
-        // Cancel and clean up recognition task
+        // Stop recognition task
         recognitionTask?.cancel()
+        recognitionTask?.finish()
         recognitionTask = nil
         
         // Clean up recognition request
