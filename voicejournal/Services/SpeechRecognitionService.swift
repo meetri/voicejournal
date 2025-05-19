@@ -714,6 +714,7 @@ class SpeechRecognitionService: ObservableObject {
         
         // Sort segments by location
         let sortedSegments = timingData.sorted { $0.textRange.location < $1.textRange.location }
+        let fullTextLength = fullText.count
         
         // Check for gaps between segments
         for i in 0..<(sortedSegments.count - 1) {
@@ -725,6 +726,14 @@ class SpeechRecognitionService: ObservableObject {
             
             if nextStart > currentEnd {
                 let gapLength = nextStart - currentEnd
+                
+                // Validate that the offsets are within bounds
+                guard currentEnd >= 0 && currentEnd <= fullTextLength &&
+                      nextStart >= 0 && nextStart <= fullTextLength else {
+                    print("[SpeechRecognition] WARNING: Invalid segment indices - currentEnd: \(currentEnd), nextStart: \(nextStart), textLength: \(fullTextLength)")
+                    continue
+                }
+                
                 let gapStart = fullText.index(fullText.startIndex, offsetBy: currentEnd)
                 let gapEnd = fullText.index(fullText.startIndex, offsetBy: nextStart)
                 let gapText = String(fullText[gapStart..<gapEnd])
@@ -738,16 +747,22 @@ class SpeechRecognitionService: ObservableObject {
         
         // Check if first segment starts at beginning
         if let firstSegment = sortedSegments.first, firstSegment.textRange.location > 0 {
-            let missedText = String(fullText.prefix(firstSegment.textRange.location))
-            print("[SpeechRecognition] WARNING: Text before first segment: '\(missedText)'")
+            let firstLocation = firstSegment.textRange.location
+            if firstLocation > 0 && firstLocation <= fullTextLength {
+                let missedText = String(fullText.prefix(firstLocation))
+                print("[SpeechRecognition] WARNING: Text before first segment: '\(missedText)'")
+            }
         }
         
         // Check if last segment ends at the end
         if let lastSegment = sortedSegments.last {
             let lastEnd = lastSegment.textRange.location + lastSegment.textRange.length
-            if lastEnd < fullText.count {
-                let missedText = String(fullText.suffix(fullText.count - lastEnd))
-                print("[SpeechRecognition] WARNING: Text after last segment: '\(missedText)'")
+            if lastEnd < fullTextLength && lastEnd >= 0 {
+                let missedCount = fullTextLength - lastEnd
+                if missedCount > 0 {
+                    let missedText = String(fullText.suffix(missedCount))
+                    print("[SpeechRecognition] WARNING: Text after last segment: '\(missedText)'")
+                }
             }
         }
     }
