@@ -39,6 +39,14 @@ struct EntryCreationView: View {
     @State private var selectedLanguage = LanguageSettings.shared.defaultRecordingLanguage
     @StateObject private var languageSettings = LanguageSettings.shared
     
+    // AI Enhancement tracking
+    @State private var showAIEnhancementStatus = false
+    @State private var enhancementStatuses: [AIEnhancementStatus] = []
+    @State private var isEnhancing = false
+    @State private var enhancementResult: AIEnhancementResult?
+    @StateObject private var transcriptionSettings = TranscriptionSettings.shared
+    @StateObject private var enhancementManager = AIEnhancementManager.shared
+    
     // MARK: - Body
     
     var body: some View {
@@ -50,55 +58,8 @@ struct EntryCreationView: View {
                 }
                 
                 // Tags section
-                Section(header: 
-                    HStack {
-                        Text("Tags")
-                        Spacer()
-                        Button(action: {
-                            showingTagSelection = true
-                        }) {
-                            Image(systemName: "plus.circle")
-                                .foregroundColor(.blue)
-                        }
-                        .buttonStyle(BorderlessButtonStyle())
-                    }
-                ) {
-                    if selectedTags.isEmpty {
-                        Text("No tags selected")
-                            .foregroundColor(.secondary)
-                            .italic()
-                    } else {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(Array(selectedTags), id: \.self) { tag in
-                                    if let name = tag.name, let color = tag.color {
-                                        HStack(spacing: 4) {
-                                            Circle()
-                                                .fill(Color(hex: color))
-                                                .frame(width: 8, height: 8)
-                                            
-                                            Text(name)
-                                                .font(.subheadline)
-                                            
-                                            Button(action: {
-                                                selectedTags.remove(tag)
-                                            }) {
-                                                Image(systemName: "xmark.circle.fill")
-                                                    .font(.caption)
-                                                    .foregroundColor(.secondary)
-                                            }
-                                            .buttonStyle(BorderlessButtonStyle())
-                                        }
-                                        .padding(.vertical, 4)
-                                        .padding(.horizontal, 8)
-                                        .background(Color(hex: color).opacity(0.1))
-                                        .cornerRadius(12)
-                                    }
-                                }
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
+                Section(header: tagsHeaderView) {
+                    tagsContentView
                 }
                 
                 // Language selection section
@@ -158,6 +119,11 @@ struct EntryCreationView: View {
                             }
                             .buttonStyle(BorderedButtonStyle())
                             .padding(.top, 4)
+                            
+                            // AI Enhancement Status
+                            if showAIEnhancementStatus && !enhancementStatuses.isEmpty {
+                                aiEnhancementStatusSection
+                            }
                         }
                     }
                 } header: {
@@ -222,6 +188,22 @@ struct EntryCreationView: View {
                             showingRecordingView = false
                         }
                     )
+                    .onAppear {
+                        // Reset enhancement status when recording view appears
+                        enhancementStatuses = []
+                        showAIEnhancementStatus = false
+                    }
+                    .onDisappear {
+                        // Check for enhancement statuses when recording view is dismissed
+                        if let entry = journalEntry {
+                            let entryID = entry.objectID.uriRepresentation().absoluteString
+                            if let statuses = enhancementManager.enhancementStatuses[entryID] {
+                                enhancementStatuses = statuses
+                                showAIEnhancementStatus = true
+                                isEnhancing = enhancementManager.activeEnhancements.contains(entryID)
+                            }
+                        }
+                    }
                 }
             }
             .sheet(isPresented: $isEditingTranscription) {
@@ -241,6 +223,148 @@ struct EntryCreationView: View {
             } message: {
                 Text("Are you sure you want to discard this entry? This action cannot be undone.")
             }
+        }
+        .onReceive(enhancementManager.$enhancementStatuses) { newValue in
+            if let entry = journalEntry {
+                let entryID = entry.objectID.uriRepresentation().absoluteString
+                if let statuses = newValue[entryID] {
+                    enhancementStatuses = statuses
+                    showAIEnhancementStatus = true
+                    isEnhancing = enhancementManager.activeEnhancements.contains(entryID)
+                }
+            }
+        }
+    }
+    
+    // MARK: - Subviews
+    
+    private var tagsHeaderView: some View {
+        HStack {
+            Text("Tags")
+            Spacer()
+            Button(action: {
+                showingTagSelection = true
+            }) {
+                Image(systemName: "plus.circle")
+                    .foregroundColor(.blue)
+            }
+            .buttonStyle(BorderlessButtonStyle())
+        }
+    }
+    
+    @ViewBuilder
+    private var tagsContentView: some View {
+        if selectedTags.isEmpty {
+            Text("No tags selected")
+                .foregroundColor(.secondary)
+                .italic()
+        } else {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Array(selectedTags), id: \.self) { tag in
+                        selectedTagView(tag)
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+    
+    @ViewBuilder
+    private func selectedTagView(_ tag: Tag) -> some View {
+        if let name = tag.name, let color = tag.color {
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(Color(hex: color))
+                    .frame(width: 8, height: 8)
+                
+                Text(name)
+                    .font(.subheadline)
+                
+                Button(action: {
+                    selectedTags.remove(tag)
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(BorderlessButtonStyle())
+            }
+            .padding(.vertical, 4)
+            .padding(.horizontal, 8)
+            .background(Color(hex: color).opacity(0.1))
+            .cornerRadius(12)
+        }
+    }
+    
+    private var aiEnhancementStatusSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 14))
+                    .foregroundColor(.blue)
+                Text("AI Enhancement")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+            }
+            .padding(.top, 8)
+            
+            ForEach(enhancementStatuses) { status in
+                enhancementStatusRow(status)
+            }
+            
+            // Summary message
+            if !isEnhancing, let result = enhancementResult {
+                Text("Enhancement completed in \(String(format: "%.1f", result.totalDuration))s")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .padding(.top, 2)
+            }
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(8)
+        .padding(.top, 8)
+    }
+    
+    private func enhancementStatusRow(_ status: AIEnhancementStatus) -> some View {
+        HStack {
+            // Icon showing feature status
+            statusIcon(for: status.status)
+            
+            // Feature name
+            Text(status.feature.displayName)
+                .font(.caption)
+                .foregroundColor(.primary)
+            
+            Spacer()
+            
+            // Status text
+            Text(status.status.displayName)
+                .font(.caption2)
+                .foregroundColor(status.status.color)
+        }
+    }
+    
+    @ViewBuilder
+    private func statusIcon(for status: AIEnhancementStatus.Status) -> some View {
+        switch status {
+        case .pending:
+            Image(systemName: "circle")
+                .foregroundColor(.gray)
+                .frame(width: 14, height: 14)
+        case .inProgress:
+            ProgressView()
+                .scaleEffect(0.6)
+                .frame(width: 14, height: 14)
+        case .completed:
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundColor(.green)
+                .frame(width: 14, height: 14)
+        case .failed:
+            Image(systemName: "exclamationmark.circle.fill")
+                .foregroundColor(.red)
+                .frame(width: 14, height: 14)
         }
     }
     

@@ -150,7 +150,7 @@ struct RecordingView: View {
         // Only show the RecordingSavedView sheet if not in edit mode
         .sheet(isPresented: isEditMode ? .constant(false) : viewModel.hasRecordingSavedBinding) {
             if let entry = viewModel.journalEntry {
-                RecordingSavedView(journalEntry: entry)
+                RecordingSavedView(journalEntry: entry, viewModel: viewModel)
             }
         }
         .onAppear {
@@ -414,6 +414,7 @@ struct SettingsView: View {
 /// A view that shows when a recording has been saved
 struct RecordingSavedView: View {
     let journalEntry: JournalEntry
+    @ObservedObject var viewModel: AudioRecordingViewModel
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.managedObjectContext) private var viewContext
@@ -525,9 +526,15 @@ struct RecordingSavedView: View {
                         .padding(.horizontal)
                     }
                     
+                    // AI Enhancement Status
+                    if viewModel.showAIEnhancementStatus {
+                        AIEnhancementStatusView(viewModel: viewModel)
+                    }
+                    
                     Spacer()
                     
                     Button("Done") {
+                        viewModel.resetAIEnhancementStatus()
                         dismiss()
                     }
                     .buttonStyle(.borderedProminent)
@@ -539,6 +546,7 @@ struct RecordingSavedView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
+                        viewModel.resetAIEnhancementStatus()
                         dismiss()
                     }
                 }

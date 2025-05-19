@@ -48,6 +48,23 @@ class AudioRecordingViewModel: ObservableObject {
     /// Error message to display
     @Published var errorMessage: String?
     
+    // MARK: - AI Enhancement Status
+    
+    /// Whether AI enhancement is currently in progress
+    @Published private(set) var isEnhancing = false
+    
+    /// Status of individual enhancement features
+    @Published private(set) var enhancementStatuses: [AIEnhancementStatus] = []
+    
+    /// Final enhancement result
+    @Published private(set) var enhancementResult: AIEnhancementResult?
+    
+    /// Whether to show AI enhancement status UI
+    @Published var showAIEnhancementStatus = false
+    
+    /// Enhancement manager
+    private let enhancementManager = AIEnhancementManager.shared
+    
     /// Whether to show the error alert
     @Published var showErrorAlert = false
     
@@ -739,31 +756,128 @@ class AudioRecordingViewModel: ObservableObject {
                 // Enhance transcription if enabled and AI is configured
                 if TranscriptionSettings.shared.autoEnhanceNewTranscriptions,
                    AIConfigurationManager.shared.activeConfiguration != nil {
-                    let aiService = AITranscriptionService.shared
+                    print("[AudioRecording] Auto-enhance enabled, triggering AI enhancement")
+                    
+                    // Initialize enhancement tracking
                     let enabledFeatures = TranscriptionSettings.shared.enabledFeatures
+                    enhancementStatuses = enabledFeatures.map { feature in
+                        AIEnhancementStatus(
+                            feature: feature,
+                            status: .pending
+                        )
+                    }
+                    showAIEnhancementStatus = true
+                    isEnhancing = true
+                    
+                    // Notify enhancement manager
+                    let entryID = entry.objectID.uriRepresentation().absoluteString
+                    enhancementManager.startEnhancement(for: entryID, statuses: enhancementStatuses)
                     
                     // Perform enhancement asynchronously
                     Task {
+                        let enhancementStart = Date()
+                        
                         do {
-                            let enhanced = try await aiService.enhanceTranscription(
-                                text: transcriptionText,
-                                features: enabledFeatures,
-                                context: managedObjectContext
-                            )
+                            let aiService = AITranscriptionService.shared
+                            
+                            // Update status as features are processed
+                            var processedText = transcriptionText
+                            
+                            for (index, feature) in enabledFeatures.enumerated() {
+                                // Update status to in progress
+                                await MainActor.run {
+                                    enhancementStatuses[index].status = .inProgress
+                                    enhancementStatuses[index].startTime = Date()
+                                    
+                                    // Update enhancement manager
+                                    enhancementManager.updateStatuses(for: entryID, statuses: enhancementStatuses)
+                                }
+                                
+                                // Process feature
+                                do {
+                                    switch feature {
+                                    case .punctuation:
+                                        processedText = try await aiService.processPunctuation(text: processedText)
+                                    case .capitalization:
+                                        processedText = try await aiService.processCapitalization(text: processedText)
+                                    case .paragraphs:
+                                        processedText = try await aiService.processParagraphs(text: processedText)
+                                    case .speakerDiarization:
+                                        let result = try await aiService.processSpeakerDiarization(text: processedText)
+                                        processedText = result.text
+                                    case .languageDetection:
+                                        _ = try await aiService.processLanguageDetection(text: processedText)
+                                    case .noiseReduction:
+                                        // Not implemented
+                                        break
+                                    }
+                                    
+                                    // Update status to completed
+                                    await MainActor.run {
+                                        enhancementStatuses[index].status = .completed
+                                        enhancementStatuses[index].endTime = Date()
+                                        
+                                        // Update enhancement manager
+                                        enhancementManager.updateStatuses(for: entryID, statuses: enhancementStatuses)
+                                    }
+                                } catch {
+                                    // Update status to failed
+                                    await MainActor.run {
+                                        enhancementStatuses[index].status = .failed
+                                        enhancementStatuses[index].endTime = Date()
+                                        enhancementStatuses[index].errorMessage = error.localizedDescription
+                                        
+                                        // Update enhancement manager
+                                        enhancementManager.updateStatuses(for: entryID, statuses: enhancementStatuses)
+                                    }
+                                }
+                            }
                             
                             // Update the transcription with enhanced text
                             await MainActor.run {
-                                transcription.text = enhanced.enhancedText
+                                transcription.text = processedText
                                 transcription.modifiedAt = Date()
+                                
+                                // Create enhancement result
+                                let totalDuration = Date().timeIntervalSince(enhancementStart)
+                                enhancementResult = AIEnhancementResult(
+                                    features: enhancementStatuses,
+                                    originalText: transcriptionText,
+                                    enhancedText: processedText,
+                                    totalDuration: totalDuration
+                                )
+                                
+                                isEnhancing = false
+                                
+                                // Notify enhancement manager
+                                enhancementManager.completeEnhancement(for: entryID, result: enhancementResult!)
+                                
                                 do {
                                     try managedObjectContext.save()
                                 } catch {
                                     print("Failed to save enhanced transcription: \(error)")
                                 }
+                                
+                                // Keep the status visible for the RecordingSavedView
+                                // We'll only hide it when the user dismisses the save view
                             }
                         } catch {
-                            // Enhancement failed, continue with original text
-                            print("Transcription enhancement failed: \(error.localizedDescription)")
+                            // Enhancement failed
+                            await MainActor.run {
+                                isEnhancing = false
+                                print("Transcription enhancement failed: \(error.localizedDescription)")
+                                
+                                // Mark all pending features as failed
+                                for index in enhancementStatuses.indices {
+                                    if enhancementStatuses[index].status == .pending {
+                                        enhancementStatuses[index].status = .failed
+                                        enhancementStatuses[index].errorMessage = error.localizedDescription
+                                    }
+                                }
+                                
+                                // Update enhancement manager with final status
+                                enhancementManager.updateStatuses(for: entryID, statuses: enhancementStatuses)
+                            }
                         }
                     }
                 }
@@ -942,6 +1056,13 @@ extension AudioRecordingViewModel {
     /// Get audio level for visualization (0.0 to 1.0)
     var visualizationLevel: CGFloat {
         return CGFloat(audioLevel)
+    }
+    
+    /// Reset AI enhancement status when the saved view is dismissed
+    func resetAIEnhancementStatus() {
+        showAIEnhancementStatus = false
+        enhancementStatuses = []
+        enhancementResult = nil
     }
     
     /// Get recording duration in seconds
