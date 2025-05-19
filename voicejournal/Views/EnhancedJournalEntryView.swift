@@ -337,6 +337,16 @@ struct EnhancedJournalEntryView: View {
                                 .fill(themeManager.theme.surface)
                         )
                 }
+            } else if showEnhancedTranscription && journalEntry.transcription?.encryptedEnhancedText != nil {
+                // Enhanced text is encrypted but not decrypted yet
+                Text("Enhanced transcription is encrypted. Please decrypt to view.")
+                    .font(.body)
+                    .foregroundColor(themeManager.theme.textSecondary)
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(themeManager.theme.surface)
+                    )
             } else {
                 // Show regular transcription with playback highlighting
                 if playbackViewModel.isPlaybackInProgress {

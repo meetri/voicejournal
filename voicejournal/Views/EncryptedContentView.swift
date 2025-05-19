@@ -217,12 +217,26 @@ struct EncryptedContentView: View {
     
     /// Decrypt the content with the provided PIN
     private func decryptContent(with pin: String) {
+        print("🔑 [EncryptedContentView] Attempting decryption with PIN")
+        
         if journalEntry.decryptContent(withPin: pin) {
+            print("✅ [EncryptedContentView] Decryption successful")
+            
+            // Check what's available after decryption
+            if let transcription = journalEntry.transcription {
+                print("📊 [EncryptedContentView] Post-decryption transcription state:")
+                print("  - Raw text: \(transcription.rawText?.count ?? 0) characters")
+                print("  - Enhanced text: \(transcription.enhancedText?.count ?? 0) characters")
+                print("  - AI analysis: \(transcription.aiAnalysis?.count ?? 0) characters")
+            }
+            
             withAnimation {
                 isContentDecrypted = true
             }
             // Success - dialog will close automatically
         } else {
+            print("❌ [EncryptedContentView] Decryption failed")
+            
             // PIN verification failed
             // We need to show the alert after the dialog dismisses itself
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
