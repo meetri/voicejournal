@@ -161,11 +161,26 @@ struct JournalEntryRow: View {
                     }
                 } else if let text = transcription.text, !text.isEmpty {
                     // Show actual transcription text
-                    Text(text)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .lineLimit(3)
-                        .padding(.top, 2)
+                    VStack(alignment: .leading, spacing: 4) {
+                        // Show enhanced indicator if enhanced transcription is available
+                        if transcription.enhancedText != nil {
+                            HStack(spacing: 4) {
+                                Image(systemName: "sparkles")
+                                    .font(.caption)
+                                    .foregroundColor(.blue)
+                                Text("AI Enhanced")
+                                    .font(.caption)
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                        
+                        // Show raw transcription by default
+                        Text(text)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .lineLimit(3)
+                    }
+                    .padding(.top, 2)
                 }
             }
         }

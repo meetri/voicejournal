@@ -93,7 +93,10 @@ extension JournalEntry {
     /// Create a new transcription for this journal entry
     func createTranscription(text: String) -> Transcription {
         let transcription = Transcription(context: managedObjectContext!)
+        // Set raw text as the initial text and also save it separately
         transcription.text = text
+        transcription.rawText = text
+        transcription.enhancedText = nil // No enhanced text initially
         transcription.createdAt = Date()
         transcription.modifiedAt = Date()
         transcription.journalEntry = self

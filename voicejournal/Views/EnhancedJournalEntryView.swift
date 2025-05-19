@@ -30,6 +30,7 @@ struct EnhancedJournalEntryView: View {
     @State private var showingShareSheet = false
     @State private var showingOptions = false
     @State private var scrollOffset: CGFloat = 0
+    @State private var showEnhancedTranscription = false
     
     // MARK: - Initialization
     
@@ -241,12 +242,41 @@ struct EnhancedJournalEntryView: View {
                     .font(.headline)
                 
                 Spacer()
+                
+                // Toggle for AI-enhanced transcription if available
+                if let transcription = journalEntry.transcription,
+                   transcription.rawText != nil,
+                   transcription.enhancedText != nil {
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showEnhancedTranscription.toggle()
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: showEnhancedTranscription ? "sparkles" : "text.alignleft")
+                                .font(.system(size: 14))
+                            Text(showEnhancedTranscription ? "Enhanced" : "Raw")
+                                .font(.caption)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(showEnhancedTranscription ? Color.blue.opacity(0.15) : Color.gray.opacity(0.15))
+                        )
+                        .foregroundColor(showEnhancedTranscription ? .blue : .gray)
+                    }
+                }
             }
             
-            // Transcription text
+            // Transcription text - use enhanced or raw based on toggle
+            let displayText = showEnhancedTranscription && journalEntry.transcription?.enhancedText != nil
+                ? (journalEntry.transcription?.enhancedText ?? text)
+                : text
+            
             if playbackViewModel.isPlaybackInProgress {
                 AttributedHighlightableText(
-                    text: text,
+                    text: displayText,
                     highlightRange: playbackViewModel.currentHighlightRange,
                     highlightColor: .yellow.opacity(0.4),
                     textColor: .primary,
@@ -258,7 +288,7 @@ struct EnhancedJournalEntryView: View {
                         .fill(themeManager.theme.surface)
                 )
             } else {
-                Text(text)
+                Text(displayText)
                     .font(.body)
                     .padding()
                     .background(

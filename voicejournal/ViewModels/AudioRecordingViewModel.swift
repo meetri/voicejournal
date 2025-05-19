@@ -835,7 +835,10 @@ class AudioRecordingViewModel: ObservableObject {
                             
                             // Update the transcription with enhanced text
                             await MainActor.run {
-                                transcription.text = processedText
+                                // Save enhanced text separately while keeping raw text as default
+                                transcription.enhancedText = processedText
+                                // Keep the raw text as the default display text
+                                // transcription.text remains unchanged (showing raw text)
                                 transcription.modifiedAt = Date()
                                 
                                 // Create enhancement result
