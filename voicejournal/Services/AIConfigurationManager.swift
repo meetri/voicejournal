@@ -93,6 +93,18 @@ class AIConfigurationManager: ObservableObject {
         loadConfigurations()
     }
     
+    func deactivateConfiguration(_ configuration: AIConfiguration) {
+        configuration.isActive = false
+        save()
+        loadConfigurations()
+    }
+    
+    func refreshTokenUsage(for configuration: AIConfiguration) {
+        // This method could be used to trigger an update to the UI
+        // The actual token usage is updated automatically when API calls are made
+        objectWillChange.send()
+    }
+    
     // MARK: - Preset Configurations
     
     func createPresetConfiguration(for vendor: AIConfiguration.AIVendor) -> AIConfiguration? {

@@ -24,8 +24,8 @@ struct AIConfigurationView: View {
         NavigationView {
             List {
                 // Active Configuration Section
-                if let activeConfig = aiManager.activeConfiguration {
-                    Section {
+                Section {
+                    if let activeConfig = aiManager.activeConfiguration {
                         ConfigurationRow(
                             configuration: activeConfig,
                             isActive: true,
@@ -38,12 +38,24 @@ struct AIConfigurationView: View {
                                 showingDeleteAlert = true
                             }
                         )
-                    } header: {
-                        Text("Active Configuration")
-                            .textCase(nil)
-                            .font(.headline)
-                            .foregroundColor(themeManager.theme.text)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    } else {
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle")
+                                .foregroundColor(.orange)
+                            Text("No active configuration")
+                                .foregroundColor(themeManager.theme.textSecondary)
+                            Spacer()
+                        }
+                        .padding(.vertical, 8)
+                        .listRowBackground(Color.clear)
                     }
+                } header: {
+                    Text("Active Configuration")
+                        .textCase(nil)
+                        .font(.headline)
+                        .foregroundColor(themeManager.theme.text)
                 }
                 
                 // Other Configurations Section
@@ -65,6 +77,8 @@ struct AIConfigurationView: View {
                                     showingDeleteAlert = true
                                 }
                             )
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                         }
                     } header: {
                         Text("Available Configurations")
@@ -131,66 +145,105 @@ struct ConfigurationRow: View {
     
     @Environment(\.themeManager) var themeManager
     
+    @State private var isRefreshing = false
+    
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(configuration.name ?? "Unknown")
-                        .font(.headline)
-                        .foregroundColor(themeManager.theme.text)
+        HStack(spacing: 12) {
+            // Main content
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(configuration.name ?? "Unknown")
+                            .font(.headline)
+                            .foregroundColor(themeManager.theme.text)
+                        
+                        Text(configuration.aiVendor?.displayName ?? "Unknown")
+                            .font(.caption)
+                            .foregroundColor(themeManager.theme.textSecondary)
+                    }
                     
-                    Text(configuration.aiVendor?.displayName ?? "Unknown")
-                        .font(.caption)
-                        .foregroundColor(themeManager.theme.textSecondary)
+                    Spacer()
+                    
+                    if isActive {
+                        Text("Active")
+                            .font(.caption)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(themeManager.theme.accent.opacity(0.2))
+                            .foregroundColor(themeManager.theme.accent)
+                            .cornerRadius(12)
+                    }
                 }
                 
-                Spacer()
-                
-                if isActive {
-                    Text("Active")
-                        .font(.caption)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(themeManager.theme.accent.opacity(0.2))
-                        .foregroundColor(themeManager.theme.accent)
-                        .cornerRadius(12)
+                // Token Usage Metrics
+                HStack {
+                    TokenMetricsView(configuration: configuration)
+                        .font(.caption2)
+                        .foregroundColor(themeManager.theme.textSecondary)
+                    
+                    Spacer()
+                    
+                    // Refresh button
+                    Button {
+                        refreshTokenUsage()
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 12))
+                            .foregroundColor(themeManager.theme.accent)
+                            .rotationEffect(.degrees(isRefreshing ? 360 : 0))
+                            .animation(isRefreshing ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isRefreshing)
+                    }
+                    .buttonStyle(BorderlessButtonStyle())
                 }
             }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                onEdit(configuration)
+            }
             
-            // Token Usage Metrics
-            TokenMetricsView(configuration: configuration)
-                .font(.caption2)
-                .foregroundColor(themeManager.theme.textSecondary)
-            
-            HStack(spacing: 16) {
-                Button {
-                    onEdit(configuration)
-                } label: {
-                    Label("Edit", systemImage: "pencil")
-                        .font(.caption)
-                        .foregroundColor(themeManager.theme.accent)
-                }
-                
-                if !isActive {
+            // Action buttons
+            VStack(spacing: 8) {
+                if isActive {
+                    Button {
+                        AIConfigurationManager.shared.deactivateConfiguration(configuration)
+                    } label: {
+                        Image(systemName: "stop.circle")
+                            .foregroundColor(.orange)
+                            .frame(width: 30, height: 30)
+                    }
+                    .buttonStyle(BorderlessButtonStyle())
+                } else {
                     Button {
                         onSetActive(configuration)
                     } label: {
-                        Label("Activate", systemImage: "checkmark.circle")
-                            .font(.caption)
+                        Image(systemName: "checkmark.circle")
                             .foregroundColor(.green)
+                            .frame(width: 30, height: 30)
                     }
+                    .buttonStyle(BorderlessButtonStyle())
                 }
                 
                 Button {
                     onDelete(configuration)
                 } label: {
-                    Label("Delete", systemImage: "trash")
-                        .font(.caption)
+                    Image(systemName: "trash")
                         .foregroundColor(.red)
+                        .frame(width: 30, height: 30)
                 }
+                .buttonStyle(BorderlessButtonStyle())
             }
         }
         .padding(.vertical, 4)
+    }
+    
+    private func refreshTokenUsage() {
+        isRefreshing = true
+        AIConfigurationManager.shared.refreshTokenUsage(for: configuration)
+        
+        // Stop the animation after a short delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            isRefreshing = false
+        }
     }
 }
 
