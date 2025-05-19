@@ -294,9 +294,13 @@ extension JournalEntry {
                     
                     // Update file path to point to encrypted file using relative path
                     let relativePath = "EncryptedFiles/\(encryptedFileName)"
+                    let previousPath = audioRecording.filePath
                     audioRecording.filePath = relativePath
                     audioRecording.isEncrypted = true
-                    print("✅ [JournalEntry] Audio encryption completed successfully, relative path: \(relativePath)")
+                    print("✅ [JournalEntry] Audio encryption completed successfully")
+                    print("  - Previous path: \(previousPath ?? "nil")")
+                    print("  - New path: \(relativePath)")
+                    print("  - Original path stored: \(audioRecording.originalFilePath ?? "nil")")
                 } else {
                     encryptionSuccess = false
                     print("❌ [JournalEntry] Failed to encrypt audio data")

@@ -20,12 +20,17 @@ extension AudioRecording {
             return AudioRecording.decryptedPaths[filePath]
         }
         set {
-            guard let filePath = self.filePath else { return }
+            guard let filePath = self.filePath else { 
+                print("⚠️ [AudioRecording] Cannot set tempDecryptedPath - filePath is nil")
+                return 
+            }
             if let newValue = newValue {
+                print("🔐 [AudioRecording] Setting tempDecryptedPath for '\(filePath)' to '\(newValue)'")
                 AudioRecording.decryptedPaths[filePath] = newValue
                 // Exclude temporary decrypted file from iCloud backup
                 excludeFromBackup(at: newValue)
             } else {
+                print("🔐 [AudioRecording] Clearing tempDecryptedPath for '\(filePath)'")
                 AudioRecording.decryptedPaths.removeValue(forKey: filePath)
             }
         }

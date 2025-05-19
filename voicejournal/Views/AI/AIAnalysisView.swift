@@ -188,8 +188,22 @@ struct AIAnalysisView: View {
                             try viewContext.save()
                             print("Successfully saved AI analysis to transcription")
                             
-                            // Force refresh the journal entry
+                            // Force refresh the journal entry and related objects
                             viewContext.refresh(journalEntry, mergeChanges: true)
+                            if let transcription = journalEntry.transcription {
+                                viewContext.refresh(transcription, mergeChanges: true)
+                            }
+                            if let audioRecording = journalEntry.audioRecording {
+                                viewContext.refresh(audioRecording, mergeChanges: true)
+                            }
+                            
+                            // Notify any observers about the change
+                            NotificationCenter.default.post(
+                                name: Notification.Name("AIAnalysisCompleted"),
+                                object: journalEntry
+                            )
+                            
+                            print("✅ [AIAnalysisView] Core Data refresh completed")
                         } catch {
                             print("Failed to auto-save AI analysis: \(error)")
                         }
@@ -241,6 +255,23 @@ struct AIAnalysisView: View {
             
             do {
                 try viewContext.save()
+                
+                // Force refresh the journal entry and related objects
+                viewContext.refresh(journalEntry, mergeChanges: true)
+                if let transcription = journalEntry.transcription {
+                    viewContext.refresh(transcription, mergeChanges: true)
+                }
+                if let audioRecording = journalEntry.audioRecording {
+                    viewContext.refresh(audioRecording, mergeChanges: true)
+                }
+                
+                // Notify any observers about the change
+                NotificationCenter.default.post(
+                    name: Notification.Name("AIAnalysisCompleted"),
+                    object: journalEntry
+                )
+                
+                print("✅ [AIAnalysisView] Manual save and Core Data refresh completed")
             } catch {
                 print("Failed to save AI analysis: \(error)")
             }

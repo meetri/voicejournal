@@ -73,6 +73,9 @@ class AudioPlaybackViewModel: ObservableObject {
     /// Current transcription being displayed
     private(set) var currentTranscription: Transcription?
     
+    /// Current journal entry being played
+    private(set) var currentJournalEntry: JournalEntry?
+    
     /// Timing data for transcription text highlighting
     private var transcriptionTimingData: [TranscriptionSegment] = []
     
@@ -98,6 +101,7 @@ class AudioPlaybackViewModel: ObservableObject {
     // MARK: - Private Properties
     
     private let playbackService: AudioPlaybackService
+    private let playbackManager = AudioPlaybackManager.shared
     private let spectrumAnalyzerService: SpectrumAnalyzerService
     private let audioFileAnalyzer = AudioFileAnalyzer()
     private var cancellables = Set<AnyCancellable>()
@@ -119,54 +123,31 @@ class AudioPlaybackViewModel: ObservableObject {
     
     /// Load an audio file for playback
     func loadAudio(from url: URL) async {
-        do {
-            try await playbackService.loadAudio(from: url)
-            audioFileURL = url
-            isAudioLoaded = true
-        } catch {
-            handleError(error)
-            isAudioLoaded = false
-        }
+        // This method is no longer needed with the new AudioPlaybackManager
+        // The manager handles loading internally
+        print("⚠️ [AudioPlaybackViewModel] Direct URL loading is deprecated. Use loadAudio(from: AudioRecording) instead.")
     }
     
     /// Load an audio file from an AudioRecording entity
     func loadAudio(from recording: AudioRecording) async {
         print("🎵 [AudioPlaybackViewModel] loadAudio from recording")
-        print("  - Is encrypted: \(recording.isEncrypted)")
-        print("  - Original file path: \(recording.filePath ?? "nil")")
-        print("  - Temp decrypted path: \(recording.tempDecryptedPath ?? "nil")")
         
-        // Use effectiveFilePath which will return decrypted path if available
-        guard let filePath = recording.effectiveFilePath else {
-            print("❌ [AudioPlaybackViewModel] No effective file path available")
+        // Get the journal entry
+        guard let journalEntry = recording.journalEntry else {
+            print("❌ [AudioPlaybackViewModel] No journal entry associated with recording")
             handleError(AudioPlaybackError.fileNotFound)
             return
         }
         
-        print("  - Using effective path: \(filePath)")
-        
-        // Convert relative path to absolute path
-        let url = FilePathUtility.toAbsolutePath(from: filePath)
-        print("  - Absolute URL: \(url.path)")
-        
-        // Check if file exists before attempting to load
-        let fileExists = FileManager.default.fileExists(atPath: url.path)
-        print("  - File exists: \(fileExists)")
-        
-        if !fileExists {
-            print("❌ [AudioPlaybackViewModel] File not found at path: \(url.path)")
-            handleError(AudioPlaybackError.fileNotFound)
-            return
-        }
-        
-        // Store the current recording
+        // Store the current recording and entry
         currentRecording = recording
+        currentJournalEntry = journalEntry
         
         // Load bookmarks
         loadBookmarks(for: recording)
         
         // Load transcription timing data if available
-        if let transcription = recording.journalEntry?.transcription {
+        if let transcription = journalEntry.transcription {
             currentTranscription = transcription
             loadTranscriptionTimingData(from: transcription)
         } else {
@@ -174,78 +155,48 @@ class AudioPlaybackViewModel: ObservableObject {
             transcriptionTimingData = []
         }
         
-        await loadAudio(from: url)
+        // Use the AudioPlaybackManager to load and prepare audio
+        playbackManager.loadAudio(for: journalEntry)
+        
+        // Subscribe to playback manager updates
+        setupPlaybackManagerBindings()
+        
+        // Update state based on manager state
+        isAudioLoaded = playbackManager.duration > 0
+        
+        // Handle any loading errors
+        if let error = playbackManager.playbackError {
+            handleError(error)
+        }
     }
     
     /// Start or resume playback
     func play() {
-        do {
-            try playbackService.play()
-            
-            // Start spectrum analysis using AudioFileAnalyzer for playback
-            if let fileURL = audioFileURL {
-                do {
-                    // Load the audio file for spectrum analysis
-                    try audioFileAnalyzer.loadFile(url: fileURL)
-                    
-                    // Set up spectrum delegate to update frequency data
-                    audioFileAnalyzer.delegate = self
-                    
-                    // Start analysis synchronized with playback time
-                    audioFileAnalyzer.startAnalysis(playbackTimeProvider: { [weak self] in
-                        self?.currentTime ?? 0
-                    })
-                } catch {
-                    // Error loading audio file for spectrum analysis
-                }
-            }
-            isPlaying = true
-            isPaused = false
-            
-            // Start highlight update timer if we have timing data
-            if !transcriptionTimingData.isEmpty {
-                startHighlightUpdateTimer()
-            }
-        } catch {
-            handleError(error)
+        playbackManager.play()
+        
+        // Start highlight update timer if we have timing data
+        if !transcriptionTimingData.isEmpty {
+            startHighlightUpdateTimer()
         }
     }
     
     /// Pause playback
     func pause() {
-        do {
-            try playbackService.pause()
-            isPlaying = false
-            isPaused = true
-            
-            // Stop spectrum analysis
-            audioFileAnalyzer.stopAnalysis()
-            
-            // Stop highlight update timer
-            stopHighlightUpdateTimer()
-        } catch {
-            handleError(error)
-        }
+        playbackManager.pause()
+        
+        // Stop highlight update timer
+        stopHighlightUpdateTimer()
     }
     
     /// Stop playback
     func stop() {
-        do {
-            try playbackService.stop()
-            isPlaying = false
-            isPaused = false
-            
-            // Stop spectrum analysis
-            audioFileAnalyzer.stopAnalysis()
-            
-            // Stop highlight update timer
-            stopHighlightUpdateTimer()
-            
-            // Clear highlight
-            currentHighlightRange = nil
-        } catch {
-            handleError(error)
-        }
+        playbackManager.stop()
+        
+        // Stop highlight update timer
+        stopHighlightUpdateTimer()
+        
+        // Clear highlight
+        currentHighlightRange = nil
     }
     
     /// Toggle between play and pause
@@ -259,14 +210,10 @@ class AudioPlaybackViewModel: ObservableObject {
     
     /// Seek to a specific position in the audio file
     func seek(to time: TimeInterval) {
-        do {
-            try playbackService.seek(to: time)
-            
-            // Update highlight immediately
-            updateHighlightedTextRange()
-        } catch {
-            handleError(error)
-        }
+        playbackManager.seek(to: time)
+        
+        // Update highlight immediately
+        updateHighlightedTextRange()
     }
     
     /// Seek to a specific progress position (0.0 to 1.0)
@@ -277,11 +224,9 @@ class AudioPlaybackViewModel: ObservableObject {
     
     /// Set the playback rate
     func setRate(_ newRate: Float) {
-        do {
-            try playbackService.setRate(newRate)
-        } catch {
-            handleError(error)
-        }
+        // The AudioPlaybackManager doesn't support rate control yet
+        // For now, we'll just update our local state
+        self.rate = newRate
     }
     
     /// Skip forward by a specified number of seconds
@@ -298,7 +243,7 @@ class AudioPlaybackViewModel: ObservableObject {
     
     /// Reset the view model state
     func reset() {
-        playbackService.reset()
+        playbackManager.stop()
         
         isPlaying = false
         isPaused = false
@@ -317,6 +262,7 @@ class AudioPlaybackViewModel: ObservableObject {
         bookmarks = []
         selectedBookmark = nil
         currentRecording = nil
+        currentJournalEntry = nil
         currentTranscription = nil
         transcriptionTimingData = []
         currentHighlightRange = nil
@@ -458,6 +404,55 @@ class AudioPlaybackViewModel: ObservableObject {
     }
     
     // MARK: - Private Methods
+    
+    private func setupPlaybackManagerBindings() {
+        // Subscribe to playback manager state changes
+        playbackManager.$isPlaying
+            .receive(on: RunLoop.main)
+            .sink { [weak self] isPlaying in
+                self?.isPlaying = isPlaying
+                self?.isPaused = !isPlaying && self?.playbackManager.currentTime ?? 0 > 0
+            }
+            .store(in: &cancellables)
+        
+        // Subscribe to current time changes
+        playbackManager.$currentTime
+            .receive(on: RunLoop.main)
+            .sink { [weak self] time in
+                guard let self = self else { return }
+                self.currentTime = time
+                self.formattedCurrentTime = self.formatTimeInterval(time)
+                
+                // Update progress
+                if self.duration > 0 {
+                    self.progress = time / self.duration
+                }
+                
+                // Update highlighted text range
+                self.updateHighlightedTextRange()
+            }
+            .store(in: &cancellables)
+        
+        // Subscribe to duration changes
+        playbackManager.$duration
+            .receive(on: RunLoop.main)
+            .sink { [weak self] duration in
+                guard let self = self else { return }
+                self.duration = duration
+                self.formattedDuration = self.formatTimeInterval(duration)
+            }
+            .store(in: &cancellables)
+        
+        // Subscribe to error changes
+        playbackManager.$playbackError
+            .receive(on: RunLoop.main)
+            .sink { [weak self] error in
+                if let error = error {
+                    self?.handleError(error)
+                }
+            }
+            .store(in: &cancellables)
+    }
     
     private func setupPublishers() {
         // Subscribe to playback state changes

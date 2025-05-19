@@ -32,6 +32,7 @@ struct EnhancedJournalEntryView: View {
     @State private var scrollOffset: CGFloat = 0
     @State private var showEnhancedTranscription = false
     @State private var showAIAnalysis = false
+    @State private var refreshID = UUID()
     
     // MARK: - Initialization
     
@@ -99,6 +100,7 @@ struct EnhancedJournalEntryView: View {
                 .padding(.bottom, 24)
             }
         }
+        .id(refreshID)
         .background(Color(.systemGroupedBackground))
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarItems(
@@ -170,6 +172,27 @@ struct EnhancedJournalEntryView: View {
         }
         .onDisappear {
             playbackViewModel.stop()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AIAnalysisCompleted"))) { notification in
+            // Check if the notification is for our journal entry
+            if let notificationEntry = notification.object as? JournalEntry,
+               notificationEntry.objectID == journalEntry.objectID {
+                print("🔄 [EnhancedJournalEntryView] Received AI analysis completion notification")
+                
+                // Refresh Core Data object
+                viewContext.refresh(journalEntry, mergeChanges: true)
+                
+                // Force UI refresh
+                refreshID = UUID()
+                
+                // Update our state if AI analysis is now available
+                if let transcription = journalEntry.transcription,
+                   transcription.aiAnalysis != nil {
+                    showAIAnalysis = true
+                    showEnhancedTranscription = false
+                    print("✅ [EnhancedJournalEntryView] AI analysis is now available, switching to analysis view")
+                }
+            }
         }
     }
     
