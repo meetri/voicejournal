@@ -19,7 +19,7 @@ struct EnhancedJournalEntryView: View {
     
     // MARK: - Properties
     
-    let journalEntry: JournalEntry
+    @ObservedObject var journalEntry: JournalEntry
     
     // MARK: - State
     

@@ -9,7 +9,7 @@ import SwiftUI
 import CoreData
 
 struct AIAnalysisView: View {
-    let journalEntry: JournalEntry
+    @ObservedObject var journalEntry: JournalEntry
     let audioURL: URL
     @Binding var isPresented: Bool
     
@@ -145,6 +145,29 @@ struct AIAnalysisView: View {
                 await MainActor.run {
                     self.analysisResult = result
                     self.isAnalyzing = false
+                    
+                    // Automatically save the analysis
+                    var transcription = journalEntry.transcription
+                    
+                    // Create transcription if it doesn't exist
+                    if transcription == nil {
+                        transcription = journalEntry.createTranscription(text: "")
+                    }
+                    
+                    if let transcription = transcription {
+                        transcription.aiAnalysis = result
+                        transcription.modifiedAt = Date()
+                        
+                        do {
+                            try viewContext.save()
+                            print("Successfully saved AI analysis to transcription")
+                            
+                            // Force refresh the journal entry
+                            viewContext.refresh(journalEntry, mergeChanges: true)
+                        } catch {
+                            print("Failed to auto-save AI analysis: \(error)")
+                        }
+                    }
                 }
             } catch {
                 await MainActor.run {
