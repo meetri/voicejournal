@@ -791,6 +791,36 @@ class AudioRecordingViewModel: ObservableObject {
                                 print("  - Enhanced text: \(transcription.enhancedText?.count ?? 0) characters")
                                 print("  - Main text: \(transcription.text?.count ?? 0) characters")
                                 
+                                // Check if entry needs encryption after enhancement
+                                if entry.hasEncryptedContent {
+                                    print("🔐 [AudioRecordingViewModel] Entry has encrypted tag, checking encryption status")
+                                    
+                                    // Check if tag is globally accessible (has decryption key available)
+                                    if let encryptedTag = entry.encryptedTag {
+                                        print("🔐 [AudioRecordingViewModel] Encrypted tag: \(encryptedTag.name ?? "Unknown")")
+                                        
+                                        if let key = EncryptedTagsAccessManager.shared.getEncryptionKey(for: encryptedTag) {
+                                            print("🔐 [AudioRecordingViewModel] Encryption key available, re-encrypting enhanced content")
+                                            
+                                            // Encrypt the enhanced text with the tag's key
+                                            if let encryptedData = EncryptionManager.encrypt(processedText, using: key) {
+                                                transcription.encryptedEnhancedText = encryptedData
+                                                transcription.enhancedText = nil
+                                                print("✅ [AudioRecordingViewModel] Enhanced text encrypted successfully")
+                                            } else {
+                                                print("❌ [AudioRecordingViewModel] Failed to encrypt enhanced text")
+                                            }
+                                        } else {
+                                            print("⚠️ [AudioRecordingViewModel] No encryption key available for tag '\(encryptedTag.name ?? "Unknown")' - content will remain unencrypted until tag is unlocked")
+                                            print("  - Tag has global access: \(encryptedTag.hasGlobalAccess)")
+                                        }
+                                    }
+                                } else if entry.isBaseEncrypted {
+                                    // Apply base encryption
+                                    print("🔐 [AudioRecordingViewModel] Applying base encryption to enhanced content")
+                                    _ = entry.applyBaseEncryption()
+                                }
+                                
                                 // Create enhancement result
                                 let totalDuration = Date().timeIntervalSince(enhancementStart)
                                 enhancementResult = AIEnhancementResult(
@@ -873,6 +903,15 @@ class AudioRecordingViewModel: ObservableObject {
                 try managedObjectContext.save()
                 journalEntry = entry
                 hasRecordingSaved = true
+                
+                // Log entry encryption status for debugging
+                print("📝 [AudioRecordingViewModel] Entry saved:")
+                print("  - Has encrypted tag: \(entry.hasEncryptedContent)")
+                print("  - Is base encrypted: \(entry.isBaseEncrypted)")
+                if let encryptedTag = entry.encryptedTag {
+                    print("  - Encrypted tag: \(encryptedTag.name ?? "Unknown")")
+                    print("  - Tag has global access: \(encryptedTag.hasGlobalAccess)")
+                }
             } catch {
                 // Failed to save managed object context
                 throw error

@@ -433,6 +433,11 @@ struct EntryCreationView: View {
                     print("  - AI analysis: \(transcription.aiAnalysis?.count ?? 0) characters")
                 }
                 
+                // First grant temporary access to the tag so the key is available for background operations
+                if EncryptedTagsAccessManager.shared.grantAccess(to: tag, with: pin) {
+                    print("🔑 [EntryCreationView] Granted temporary access to encrypted tag")
+                }
+                
                 // Apply tag with PIN to encrypt content
                 if entry.applyEncryptedTagWithPin(tag, pin: pin) {
                     print("✅ [EntryCreationView] Encrypted tag applied successfully")

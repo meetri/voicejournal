@@ -729,6 +729,99 @@ extension JournalEntry {
         
         return decryptionSuccess
     }
+    
+    // MARK: - Encryption Helpers
+    
+    /// Ensure all content is properly encrypted based on the current encryption state
+    func ensureContentEncryption() {
+        if hasEncryptedContent {
+            // If we have an encrypted tag, ensure all content is encrypted with that tag's key
+            if let encryptedTag = self.encryptedTag,
+               let key = EncryptedTagsAccessManager.shared.getEncryptionKey(for: encryptedTag) {
+                print("🔐 [JournalEntry] Ensuring tag encryption for all content")
+                
+                // Check transcription
+                if let transcription = self.transcription {
+                    transcription.ensureEncryption()
+                }
+                
+                // Re-encrypt any unencrypted content
+                var needsEncryption = false
+                
+                // Check if transcription has unencrypted content
+                if let transcription = self.transcription {
+                    if transcription.enhancedText != nil ||
+                       transcription.aiAnalysis != nil ||
+                       transcription.text != nil ||
+                       transcription.rawText != nil {
+                        needsEncryption = true
+                    }
+                }
+                
+                if needsEncryption {
+                    print("🔐 [JournalEntry] Found unencrypted content, re-encrypting")
+                    _ = encryptContentWithKey(key)
+                }
+            }
+        } else if isBaseEncrypted {
+            // Ensure base encryption is applied
+            print("🔐 [JournalEntry] Ensuring base encryption for all content")
+            _ = applyBaseEncryption()
+        }
+    }
+    
+    /// Encrypt content with a specific key (used for automatic encryption)
+    private func encryptContentWithKey(_ key: SymmetricKey) -> Bool {
+        var encryptionSuccess = true
+        
+        // Use the existing encryption logic but with the provided key
+        if let transcription = self.transcription {
+            // Encrypt enhanced text
+            if let enhancedText = transcription.enhancedText {
+                if let encryptedData = EncryptionManager.encrypt(enhancedText, using: key) {
+                    transcription.encryptedEnhancedText = encryptedData
+                    transcription.enhancedText = nil
+                } else {
+                    encryptionSuccess = false
+                }
+            }
+            
+            // Encrypt AI analysis
+            if let aiAnalysis = transcription.aiAnalysis {
+                if let encryptedData = EncryptionManager.encrypt(aiAnalysis, using: key) {
+                    transcription.encryptedAIAnalysis = encryptedData
+                    transcription.aiAnalysis = nil
+                } else {
+                    encryptionSuccess = false
+                }
+            }
+            
+            // Encrypt main text
+            if let text = transcription.text {
+                if let encryptedData = EncryptionManager.encrypt(text, using: key) {
+                    transcription.encryptedText = encryptedData
+                    transcription.text = nil
+                } else {
+                    encryptionSuccess = false
+                }
+            }
+            
+            // Encrypt raw text
+            if let rawText = transcription.rawText {
+                if let encryptedData = EncryptionManager.encrypt(rawText, using: key) {
+                    transcription.encryptedRawText = encryptedData
+                    transcription.rawText = nil
+                } else {
+                    encryptionSuccess = false
+                }
+            }
+            
+            transcription.modifiedAt = Date()
+        }
+        
+        self.modifiedAt = Date()
+        return encryptionSuccess
+    }
 }
 
 // MARK: - Additional Property Extensions

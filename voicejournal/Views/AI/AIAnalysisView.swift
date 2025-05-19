@@ -158,6 +158,32 @@ struct AIAnalysisView: View {
                         transcription.aiAnalysis = result
                         transcription.modifiedAt = Date()
                         
+                        // Check if entry needs encryption after AI analysis
+                        if journalEntry.hasEncryptedContent {
+                            print("🔐 [AIAnalysisView] Entry has encrypted tag, checking encryption status")
+                            
+                            // Check if tag is globally accessible (has decryption key available)
+                            if let encryptedTag = journalEntry.encryptedTag,
+                               let key = EncryptedTagsAccessManager.shared.getEncryptionKey(for: encryptedTag) {
+                                print("🔐 [AIAnalysisView] Encryption key available, encrypting AI analysis")
+                                
+                                // Encrypt the AI analysis with the tag's key
+                                if let encryptedData = EncryptionManager.encrypt(result, using: key) {
+                                    transcription.encryptedAIAnalysis = encryptedData
+                                    transcription.aiAnalysis = nil
+                                    print("✅ [AIAnalysisView] AI analysis encrypted successfully")
+                                } else {
+                                    print("❌ [AIAnalysisView] Failed to encrypt AI analysis")
+                                }
+                            } else {
+                                print("⚠️ [AIAnalysisView] No encryption key available - analysis will remain unencrypted until tag is unlocked")
+                            }
+                        } else if journalEntry.isBaseEncrypted {
+                            // Apply base encryption
+                            print("🔐 [AIAnalysisView] Applying base encryption to AI analysis")
+                            _ = journalEntry.applyBaseEncryption()
+                        }
+                        
                         do {
                             try viewContext.save()
                             print("Successfully saved AI analysis to transcription")
@@ -186,6 +212,32 @@ struct AIAnalysisView: View {
         if let transcription = journalEntry.transcription {
             transcription.aiAnalysis = analysis
             transcription.modifiedAt = Date()
+            
+            // Check if entry needs encryption after saving AI analysis
+            if journalEntry.hasEncryptedContent {
+                print("🔐 [AIAnalysisView] Entry has encrypted tag, checking encryption status")
+                
+                // Check if tag is globally accessible (has decryption key available)
+                if let encryptedTag = journalEntry.encryptedTag,
+                   let key = EncryptedTagsAccessManager.shared.getEncryptionKey(for: encryptedTag) {
+                    print("🔐 [AIAnalysisView] Encryption key available, encrypting AI analysis")
+                    
+                    // Encrypt the AI analysis with the tag's key
+                    if let encryptedData = EncryptionManager.encrypt(analysis, using: key) {
+                        transcription.encryptedAIAnalysis = encryptedData
+                        transcription.aiAnalysis = nil
+                        print("✅ [AIAnalysisView] AI analysis encrypted successfully")
+                    } else {
+                        print("❌ [AIAnalysisView] Failed to encrypt AI analysis")
+                    }
+                } else {
+                    print("⚠️ [AIAnalysisView] No encryption key available - analysis will remain unencrypted until tag is unlocked")
+                }
+            } else if journalEntry.isBaseEncrypted {
+                // Apply base encryption
+                print("🔐 [AIAnalysisView] Applying base encryption to AI analysis")
+                _ = journalEntry.applyBaseEncryption()
+            }
             
             do {
                 try viewContext.save()
