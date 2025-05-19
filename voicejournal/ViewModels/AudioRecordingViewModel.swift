@@ -119,18 +119,17 @@ class AudioRecordingViewModel: ObservableObject {
         // Always create a speech recognition service 
         if let service = speechRecognitionService {
             self.speechRecognitionService = service
+            // Use the locale already set on the service
+            let locale = service.currentLocale
+            currentTranscriptionLanguage = locale.localizedLanguageName ?? locale.identifier
+            print("[AudioRecording] Using existing service with locale: \(locale.identifier)")
         } else {
             // Create a new instance with the correct locale
             let locale = LanguageSettings.shared.selectedLocale
             print("[AudioRecording] Creating speech recognizer with locale: \(locale.identifier)")
             self.speechRecognitionService = SpeechRecognitionService(locale: locale)
+            currentTranscriptionLanguage = locale.localizedLanguageName ?? locale.identifier
         }
-        
-        // Set the speech recognition locale from settings
-        let locale = LanguageSettings.shared.selectedLocale
-        print("[AudioRecording] Setting recognition locale to: \(locale.identifier)")
-        self.speechRecognitionService.setRecognitionLocale(locale)
-        currentTranscriptionLanguage = locale.localizedLanguageName ?? locale.identifier
         print("[AudioRecording] Current transcription language: \(currentTranscriptionLanguage)")
         
         // Always set up publishers in the init
@@ -142,10 +141,9 @@ class AudioRecordingViewModel: ObservableObject {
         print("[AudioRecording] Updating speech recognition service from environment")
         self.speechRecognitionService = service
         
-        // Ensure the correct locale is set
-        let locale = LanguageSettings.shared.selectedLocale
-        print("[AudioRecording] Updating service locale to: \(locale.identifier)")
-        service.setRecognitionLocale(locale)
+        // Use the locale that's already set on the service (which was set in RecordingView)
+        let locale = service.currentLocale
+        print("[AudioRecording] Using service's current locale: \(locale.identifier)")
         currentTranscriptionLanguage = locale.localizedLanguageName ?? locale.identifier
         print("[AudioRecording] Updated transcription language: \(currentTranscriptionLanguage)")
         

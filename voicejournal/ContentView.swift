@@ -68,32 +68,10 @@ struct SettingsTabView: View {
     
     @State private var showTagManagement = false
     @State private var showEncryptedTagManagement = false
-    @State private var showingLanguageSettings = false
     
     var body: some View {
         NavigationView {
             List {
-                // MARK: - General Section
-                Section {
-                    // Language settings
-                    NavigationLink {
-                        LanguageSelectionView()
-                    } label: {
-                        SettingsRow(
-                            icon: "globe",
-                            iconColor: .blue,
-                            title: "Language",
-                            value: getCurrentLanguageName(),
-                            showDisclosure: false
-                        )
-                    }
-                } header: {
-                    Text("General")
-                        .textCase(nil)
-                        .font(.headline)
-                        .foregroundColor(themeManager.theme.text)
-                        .padding(.bottom, 4)
-                }
                 
                 // MARK: - Appearance Section
                 Section {
@@ -376,10 +354,6 @@ struct SettingsTabView: View {
         return "Custom"
     }
     
-    private func getCurrentLanguageName() -> String {
-        let locale = LanguageSettings.shared.selectedLocale
-        return LanguageSettings.shared.localizedName(for: locale)
-    }
     
     private func getAppVersion() -> String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
