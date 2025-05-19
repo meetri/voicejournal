@@ -436,6 +436,14 @@ struct EntryCreationView: View {
                 // Apply tag with PIN to encrypt content
                 if entry.applyEncryptedTagWithPin(tag, pin: pin) {
                     print("✅ [EntryCreationView] Encrypted tag applied successfully")
+                    
+                    // Check post-encryption state
+                    if let transcription = entry.transcription {
+                        print("📊 [EntryCreationView] Post-encryption transcription state:")
+                        print("  - Raw text: \(transcription.rawText?.count ?? 0) characters")
+                        print("  - Enhanced text: \(transcription.enhancedText?.count ?? 0) characters")
+                        print("  - Encrypted enhanced: \(transcription.encryptedEnhancedText?.count ?? 0) bytes")
+                    }
                 } else {
                     print("❌ [EntryCreationView] Failed to apply encrypted tag")
                 }

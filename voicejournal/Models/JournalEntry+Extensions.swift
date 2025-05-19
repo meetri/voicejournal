@@ -255,6 +255,7 @@ extension JournalEntry {
         if let audioRecording = self.audioRecording,
            let filePath = audioRecording.filePath {
             
+            print("🔐 [JournalEntry] Starting audio encryption...")
             do {
                 // Create a directory for encrypted files if it doesn't exist
                 let fileManager = FileManager.default
@@ -270,11 +271,14 @@ extension JournalEntry {
                 let fileName = originalURL.lastPathComponent
                 let encryptedFilePath = encryptedDirectory.appendingPathComponent("\(fileName).encrypted").path
                 
+                print("🔐 [JournalEntry] Reading audio file from: \(filePath)")
                 // Read the audio file data
                 let audioData = try Data(contentsOf: originalURL)
+                print("🔐 [JournalEntry] Audio data size: \(audioData.count) bytes")
                 
                 // Encrypt the data
                 if let encryptedData = EncryptionManager.encrypt(audioData, using: key) {
+                    print("🔐 [JournalEntry] Audio encrypted successfully, writing to: \(encryptedFilePath)")
                     // Write encrypted data to the encrypted file path
                     try encryptedData.write(to: URL(fileURLWithPath: encryptedFilePath))
                     
@@ -284,13 +288,18 @@ extension JournalEntry {
                     // Update file path to point to encrypted file
                     audioRecording.filePath = encryptedFilePath
                     audioRecording.isEncrypted = true
+                    print("✅ [JournalEntry] Audio encryption completed successfully")
                 } else {
                     encryptionSuccess = false
+                    print("❌ [JournalEntry] Failed to encrypt audio data")
                 }
             } catch {
                 // Error occurred
                 encryptionSuccess = false
+                print("❌ [JournalEntry] Audio encryption error: \(error)")
             }
+        } else {
+            print("⚠️ [JournalEntry] No audio recording to encrypt")
         }
         
         // Encrypt the transcription if it exists
@@ -369,6 +378,7 @@ extension JournalEntry {
         self.modifiedAt = Date()
         try? self.managedObjectContext?.save()
         
+        print("🔐 [JournalEntry] Overall encryption result: \(encryptionSuccess)")
         return encryptionSuccess
     }
     
