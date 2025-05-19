@@ -8,6 +8,7 @@
 import Foundation
 import CoreData
 import Combine
+import AVFoundation
 
 /// Service for enhancing transcriptions using AI
 class AITranscriptionService: ObservableObject {
@@ -323,6 +324,79 @@ class AITranscriptionService: ObservableObject {
         
         return Array(Set(speakers)).sorted()
     }
+    
+    // MARK: - Audio Analysis
+    
+    /// Analyze an audio file and generate a detailed markdown report
+    func analyzeAudioFile(audioURL: URL, transcription: Transcription?) async throws -> String {
+        guard let config = aiManager.activeConfiguration,
+              config.isValid else {
+            throw AITranscriptionError.noActiveConfiguration
+        }
+        
+        isProcessing = true
+        processingProgress = 0.0
+        
+        defer {
+            isProcessing = false
+            processingProgress = 1.0
+        }
+        
+        // Read the audio file
+        guard FileManager.default.fileExists(atPath: audioURL.path) else {
+            throw AITranscriptionError.invalidInput("Audio file not found")
+        }
+        
+        // Get audio duration
+        let asset = AVAsset(url: audioURL)
+        let duration = try await asset.load(.duration)
+        let durationInSeconds = CMTimeGetSeconds(duration)
+        
+        // Get file size
+        let fileAttributes = try FileManager.default.attributesOfItem(atPath: audioURL.path)
+        let fileSize = fileAttributes[.size] as? Int64 ?? 0
+        let fileSizeInMB = Double(fileSize) / (1024 * 1024)
+        
+        // Prepare the analysis prompt
+        let defaultPrompt = """
+        Please analyze this audio recording and provide:
+
+        1. A detailed summary of the audio content
+        2. Key topics and themes discussed
+        3. Important insights or conclusions
+        4. Any notable patterns or recurring elements
+        5. Suggested action items or follow-ups (if applicable)
+        6. Create relevant mermaid diagrams if the content involves:
+           - Processes or workflows
+           - Relationships or hierarchies
+           - Timeline or sequences
+           - Decision trees
+
+        Format the response in markdown with clear sections and headers.
+        If creating mermaid diagrams, use proper mermaid syntax blocks.
+
+        Audio Details:
+        - Duration: \(Int(durationInSeconds)) seconds (\(Int(durationInSeconds/60)) minutes)
+        - File Size: \(String(format: "%.2f", fileSizeInMB)) MB
+        """
+        
+        let prompt = config.audioAnalysisPrompt ?? defaultPrompt
+        
+        // If we have a transcription, include it in the analysis
+        var contentToAnalyze = prompt
+        
+        if let transcription = transcription {
+            if let rawText = transcription.rawText, !rawText.isEmpty {
+                contentToAnalyze += "\n\nTranscription:\n\(rawText)"
+            } else if let text = transcription.text, !text.isEmpty {
+                contentToAnalyze += "\n\nTranscription:\n\(text)"
+            }
+        }
+        
+        // Process with AI
+        let systemPrompt = "You are an expert audio analyst. Analyze the provided audio information and generate a comprehensive markdown report."
+        return try await processWithAI(prompt: contentToAnalyze, systemPrompt: systemPrompt)
+    }
 }
 
 // MARK: - Supporting Types
@@ -397,6 +471,7 @@ enum AITranscriptionError: Error {
     case apiRequestFailed
     case invalidResponse
     case languageNotSupported
+    case invalidInput(String)
     
     var localizedDescription: String {
         switch self {
@@ -412,6 +487,8 @@ enum AITranscriptionError: Error {
             return "Invalid response from AI service"
         case .languageNotSupported:
             return "Language not supported for this feature"
+        case .invalidInput(let message):
+            return message
         }
     }
 }

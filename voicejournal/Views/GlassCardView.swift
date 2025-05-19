@@ -96,5 +96,4 @@ struct EnhancedGlassView: View {
         .padding()
     }
     .padding()
-    .previewLayout(.sizeThatFits)
 }

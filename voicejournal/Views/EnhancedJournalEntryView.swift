@@ -31,6 +31,7 @@ struct EnhancedJournalEntryView: View {
     @State private var showingOptions = false
     @State private var scrollOffset: CGFloat = 0
     @State private var showEnhancedTranscription = false
+    @State private var showAIAnalysis = false
     
     // MARK: - Initialization
     
@@ -237,58 +238,119 @@ struct EnhancedJournalEntryView: View {
                 
                 Spacer()
                 
-                // Toggle for AI-enhanced transcription if available
-                if let transcription = journalEntry.transcription,
-                   transcription.rawText != nil,
-                   transcription.enhancedText != nil {
-                    Button(action: {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showEnhancedTranscription.toggle()
+                // Toggle between different content types
+                if let transcription = journalEntry.transcription {
+                    Menu {
+                        Button(action: {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                showEnhancedTranscription = false
+                                showAIAnalysis = false
+                            }
+                        }) {
+                            Label("Raw", systemImage: "text.alignleft")
                         }
-                    }) {
+                        
+                        if transcription.enhancedText != nil {
+                            Button(action: {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    showEnhancedTranscription = true
+                                    showAIAnalysis = false
+                                }
+                            }) {
+                                Label("Enhanced", systemImage: "sparkles")
+                            }
+                        }
+                        
+                        if transcription.aiAnalysis != nil {
+                            Button(action: {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    showEnhancedTranscription = false
+                                    showAIAnalysis = true
+                                }
+                            }) {
+                                Label("AI Analysis", systemImage: "brain")
+                            }
+                        }
+                    } label: {
                         HStack(spacing: 4) {
-                            Image(systemName: showEnhancedTranscription ? "sparkles" : "text.alignleft")
+                            Image(systemName: showAIAnalysis ? "brain" : (showEnhancedTranscription ? "sparkles" : "text.alignleft"))
                                 .font(.system(size: 14))
-                            Text(showEnhancedTranscription ? "Enhanced" : "Raw")
+                            Text(showAIAnalysis ? "Analysis" : (showEnhancedTranscription ? "Enhanced" : "Raw"))
                                 .font(.caption)
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(
                             RoundedRectangle(cornerRadius: 8)
-                                .fill(showEnhancedTranscription ? Color.blue.opacity(0.15) : Color.gray.opacity(0.15))
+                                .fill(showAIAnalysis ? Color.green.opacity(0.15) : (showEnhancedTranscription ? Color.blue.opacity(0.15) : Color.gray.opacity(0.15)))
                         )
-                        .foregroundColor(showEnhancedTranscription ? .blue : .gray)
+                        .foregroundColor(showAIAnalysis ? .green : (showEnhancedTranscription ? .blue : .gray))
                     }
                 }
             }
             
-            // Transcription text - use enhanced or raw based on toggle
-            let displayText = showEnhancedTranscription && journalEntry.transcription?.enhancedText != nil
-                ? (journalEntry.transcription?.enhancedText ?? text)
-                : text
-            
-            if playbackViewModel.isPlaybackInProgress {
-                AttributedHighlightableText(
-                    text: displayText,
-                    highlightRange: playbackViewModel.currentHighlightRange,
-                    highlightColor: .yellow.opacity(0.4),
-                    textColor: .primary,
-                    font: .body
-                )
-                .padding()
+            // Display content based on type
+            if showAIAnalysis, let analysis = journalEntry.transcription?.aiAnalysis {
+                // Show AI analysis in a scrollable markdown view
+                ScrollView {
+                    Text(analysis)
+                        .font(.body)
+                        .padding()
+                        .textSelection(.enabled)
+                }
+                .frame(maxHeight: 400)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
                         .fill(themeManager.theme.surface)
                 )
-            } else {
-                Text(displayText)
-                    .font(.body)
+            } else if showEnhancedTranscription, let enhanced = journalEntry.transcription?.enhancedText {
+                // Show enhanced transcription
+                if playbackViewModel.isPlaybackInProgress {
+                    AttributedHighlightableText(
+                        text: enhanced,
+                        highlightRange: playbackViewModel.currentHighlightRange,
+                        highlightColor: .yellow.opacity(0.4),
+                        textColor: .primary,
+                        font: .body
+                    )
                     .padding()
                     .background(
                         RoundedRectangle(cornerRadius: 12)
                             .fill(themeManager.theme.surface)
                     )
+                } else {
+                    Text(enhanced)
+                        .font(.body)
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(themeManager.theme.surface)
+                        )
+                }
+            } else {
+                // Show regular transcription with playback highlighting
+                if playbackViewModel.isPlaybackInProgress {
+                    AttributedHighlightableText(
+                        text: text,
+                        highlightRange: playbackViewModel.currentHighlightRange,
+                        highlightColor: .yellow.opacity(0.4),
+                        textColor: .primary,
+                        font: .body
+                    )
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(themeManager.theme.surface)
+                    )
+                } else {
+                    Text(text)
+                        .font(.body)
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(themeManager.theme.surface)
+                        )
+                }
             }
         }
         .padding()
@@ -638,7 +700,7 @@ struct EnhancedJournalEntryView: View {
     recording.fileSize = 1024 * 1024 * 2 // 2 MB
     
     // Create transcription
-    let transcription = entry.createTranscription(text: "This is a sample transcription of a voice journal entry. It contains the text that would be generated from the audio recording using speech recognition. The transcription can be quite long and may contain multiple paragraphs of text. This allows users to read through their journal entries even when they can't listen to the audio.")
+    _ = entry.createTranscription(text: "This is a sample transcription of a voice journal entry. It contains the text that would be generated from the audio recording using speech recognition. The transcription can be quite long and may contain multiple paragraphs of text. This allows users to read through their journal entries even when they can't listen to the audio.")
     
     // Add tags
     let _ = entry.addTag("Personal", color: "#FF5733")

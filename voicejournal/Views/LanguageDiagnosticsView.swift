@@ -93,9 +93,9 @@ struct LanguageDiagnosticsView: View {
     }
     
     private func localizedName(for locale: Locale) -> String {
-        if let languageCode = locale.languageCode {
+        if let languageCode = locale.language.languageCode?.identifier {
             if let displayName = Locale.current.localizedString(forLanguageCode: languageCode) {
-                if let regionCode = locale.regionCode,
+                if let regionCode = locale.region?.identifier,
                    let regionName = Locale.current.localizedString(forRegionCode: regionCode) {
                     return "\(displayName) (\(regionName))"
                 }

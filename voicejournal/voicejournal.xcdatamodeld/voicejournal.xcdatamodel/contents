@@ -49,6 +49,7 @@
         <attribute name="rawText" optional="YES" attributeType="String"/>
         <attribute name="text" optional="YES" attributeType="String"/>
         <attribute name="timingData" optional="YES" attributeType="String"/>
+        <attribute name="aiAnalysis" optional="YES" attributeType="String"/>
         <relationship name="journalEntry" maxCount="1" deletionRule="Nullify" destinationEntity="JournalEntry" inverseName="transcription" inverseEntity="JournalEntry"/>
     </entity>
     <entity name="CustomTheme" representedClassName="CustomTheme" syncable="YES">
@@ -76,5 +77,6 @@
         <attribute name="totalOutputTokens" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="totalRequests" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="lastUsedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="audioAnalysisPrompt" optional="YES" attributeType="String"/>
     </entity>
 </model>

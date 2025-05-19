@@ -79,6 +79,22 @@ class AudioPlaybackViewModel: ObservableObject {
     /// Frequency data for spectrum visualization
     @Published private(set) var frequencyData: [Float] = []
     
+    /// Whether to show AI analysis view
+    @Published var showAIAnalysis = false
+    
+    /// Whether AI analysis is in progress
+    @Published private(set) var isAnalyzing = false
+    
+    /// Current journal entry (for AI analysis)
+    var journalEntry: JournalEntry? {
+        currentRecording?.journalEntry
+    }
+    
+    /// Current audio URL (for AI analysis)
+    var audioURL: URL {
+        audioFileURL ?? URL(fileURLWithPath: currentRecording?.effectiveFilePath ?? "")
+    }
+    
     // MARK: - Private Properties
     
     private let playbackService: AudioPlaybackService

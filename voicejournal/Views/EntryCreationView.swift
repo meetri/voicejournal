@@ -382,7 +382,7 @@ struct EntryCreationView: View {
         for tag in selectedTags {
             if tag.isEncrypted, let tagName = tag.name {
                 
-                if let pin = EntryCreationView.encryptedTagPINs[tagName] {
+                if EntryCreationView.encryptedTagPINs[tagName] != nil {
                     // Store this encrypted tag for later application (after recording is saved)
                     encryptedTag = tag
                     

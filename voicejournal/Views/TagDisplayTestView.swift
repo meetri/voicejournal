@@ -131,7 +131,7 @@ struct TagDisplayTestView: View {
         entry.createdAt = Date()
         
         // Create a transcription
-        let transcription = entry.createTranscription(text: "This is a test entry for demonstrating tag display.")
+        _ = entry.createTranscription(text: "This is a test entry for demonstrating tag display.")
         
         do {
             try viewContext.save()
@@ -146,9 +146,9 @@ struct TagDisplayTestView: View {
         guard let entry = testEntry else { return }
         
         // Add three regular tags
-        let tag1 = entry.addTag("Personal", color: "#FF5733")
-        let tag2 = entry.addTag("Work", color: "#33FF57")
-        let tag3 = entry.addTag("Important", color: "#3357FF")
+        _ = entry.addTag("Personal", color: "#FF5733")
+        _ = entry.addTag("Work", color: "#33FF57")
+        _ = entry.addTag("Important", color: "#3357FF")
         
         do {
             try viewContext.save()

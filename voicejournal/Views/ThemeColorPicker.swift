@@ -56,7 +56,7 @@ struct ThemeColorPicker: View {
                         }
                     })
                     .textFieldStyle(PlainTextFieldStyle())
-                    .onChange(of: tempHex) { newValue in
+                    .onChange(of: tempHex) { oldValue, newValue in
                         // Limit to 8 characters max (RRGGBBAA)
                         if newValue.count > 8 {
                             tempHex = String(newValue.prefix(8))
@@ -75,7 +75,7 @@ struct ThemeColorPicker: View {
                     ColorPicker("", selection: $selectedColor)
                         .labelsHidden()
                         .frame(width: 40, height: 40)
-                        .onChange(of: selectedColor) { newColor in
+                        .onChange(of: selectedColor) { oldColor, newColor in
                             color = newColor.hexString
                             updateTempHex()
                         }

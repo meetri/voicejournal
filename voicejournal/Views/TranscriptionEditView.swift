@@ -150,14 +150,8 @@ struct TranscriptionEditView: View {
                     // Dismiss keyboard before text operation
                     isTextEditorFocused = false
                     
-                    // Use try-catch to handle potential errors
-                    do {
-                        editedText = capitalizeFirstLetterOfSentences(editedText)
-                    } catch {
-                        errorMessage = "Error capitalizing text: \(error.localizedDescription)"
-                        showErrorAlert = true
-                        // Error occurred
-                    }
+                    // Perform text operation
+                    editedText = capitalizeFirstLetterOfSentences(editedText)
                 }) {
                     VStack {
                         Image(systemName: "textformat.abc.dottedunderline")
@@ -172,14 +166,8 @@ struct TranscriptionEditView: View {
                     // Dismiss keyboard before text operation
                     isTextEditorFocused = false
                     
-                    // Use try-catch to handle potential errors
-                    do {
-                        editedText = addPeriodsToSentences(editedText)
-                    } catch {
-                        errorMessage = "Error adding periods: \(error.localizedDescription)"
-                        showErrorAlert = true
-                        // Error occurred
-                    }
+                    // Perform text operation
+                    editedText = addPeriodsToSentences(editedText)
                 }) {
                     VStack {
                         Image(systemName: "text.append")
@@ -194,14 +182,8 @@ struct TranscriptionEditView: View {
                     // Dismiss keyboard before text operation
                     isTextEditorFocused = false
                     
-                    // Use try-catch to handle potential errors
-                    do {
-                        editedText = fixCommonErrors(editedText)
-                    } catch {
-                        errorMessage = "Error fixing text: \(error.localizedDescription)"
-                        showErrorAlert = true
-                        // Error occurred
-                    }
+                    // Perform text operation
+                    editedText = fixCommonErrors(editedText)
                 }) {
                     VStack {
                         Image(systemName: "checkmark.circle")
@@ -216,14 +198,8 @@ struct TranscriptionEditView: View {
                     // Dismiss keyboard before text operation
                     isTextEditorFocused = false
                     
-                    // Use try-catch to handle potential errors
-                    do {
-                        editedText = editedText.trimmingCharacters(in: .whitespacesAndNewlines)
-                    } catch {
-                        errorMessage = "Error cleaning text: \(error.localizedDescription)"
-                        showErrorAlert = true
-                        // Error occurred
-                    }
+                    // Perform text operation
+                    editedText = editedText.trimmingCharacters(in: .whitespacesAndNewlines)
                 }) {
                     VStack {
                         Image(systemName: "text.badge.xmark")
@@ -260,21 +236,14 @@ struct TranscriptionEditView: View {
         // Make sure keyboard is dismissed
         isTextEditorFocused = false
         
-        do {
-            // Update the binding
-            transcriptionText = editedText
-            
-            // Call the save callback
-            onSave()
-            
-            // Dismiss the view
-            dismiss()
-        } catch {
-            // Handle any errors during save
-            errorMessage = "Error saving transcription: \(error.localizedDescription)"
-            showErrorAlert = true
-            // Error occurred
-        }
+        // Update the binding
+        transcriptionText = editedText
+        
+        // Call the save callback
+        onSave()
+        
+        // Dismiss the view
+        dismiss()
     }
     
     /// Capitalize the first letter of each sentence

@@ -258,6 +258,30 @@ struct EnhancedPlaybackView: View {
                         .cornerRadius(10)
                     }
                 }
+                
+                // AI Analysis row
+                HStack(spacing: 12) {
+                    // AI Analyze button
+                    Button(action: {
+                        viewModel.showAIAnalysis = true
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 14))
+                            Text("AI Analysis")
+                                .font(.system(.footnote))
+                                .fontWeight(.medium)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity)
+                        .background(Color(hex: "#34C759").opacity(0.1))
+                        .foregroundColor(Color(hex: "#34C759"))
+                        .cornerRadius(10)
+                    }
+                    .disabled(viewModel.isAnalyzing)
+                }
             }
             .padding(.horizontal)
             
@@ -292,6 +316,15 @@ struct EnhancedPlaybackView: View {
             }
         } message: {
             Text("Add a bookmark at the current position (\(viewModel.formattedCurrentTime))")
+        }
+        .sheet(isPresented: $viewModel.showAIAnalysis) {
+            if let journalEntry = viewModel.journalEntry {
+                AIAnalysisView(
+                    journalEntry: journalEntry,
+                    audioURL: viewModel.audioURL,
+                    isPresented: $viewModel.showAIAnalysis
+                )
+            }
         }
     }
     

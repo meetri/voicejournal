@@ -210,7 +210,7 @@ struct EncryptedEntryPlaceholderView: View {
     recording.fileSize = 1024 * 1024 * 2 // 2 MB
     
     // Create transcription
-    let transcription = entry.createTranscription(text: "This is a sample transcription of a voice journal entry. It contains the text that would be generated from the audio recording using speech recognition.")
+    _ = entry.createTranscription(text: "This is a sample transcription of a voice journal entry. It contains the text that would be generated from the audio recording using speech recognition.")
     
     // Add tags
     let _ = entry.addTag("Personal", color: "#FF5733")
@@ -235,7 +235,7 @@ struct EncryptedEntryPlaceholderView: View {
     recording.fileSize = 1024 * 1024 * 2 // 2 MB
     
     // Create transcription - note that this would normally be encrypted
-    let transcription = entry.createTranscription(text: "This is secret content that is protected with a PIN.")
+    _ = entry.createTranscription(text: "This is secret content that is protected with a PIN.")
     
     // Create an encrypted tag
     let encryptedTag = Tag(context: context)
