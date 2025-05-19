@@ -415,8 +415,14 @@ class AudioRecordingViewModel: ObservableObject {
             // Create a journal entry with the recording and transcription
             await createJournalEntry(recordingURL: recordingURL)
             
-            // If no live transcription was done, process the audio file for transcription
-            if transcriptionText.isEmpty && checkSpeechRecognitionPermission() {
+            // Always process the audio file for better timing data after recording, even if we have live transcription
+            if checkSpeechRecognitionPermission() {
+                processingTask?.cancel()
+                processingTask = Task {
+                    await processAudioFileForBetterTimingData(recordingURL)
+                }
+            } else if transcriptionText.isEmpty && checkSpeechRecognitionPermission() {
+                // If no live transcription was done, process for full transcription
                 processingTask?.cancel()
                 processingTask = Task {
                     await processAudioFileForTranscription(recordingURL)
@@ -454,6 +460,53 @@ class AudioRecordingViewModel: ObservableObject {
             // Don't show error alert for transcription failures
             // This is a background task and shouldn't interrupt the user
             // Transcription failed
+        }
+    }
+    
+    /// Process audio file for better timing data after recording completes
+    private func processAudioFileForBetterTimingData(_ url: URL) async {
+        do {
+            print("[AudioRecording] Processing audio file for accurate timing data")
+            
+            // Get absolute URL from relative path if needed
+            let fileURL = FilePathUtility.toAbsolutePath(from: url.path)
+            
+            // Create a new instance of speech recognition service for file processing
+            let fileRecognitionService = SpeechRecognitionService()
+            
+            // Use the same locale as the live recognition
+            fileRecognitionService.setRecognitionLocale(speechRecognitionService.currentLocale)
+            
+            // Recognize speech from file to get accurate timing data
+            _ = try await fileRecognitionService.recognizeFromFile(url: fileURL)
+            
+            // Get the timing data from file recognition
+            if let fileTimingData = fileRecognitionService.getTimingDataJSON() {
+                print("[AudioRecording] Got accurate timing data from file processing: \(fileTimingData.prefix(200))...")
+                
+                // Update journal entry with better timing data if it exists
+                if let entry = journalEntry,
+                   let transcription = entry.transcription {
+                    
+                    await MainActor.run {
+                        transcription.timingData = fileTimingData
+                        transcription.modifiedAt = Date()
+                        
+                        do {
+                            try managedObjectContext.save()
+                            print("[AudioRecording] Updated transcription with accurate timing data from file")
+                        } catch {
+                            print("[AudioRecording] Failed to save accurate timing data: \(error)")
+                        }
+                    }
+                }
+            } else {
+                print("[AudioRecording] No timing data available from file processing")
+            }
+        } catch {
+            print("[AudioRecording] Failed to process file for timing data: \(error)")
+            // Don't show error alert for timing data failures
+            // This is a background improvement and shouldn't interrupt the user
         }
     }
     
