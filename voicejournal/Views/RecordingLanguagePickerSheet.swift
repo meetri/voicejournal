@@ -14,8 +14,13 @@ struct RecordingLanguagePickerSheet: View {
             return availableLanguages
         } else {
             return availableLanguages.filter { language in
-                language.name.localizedCaseInsensitiveContains(searchText) ||
-                language.nativeName.localizedCaseInsensitiveContains(searchText)
+                // Get the localized name (e.g., "Spanish (Spain)")
+                let localizedName = LanguageSettings.shared.localizedName(for: language.locale)
+                
+                return language.name.localizedCaseInsensitiveContains(searchText) ||
+                       language.nativeName.localizedCaseInsensitiveContains(searchText) ||
+                       localizedName.localizedCaseInsensitiveContains(searchText) ||
+                       language.locale.identifier.localizedCaseInsensitiveContains(searchText)
             }
         }
     }
