@@ -294,17 +294,48 @@ extension JournalEntry {
         }
         
         // Encrypt the transcription if it exists
-        if let transcription = self.transcription,
-           let text = transcription.text {
-            
-            if let encryptedData = EncryptionManager.encrypt(text, using: key) {
-                // Store encrypted data and clear plaintext
-                transcription.encryptedText = encryptedData
-                transcription.text = nil
-                transcription.modifiedAt = Date()
-            } else {
-                encryptionSuccess = false
+        if let transcription = self.transcription {
+            // Encrypt main text
+            if let text = transcription.text {
+                if let encryptedData = EncryptionManager.encrypt(text, using: key) {
+                    transcription.encryptedText = encryptedData
+                    transcription.text = nil
+                } else {
+                    encryptionSuccess = false
+                }
             }
+            
+            // Encrypt raw text
+            if let rawText = transcription.rawText {
+                if let encryptedData = EncryptionManager.encrypt(rawText, using: key) {
+                    transcription.encryptedRawText = encryptedData
+                    transcription.rawText = nil
+                } else {
+                    encryptionSuccess = false
+                }
+            }
+            
+            // Encrypt enhanced text
+            if let enhancedText = transcription.enhancedText {
+                if let encryptedData = EncryptionManager.encrypt(enhancedText, using: key) {
+                    transcription.encryptedEnhancedText = encryptedData
+                    transcription.enhancedText = nil
+                } else {
+                    encryptionSuccess = false
+                }
+            }
+            
+            // Encrypt AI analysis
+            if let aiAnalysis = transcription.aiAnalysis {
+                if let encryptedData = EncryptionManager.encrypt(aiAnalysis, using: key) {
+                    transcription.encryptedAIAnalysis = encryptedData
+                    transcription.aiAnalysis = nil
+                } else {
+                    encryptionSuccess = false
+                }
+            }
+            
+            transcription.modifiedAt = Date()
         }
         
         // Mark as encrypted
@@ -363,15 +394,45 @@ extension JournalEntry {
         }
         
         // Decrypt the transcription if it exists and is encrypted
-        if let transcription = self.transcription,
-           let encryptedData = transcription.encryptedText,
-           transcription.text == nil {
+        if let transcription = self.transcription {
+            // Decrypt main text
+            if let encryptedData = transcription.encryptedText,
+               transcription.text == nil {
+                if let decryptedText = EncryptionManager.decryptToString(encryptedData, using: key) {
+                    transcription.text = decryptedText
+                } else {
+                    decryptionSuccess = false
+                }
+            }
             
-            if let decryptedText = EncryptionManager.decryptToString(encryptedData, using: key) {
-                // Store decrypted text temporarily (in memory)
-                transcription.text = decryptedText
-            } else {
-                decryptionSuccess = false
+            // Decrypt raw text
+            if let encryptedData = transcription.encryptedRawText,
+               transcription.rawText == nil {
+                if let decryptedText = EncryptionManager.decryptToString(encryptedData, using: key) {
+                    transcription.rawText = decryptedText
+                } else {
+                    decryptionSuccess = false
+                }
+            }
+            
+            // Decrypt enhanced text
+            if let encryptedData = transcription.encryptedEnhancedText,
+               transcription.enhancedText == nil {
+                if let decryptedText = EncryptionManager.decryptToString(encryptedData, using: key) {
+                    transcription.enhancedText = decryptedText
+                } else {
+                    decryptionSuccess = false
+                }
+            }
+            
+            // Decrypt AI analysis
+            if let encryptedData = transcription.encryptedAIAnalysis,
+               transcription.aiAnalysis == nil {
+                if let decryptedText = EncryptionManager.decryptToString(encryptedData, using: key) {
+                    transcription.aiAnalysis = decryptedText
+                } else {
+                    decryptionSuccess = false
+                }
             }
         }
         
@@ -452,18 +513,52 @@ extension JournalEntry {
         }
         
         // Encrypt the transcription if it exists
-        if let transcription = self.transcription,
-           let text = transcription.text,
-           transcription.encryptedText == nil {
-            
-            if let encryptedData = EncryptionManager.encrypt(text, using: rootKey) {
-                // Store encrypted data and clear plaintext
-                transcription.encryptedText = encryptedData
-                transcription.text = nil
-                transcription.modifiedAt = Date()
-            } else {
-                encryptionSuccess = false
+        if let transcription = self.transcription {
+            // Encrypt main text
+            if let text = transcription.text,
+               transcription.encryptedText == nil {
+                if let encryptedData = EncryptionManager.encrypt(text, using: rootKey) {
+                    transcription.encryptedText = encryptedData
+                    transcription.text = nil
+                } else {
+                    encryptionSuccess = false
+                }
             }
+            
+            // Encrypt raw text for base encryption
+            if let rawText = transcription.rawText,
+               transcription.encryptedRawText == nil {
+                if let encryptedData = EncryptionManager.encrypt(rawText, using: rootKey) {
+                    transcription.encryptedRawText = encryptedData
+                    transcription.rawText = nil
+                } else {
+                    encryptionSuccess = false
+                }
+            }
+            
+            // Encrypt enhanced text for base encryption
+            if let enhancedText = transcription.enhancedText,
+               transcription.encryptedEnhancedText == nil {
+                if let encryptedData = EncryptionManager.encrypt(enhancedText, using: rootKey) {
+                    transcription.encryptedEnhancedText = encryptedData
+                    transcription.enhancedText = nil
+                } else {
+                    encryptionSuccess = false
+                }
+            }
+            
+            // Encrypt AI analysis for base encryption
+            if let aiAnalysis = transcription.aiAnalysis,
+               transcription.encryptedAIAnalysis == nil {
+                if let encryptedData = EncryptionManager.encrypt(aiAnalysis, using: rootKey) {
+                    transcription.encryptedAIAnalysis = encryptedData
+                    transcription.aiAnalysis = nil
+                } else {
+                    encryptionSuccess = false
+                }
+            }
+            
+            transcription.modifiedAt = Date()
         }
         
         // Mark as base encrypted
@@ -524,15 +619,45 @@ extension JournalEntry {
         }
         
         // Decrypt the transcription if it exists and is encrypted
-        if let transcription = self.transcription,
-           let encryptedData = transcription.encryptedText,
-           transcription.text == nil {
+        if let transcription = self.transcription {
+            // Decrypt main text
+            if let encryptedData = transcription.encryptedText,
+               transcription.text == nil {
+                if let decryptedText = EncryptionManager.decryptToString(encryptedData, using: rootKey) {
+                    transcription.text = decryptedText
+                } else {
+                    decryptionSuccess = false
+                }
+            }
             
-            if let decryptedText = EncryptionManager.decryptToString(encryptedData, using: rootKey) {
-                // Store decrypted text temporarily (in memory)
-                transcription.text = decryptedText
-            } else {
-                decryptionSuccess = false
+            // Decrypt raw text
+            if let encryptedData = transcription.encryptedRawText,
+               transcription.rawText == nil {
+                if let decryptedText = EncryptionManager.decryptToString(encryptedData, using: rootKey) {
+                    transcription.rawText = decryptedText
+                } else {
+                    decryptionSuccess = false
+                }
+            }
+            
+            // Decrypt enhanced text
+            if let encryptedData = transcription.encryptedEnhancedText,
+               transcription.enhancedText == nil {
+                if let decryptedText = EncryptionManager.decryptToString(encryptedData, using: rootKey) {
+                    transcription.enhancedText = decryptedText
+                } else {
+                    decryptionSuccess = false
+                }
+            }
+            
+            // Decrypt AI analysis
+            if let encryptedData = transcription.encryptedAIAnalysis,
+               transcription.aiAnalysis == nil {
+                if let decryptedText = EncryptionManager.decryptToString(encryptedData, using: rootKey) {
+                    transcription.aiAnalysis = decryptedText
+                } else {
+                    decryptionSuccess = false
+                }
             }
         }
         

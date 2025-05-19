@@ -44,6 +44,9 @@
     <entity name="Transcription" representedClassName="Transcription" syncable="YES" codeGenerationType="class">
         <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="encryptedText" optional="YES" attributeType="Binary"/>
+        <attribute name="encryptedRawText" optional="YES" attributeType="Binary"/>
+        <attribute name="encryptedEnhancedText" optional="YES" attributeType="Binary"/>
+        <attribute name="encryptedAIAnalysis" optional="YES" attributeType="Binary"/>
         <attribute name="enhancedText" optional="YES" attributeType="String"/>
         <attribute name="modifiedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="rawText" optional="YES" attributeType="String"/>
