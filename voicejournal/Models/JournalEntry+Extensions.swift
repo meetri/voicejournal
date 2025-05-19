@@ -266,14 +266,14 @@ extension JournalEntry {
                     try fileManager.createDirectory(at: encryptedDirectory, withIntermediateDirectories: true)
                 }
                 
-                // Construct encrypted file path
-                let originalURL = URL(fileURLWithPath: filePath)
-                let fileName = originalURL.lastPathComponent
+                // Convert relative path to absolute path
+                let absoluteURL = FilePathUtility.toAbsolutePath(from: filePath)
+                let fileName = absoluteURL.lastPathComponent
                 let encryptedFilePath = encryptedDirectory.appendingPathComponent("\(fileName).encrypted").path
                 
-                print("🔐 [JournalEntry] Reading audio file from: \(filePath)")
+                print("🔐 [JournalEntry] Reading audio file from: \(absoluteURL.path)")
                 // Read the audio file data
-                let audioData = try Data(contentsOf: originalURL)
+                let audioData = try Data(contentsOf: absoluteURL)
                 print("🔐 [JournalEntry] Audio data size: \(audioData.count) bytes")
                 
                 // Encrypt the data
