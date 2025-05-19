@@ -38,8 +38,6 @@ struct AIConfigurationView: View {
                                 showingDeleteAlert = true
                             }
                         )
-                        .listRowBackground(Color.clear)
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                     } else {
                         HStack {
                             Image(systemName: "exclamationmark.triangle")
@@ -48,14 +46,10 @@ struct AIConfigurationView: View {
                                 .foregroundColor(themeManager.theme.textSecondary)
                             Spacer()
                         }
-                        .padding(.vertical, 8)
-                        .listRowBackground(Color.clear)
+                        .padding(.vertical, 12)
                     }
                 } header: {
-                    Text("Active Configuration")
-                        .textCase(nil)
-                        .font(.headline)
-                        .foregroundColor(themeManager.theme.text)
+                    Text("ACTIVE CONFIGURATION")
                 }
                 
                 // Other Configurations Section
@@ -77,14 +71,9 @@ struct AIConfigurationView: View {
                                     showingDeleteAlert = true
                                 }
                             )
-                            .listRowBackground(Color.clear)
-                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                         }
                     } header: {
-                        Text("Available Configurations")
-                            .textCase(nil)
-                            .font(.headline)
-                            .foregroundColor(themeManager.theme.text)
+                        Text("AVAILABLE CONFIGURATIONS")
                     }
                 }
                 
@@ -93,12 +82,7 @@ struct AIConfigurationView: View {
                     Button {
                         showingAddConfiguration = true
                     } label: {
-                        HStack {
-                            Image(systemName: "plus.circle.fill")
-                                .foregroundColor(themeManager.theme.accent)
-                            Text("Add Configuration")
-                                .foregroundColor(themeManager.theme.accent)
-                        }
+                        Label("Add Configuration", systemImage: "plus.circle.fill")
                     }
                 }
             }
@@ -143,106 +127,200 @@ struct ConfigurationRow: View {
     let onSetActive: (AIConfiguration) -> Void
     let onDelete: (AIConfiguration) -> Void
     
-    @Environment(\.themeManager) var themeManager
-    
-    @State private var isRefreshing = false
+    @State private var showingDetails = false
     
     var body: some View {
-        HStack(spacing: 12) {
-            // Main content
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(configuration.name ?? "Unknown")
-                            .font(.headline)
-                            .foregroundColor(themeManager.theme.text)
-                        
+        Button {
+            showingDetails = true
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(configuration.name ?? "Unknown")
+                        .font(.body)
+                        .foregroundColor(.primary)
+                    
+                    HStack(spacing: 12) {
                         Text(configuration.aiVendor?.displayName ?? "Unknown")
                             .font(.caption)
-                            .foregroundColor(themeManager.theme.textSecondary)
-                    }
-                    
-                    Spacer()
-                    
-                    if isActive {
-                        Text("Active")
-                            .font(.caption)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(themeManager.theme.accent.opacity(0.2))
-                            .foregroundColor(themeManager.theme.accent)
-                            .cornerRadius(12)
+                            .foregroundColor(.secondary)
+                        
+                        if configuration.totalRequests > 0 {
+                            Text("\(configuration.totalRequests) requests")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
                 
-                // Token Usage Metrics
-                HStack {
-                    TokenMetricsView(configuration: configuration)
-                        .font(.caption2)
-                        .foregroundColor(themeManager.theme.textSecondary)
-                    
-                    Spacer()
-                    
-                    // Refresh button
-                    Button {
-                        refreshTokenUsage()
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 12))
-                            .foregroundColor(themeManager.theme.accent)
-                            .rotationEffect(.degrees(isRefreshing ? 360 : 0))
-                            .animation(isRefreshing ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isRefreshing)
-                    }
-                    .buttonStyle(BorderlessButtonStyle())
+                Spacer()
+                
+                if isActive {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                        .imageScale(.large)
+                } else {
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(Color(UIColor.tertiaryLabel))
+                        .imageScale(.small)
                 }
             }
             .contentShape(Rectangle())
-            .onTapGesture {
-                onEdit(configuration)
-            }
-            
-            // Action buttons
-            VStack(spacing: 8) {
-                if isActive {
-                    Button {
-                        AIConfigurationManager.shared.deactivateConfiguration(configuration)
-                    } label: {
-                        Image(systemName: "stop.circle")
-                            .foregroundColor(.orange)
-                            .frame(width: 30, height: 30)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .sheet(isPresented: $showingDetails) {
+            ConfigurationDetailView(
+                configuration: configuration,
+                isActive: isActive,
+                onEdit: onEdit,
+                onSetActive: onSetActive,
+                onDelete: onDelete
+            )
+        }
+    }
+}
+
+// MARK: - Configuration Detail View
+
+struct ConfigurationDetailView: View {
+    let configuration: AIConfiguration
+    let isActive: Bool
+    let onEdit: (AIConfiguration) -> Void
+    let onSetActive: (AIConfiguration) -> Void
+    let onDelete: (AIConfiguration) -> Void
+    
+    @Environment(\.dismiss) var dismiss
+    @State private var showingDeleteAlert = false
+    
+    var body: some View {
+        NavigationView {
+            List {
+                // Configuration Info
+                Section {
+                    HStack {
+                        Text("Name")
+                        Spacer()
+                        Text(configuration.name ?? "Unknown")
+                            .foregroundColor(.secondary)
                     }
-                    .buttonStyle(BorderlessButtonStyle())
-                } else {
-                    Button {
-                        onSetActive(configuration)
-                    } label: {
-                        Image(systemName: "checkmark.circle")
-                            .foregroundColor(.green)
-                            .frame(width: 30, height: 30)
+                    
+                    HStack {
+                        Text("Provider")
+                        Spacer()
+                        Text(configuration.aiVendor?.displayName ?? "Unknown")
+                            .foregroundColor(.secondary)
                     }
-                    .buttonStyle(BorderlessButtonStyle())
+                    
+                    if let endpoint = configuration.apiEndpoint {
+                        HStack {
+                            Text("Endpoint")
+                            Spacer()
+                            Text(endpoint)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                    }
                 }
                 
-                Button {
-                    onDelete(configuration)
-                } label: {
-                    Image(systemName: "trash")
-                        .foregroundColor(.red)
-                        .frame(width: 30, height: 30)
+                // Token Usage
+                Section {
+                    HStack {
+                        Text("Total Requests")
+                        Spacer()
+                        Text("\(configuration.totalRequests)")
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    HStack {
+                        Text("Input Tokens")
+                        Spacer()
+                        Text("\(configuration.totalInputTokens.formatted())")
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    HStack {
+                        Text("Output Tokens")
+                        Spacer()
+                        Text("\(configuration.totalOutputTokens.formatted())")
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    HStack {
+                        Text("Total Tokens")
+                        Spacer()
+                        Text("\((configuration.totalInputTokens + configuration.totalOutputTokens).formatted())")
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    if let lastUsed = configuration.lastUsedAt {
+                        HStack {
+                            Text("Last Used")
+                            Spacer()
+                            Text(lastUsed, style: .relative)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                } header: {
+                    Text("USAGE METRICS")
                 }
-                .buttonStyle(BorderlessButtonStyle())
+                
+                // Actions
+                Section {
+                    if isActive {
+                        Button {
+                            AIConfigurationManager.shared.deactivateConfiguration(configuration)
+                            dismiss()
+                        } label: {
+                            Label("Deactivate", systemImage: "stop.circle")
+                                .foregroundColor(.orange)
+                        }
+                    } else {
+                        Button {
+                            onSetActive(configuration)
+                            dismiss()
+                        } label: {
+                            Label("Set as Active", systemImage: "checkmark.circle")
+                                .foregroundColor(.green)
+                        }
+                    }
+                    
+                    Button {
+                        dismiss()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            onEdit(configuration)
+                        }
+                    } label: {
+                        Label("Edit Configuration", systemImage: "pencil")
+                    }
+                }
+                
+                Section {
+                    Button(role: .destructive) {
+                        showingDeleteAlert = true
+                    } label: {
+                        Label("Delete Configuration", systemImage: "trash")
+                    }
+                }
+            }
+            .listStyle(InsetGroupedListStyle())
+            .navigationTitle(configuration.name ?? "Configuration")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
             }
         }
-        .padding(.vertical, 4)
-    }
-    
-    private func refreshTokenUsage() {
-        isRefreshing = true
-        AIConfigurationManager.shared.refreshTokenUsage(for: configuration)
-        
-        // Stop the animation after a short delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            isRefreshing = false
+        .alert("Delete Configuration", isPresented: $showingDeleteAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                onDelete(configuration)
+                dismiss()
+            }
+        } message: {
+            Text("Are you sure you want to delete '\(configuration.name ?? "Unknown")'?")
         }
     }
 }
@@ -429,74 +507,6 @@ struct EditAIConfigurationView: View {
     }
 }
 
-// MARK: - Token Metrics View
-
-struct TokenMetricsView: View {
-    let configuration: AIConfiguration
-    
-    @Environment(\.themeManager) var themeManager
-    
-    private var totalTokens: Int64 {
-        configuration.totalInputTokens + configuration.totalOutputTokens
-    }
-    
-    private var formattedLastUsed: String {
-        if let lastUsed = configuration.lastUsedAt {
-            let formatter = RelativeDateTimeFormatter()
-            formatter.unitsStyle = .abbreviated
-            return formatter.localizedString(for: lastUsed, relativeTo: Date())
-        }
-        return "Never"
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            // Token usage row
-            HStack(spacing: 12) {
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.up.circle")
-                        .font(.system(size: 10))
-                    Text("\(configuration.totalInputTokens.formatted()) in")
-                }
-                
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.down.circle")
-                        .font(.system(size: 10))
-                    Text("\(configuration.totalOutputTokens.formatted()) out")
-                }
-                
-                HStack(spacing: 4) {
-                    Image(systemName: "sum")
-                        .font(.system(size: 10))
-                    Text("\(totalTokens.formatted()) total")
-                }
-                
-                Spacer()
-            }
-            
-            // Request count and last used
-            HStack(spacing: 12) {
-                HStack(spacing: 4) {
-                    Image(systemName: "network")
-                        .font(.system(size: 10))
-                    Text("\(configuration.totalRequests) requests")
-                }
-                
-                HStack(spacing: 4) {
-                    Image(systemName: "clock")
-                        .font(.system(size: 10))
-                    Text(formattedLastUsed)
-                }
-                
-                Spacer()
-            }
-        }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 8)
-        .background(themeManager.theme.surface)
-        .cornerRadius(6)
-    }
-}
 
 #Preview {
     AIConfigurationView()
