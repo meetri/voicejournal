@@ -148,28 +148,23 @@ struct LanguageDebugView: View {
     private func testRecognition() {
         Task {
             do {
-                print("[LanguageDebug] Testing recognition with locale: \(speechRecognitionService.currentLocale.identifier)")
+                // Testing recognition with locale
                 try await speechRecognitionService.startLiveRecognition()
                 
                 // Stop after 2 seconds
                 try await Task.sleep(nanoseconds: 2_000_000_000)
                 speechRecognitionService.stopRecognition()
                 
-                print("[LanguageDebug] Test complete")
+                // Test complete
             } catch {
-                print("[LanguageDebug] Test failed: \(error)")
+                // Test failed: \(error)
             }
         }
     }
     
     private func printDebugInfo() {
-        print("=== Language Debug Info ===")
-        print("Language Settings: \(languageSettings.selectedLocale.identifier)")
-        print("Speech Service: \(speechRecognitionService.currentLocale.identifier)")
-        print("Language Status: \(speechRecognitionService.languageStatus.description)")
-        print("Recognition State: \(stateDescription)")
-        print("Available Locales: \(languageSettings.availableLocales.map { $0.identifier })")
-        print("=======================")
+        // Language debug info logged internally
+        // Debug info separator
     }
 }
 

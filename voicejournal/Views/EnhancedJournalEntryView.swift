@@ -49,23 +49,17 @@ struct EnhancedJournalEntryView: View {
     
     private var shareItems: [Any] {
         var items: [Any] = [entryTitle]
-        print("DEBUG: Preparing share items for entry: \(entryTitle)")
         
         // Add transcription text if available
         if let text = journalEntry.transcription?.text {
-            print("DEBUG: Adding transcription text to share items")
             items.append(text)
         }
         
         // Add audio file if available
         if let audioURL = prepareAudioForSharing() {
-            print("DEBUG: Adding audio URL to share items: \(audioURL)")
             items.append(audioURL)
-        } else {
-            print("DEBUG: No audio URL available for sharing")
         }
         
-        print("DEBUG: Total share items: \(items.count)")
         return items
     }
     
@@ -573,16 +567,8 @@ struct EnhancedJournalEntryView: View {
     /// Prepare audio file for sharing by ensuring we have an unencrypted version
     private func prepareAudioForSharing() -> URL? {
         guard let audioRecording = journalEntry.audioRecording else { 
-            print("DEBUG: No audio recording found")
             return nil 
         }
-        
-        print("DEBUG: Audio recording found")
-        print("DEBUG: - filePath: \(audioRecording.filePath ?? "nil")")
-        print("DEBUG: - originalFilePath: \(audioRecording.originalFilePath ?? "nil")")
-        print("DEBUG: - tempDecryptedPath: \(audioRecording.tempDecryptedPath ?? "nil")")
-        print("DEBUG: - effectiveFilePath: \(audioRecording.effectiveFilePath ?? "nil")")
-        print("DEBUG: - isEncrypted: \(audioRecording.isEncrypted)")
         
         let fileManager = FileManager.default
         
@@ -591,21 +577,16 @@ struct EnhancedJournalEntryView: View {
             // Convert relative path to absolute path
             let absoluteURL = FilePathUtility.toAbsolutePath(from: effectivePath)
             let exists = fileManager.fileExists(atPath: absoluteURL.path)
-            print("DEBUG: effectiveFilePath exists: \(exists) at: \(absoluteURL.path)")
             
             if exists {
                 // Skip if this is an encrypted file
                 if absoluteURL.pathExtension == "encrypted" || absoluteURL.pathExtension == "baseenc" {
-                    print("DEBUG: Audio file is still encrypted: \(absoluteURL.path)")
-                    
                     // Try to use the original file if available
                     if let originalPath = audioRecording.originalFilePath {
                         let originalURL = FilePathUtility.toAbsolutePath(from: originalPath)
                         let originalExists = fileManager.fileExists(atPath: originalURL.path)
-                        print("DEBUG: originalFilePath exists: \(originalExists) at: \(originalURL.path)")
                         
                         if originalExists {
-                            print("DEBUG: Using original file path: \(originalURL.path)")
                             return originalURL
                         }
                     }
@@ -613,7 +594,6 @@ struct EnhancedJournalEntryView: View {
                     return nil
                 }
                 
-                print("DEBUG: Using effective file path: \(absoluteURL.path)")
                 return absoluteURL
             }
         }
@@ -622,10 +602,8 @@ struct EnhancedJournalEntryView: View {
         if let originalPath = audioRecording.originalFilePath {
             let originalURL = FilePathUtility.toAbsolutePath(from: originalPath)
             let originalExists = fileManager.fileExists(atPath: originalURL.path)
-            print("DEBUG: originalFilePath exists (fallback): \(originalExists) at: \(originalURL.path)")
             
             if originalExists {
-                print("DEBUG: Using original file path (fallback): \(originalURL.path)")
                 return originalURL
             }
         }
@@ -634,15 +612,12 @@ struct EnhancedJournalEntryView: View {
         if let filePath = audioRecording.filePath {
             let fileURL = FilePathUtility.toAbsolutePath(from: filePath)
             let fileExists = fileManager.fileExists(atPath: fileURL.path)
-            print("DEBUG: Main filePath exists: \(fileExists) at: \(fileURL.path)")
             
             if fileExists {
-                print("DEBUG: Using main file path: \(fileURL.path)")
                 return fileURL
             }
         }
         
-        print("DEBUG: No valid audio file path found")
         return nil
     }
     

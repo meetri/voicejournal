@@ -375,29 +375,17 @@ class AudioPlaybackViewModel: ObservableObject {
         debugPrintedSegments = false
         
         guard let timingDataString = transcription.timingData else {
-            print("[AudioPlayback] No timing data in transcription")
             transcriptionTimingData = []
             return
         }
-        
-        print("[AudioPlayback] Loading timing data from transcription, length: \(timingDataString.count) chars")
-        print("[AudioPlayback] First 500 chars of timing data: \(timingDataString.prefix(500))...")
         
         do {
             // Parse JSON timing data
             if let data = timingDataString.data(using: .utf8) {
                 let decoder = JSONDecoder()
                 transcriptionTimingData = try decoder.decode([TranscriptionSegment].self, from: data)
-                print("[AudioPlayback] Loaded \(transcriptionTimingData.count) timing segments")
-                if let firstSegment = transcriptionTimingData.first,
-                   let lastSegment = transcriptionTimingData.last {
-                    print("[AudioPlayback] Timing range: \(String(format: "%.2f", firstSegment.startTime))s - \(String(format: "%.2f", lastSegment.endTime))s")
-                    print("[AudioPlayback] First segment: '\(firstSegment.text)' at \(String(format: "%.2f", firstSegment.startTime))s")
-                    print("[AudioPlayback] Last segment: '\(lastSegment.text)' at \(String(format: "%.2f", lastSegment.endTime))s")
-                }
             }
         } catch {
-            print("[AudioPlayback] Error loading timing data: \(error)")
             transcriptionTimingData = []
         }
     }
@@ -409,19 +397,6 @@ class AudioPlaybackViewModel: ObservableObject {
             return
         }
         
-        // Print all segments once at the beginning
-        if currentTime < 0.2 && !debugPrintedSegments {
-            debugPrintedSegments = true
-            print("[AudioPlayback] Debug - All segments:")
-            for (index, segment) in transcriptionTimingData.enumerated() {
-                print("[AudioPlayback] Segment \(index): '\(segment.text)' \(String(format: "%.2f", segment.startTime))-\(String(format: "%.2f", segment.endTime))s, range: \(segment.textRange)")
-            }
-            
-            if let firstSegment = transcriptionTimingData.first,
-               let lastSegment = transcriptionTimingData.last {
-                print("[AudioPlayback] Timing coverage: \(String(format: "%.2f", firstSegment.startTime))s - \(String(format: "%.2f", lastSegment.endTime))s")
-            }
-        }
         
         // Find the segment that corresponds to the current playback time
         let currentSegment = transcriptionTimingData.first { segment in
@@ -430,7 +405,6 @@ class AudioPlaybackViewModel: ObservableObject {
         
         if let segment = currentSegment {
             currentHighlightRange = NSRange(location: segment.textRange.location, length: segment.textRange.length)
-            print("[AudioPlayback] Highlighting: '\(segment.text)' at \(String(format: "%.2f", currentTime))s")
         } else {
             currentHighlightRange = nil
         }

@@ -180,13 +180,8 @@ class SpeechRecognitionService: ObservableObject {
     nonisolated init(locale: Locale = Locale(identifier: "en-US")) {
         // Move any main actor work to a separate method
         Task { @MainActor in
-            print("[SpeechRecognition] Initializing with locale: \(locale.identifier)")
             self.currentLocale = locale
             self.speechRecognizer = SFSpeechRecognizer(locale: locale)
-            print("[SpeechRecognition] Created recognizer: \(self.speechRecognizer != nil ? "Success" : "Failed")")
-            if let recognizer = self.speechRecognizer {
-                print("[SpeechRecognition] Recognizer locale: \(recognizer.locale.identifier)")
-            }
             await self.checkAvailability()
         }
     }
@@ -209,18 +204,9 @@ class SpeechRecognitionService: ObservableObject {
     
     /// Set the locale for speech recognition
     func setRecognitionLocale(_ locale: Locale) {
-        print("[SpeechRecognition] Setting locale to: \(locale.identifier)")
-        print("[SpeechRecognition] Previous locale was: \(currentLocale.identifier)")
-        
         currentLocale = locale
         // Update the speech recognizer with the new locale
         speechRecognizer = SFSpeechRecognizer(locale: locale)
-        
-        print("[SpeechRecognition] Created recognizer: \(speechRecognizer != nil ? "Success" : "Failed")")
-        if let recognizer = speechRecognizer {
-            print("[SpeechRecognition] Recognizer locale: \(recognizer.locale.identifier)")
-            print("[SpeechRecognition] Recognizer available: \(recognizer.isAvailable)")
-        }
         
         checkAvailability()
     }
@@ -307,23 +293,10 @@ class SpeechRecognitionService: ObservableObject {
     /// Update the language status for the current locale
     func updateLanguageStatus() {
         languageStatus = checkLanguageStatus(locale: currentLocale)
-        
-        // Log the language status for debugging
-        print("[SpeechRecognition] Language status for \(currentLocale.identifier): \(languageStatus.description)")
-        
-        // Additional diagnostics
-        if languageStatus != .available {
-            let supportedLocales = SFSpeechRecognizer.supportedLocales()
-            let isSupported = supportedLocales.contains(where: { $0.identifier == currentLocale.identifier })
-            print("[SpeechRecognition] Locale \(currentLocale.identifier) is \(isSupported ? "supported" : "not supported")")
-            print("[SpeechRecognition] Total supported locales: \(supportedLocales.count)")
-        }
     }
     
     /// Start real-time speech recognition from the microphone
     func startLiveRecognition() async throws {
-        print("[SpeechRecognition] Starting live recognition with locale: \(currentLocale.identifier)")
-        
         // Reset error message
         errorMessage = ""
         
@@ -336,23 +309,16 @@ class SpeechRecognitionService: ObservableObject {
         
         // Ensure recognizer is using the current locale
         if speechRecognizer == nil || speechRecognizer?.locale != currentLocale {
-            print("[SpeechRecognition] Creating new recognizer for locale: \(currentLocale.identifier)")
             speechRecognizer = SFSpeechRecognizer(locale: currentLocale)
         }
-        
-        print("[SpeechRecognition] Current recognizer locale: \(speechRecognizer?.locale.identifier ?? "nil")")
         
         // Update and check language status
         updateLanguageStatus()
         
         // Check availability
         guard speechRecognizer?.isAvailable == true else {
-            print("[SpeechRecognition] Speech recognizer not available for locale: \(currentLocale.identifier)")
-            
             // Check if it's a language model issue
             if let recognizer = speechRecognizer {
-                print("[SpeechRecognition] Recognizer exists but not available")
-                print("[SpeechRecognition] Supported locales: \(SFSpeechRecognizer.supportedLocales().map { $0.identifier })")
                 
                 // Update language status based on availability
                 if languageStatus == .downloading {
@@ -427,23 +393,17 @@ class SpeechRecognitionService: ObservableObject {
                     
                     // Check if it's the expected "No speech detected" timeout (code 1110)
                     if nsError.code == 1110 && nsError.domain == "kAFAssistantErrorDomain" {
-                        print("[SpeechRecognition] Recognition timeout - code 1110")
                         // Only treat this as finished if we're not actively recognizing
                         if self.state != .recognizing {
-                            print("[SpeechRecognition] Recognition ended with expected timeout - processing complete")
                             self.state = .finished
                             // Don't treat this as an error - we already have our results
                             return
                         } else {
-                            print("[SpeechRecognition] Ignoring timeout during active recognition")
                             // During active recognition, this might just be a pause in speech
                             // Continue normally without changing state
                             return
                         }
                     }
-                    
-                    print("[SpeechRecognition] Recognition error: \(error)")
-                    print("[SpeechRecognition] Error domain: \(nsError.domain), code: \(nsError.code)")
                     
                     // Convert the error to a more specific SpeechRecognitionError
                     let specificError = SpeechRecognitionError.fromSystemError(error)
@@ -465,11 +425,8 @@ class SpeechRecognitionService: ObservableObject {
             
             if let result = result {
                 Task { @MainActor in
-                    print("[SpeechRecognition] Recognition result - isFinal: \(result.isFinal), text: '\(result.bestTranscription.formattedString)'")
-                    
                     // Update interim transcription with partial results
                     self.interimTranscription = result.bestTranscription.formattedString
-                    print("[SpeechRecognition] Updated interim transcription: '\(self.interimTranscription)'")
                     
                     // For both interim and final results, extract timing data
                     // This ensures we capture timing even if we never get final results
@@ -478,12 +435,10 @@ class SpeechRecognitionService: ObservableObject {
                     // If final result, update the main transcription
                     if result.isFinal {
                         self.transcription += result.bestTranscription.formattedString + " "
-                        print("[SpeechRecognition] Updated final transcription: '\(self.transcription)'")
                     }
                     
                     // Extract timing data for all results (both interim and final)
                     self.extractTimingDataForCurrentState(from: result.bestTranscription, transcriptionOffset: previousLength, isFinal: result.isFinal)
-                    print("[SpeechRecognition] Total timing segments: \(self.timingData.count)")
                     
                     // Update progress
                     if self.recognitionRequest != nil {
@@ -499,8 +454,6 @@ class SpeechRecognitionService: ObservableObject {
     
     /// Start speech recognition from an audio file
     func recognizeFromFile(url: URL) async throws -> String {
-        print("[SpeechRecognition] Recognizing file with locale: \(currentLocale.identifier)")
-        
         // Check authorization
         let permission = checkAuthorization()
         guard permission == .granted else {
@@ -509,11 +462,8 @@ class SpeechRecognitionService: ObservableObject {
         
         // Ensure recognizer is using the current locale
         if speechRecognizer == nil || speechRecognizer?.locale != currentLocale {
-            print("[SpeechRecognition] Creating new recognizer for file with locale: \(currentLocale.identifier)")
             speechRecognizer = SFSpeechRecognizer(locale: currentLocale)
         }
-        
-        print("[SpeechRecognition] Recognizer locale for file: \(speechRecognizer?.locale.identifier ?? "nil")")
         
         // Check availability
         guard speechRecognizer?.isAvailable == true else {
@@ -642,10 +592,6 @@ class SpeechRecognitionService: ObservableObject {
         // For interim results, we'll store them temporarily and replace them when we get the final result
         // This handles the case where we never get final results due to errors
         
-        print("[SpeechRecognition] Extracting timing data - isFinal: \(isFinal), transcriptionOffset: \(transcriptionOffset)")
-        print("[SpeechRecognition] Transcription text: '\(transcription.formattedString)'")
-        print("[SpeechRecognition] Number of segments: \(transcription.segments.count)")
-        
         var newTimingData: [TranscriptionSegment] = []
         
         // Process all segments in the current transcription
@@ -654,10 +600,6 @@ class SpeechRecognitionService: ObservableObject {
             let timestamp = segment.timestamp
             let duration = segment.duration
             let nsRange = segment.substringRange // Use the provided range from Apple
-            
-            print("[SpeechRecognition] Processing segment \(index): '\(segmentText)'")
-            print("[SpeechRecognition]   - timestamp: \(timestamp), duration: \(duration)")
-            print("[SpeechRecognition]   - range: \(nsRange)")
             
             // For interim results, Apple often provides unreliable timing (0.011s durations)
             // We'll adjust this to be more reasonable
@@ -684,7 +626,6 @@ class SpeechRecognitionService: ObservableObject {
             )
             
             newTimingData.append(transcriptionSegment)
-            print("[SpeechRecognition] Added segment: '\(segmentText)' at \(adjustedTimestamp)-\(adjustedTimestamp + adjustedDuration)s")
         }
         
         // Replace existing timing data with cleaned version
@@ -693,13 +634,7 @@ class SpeechRecognitionService: ObservableObject {
             self.timingData = self.cleanupOverlappingSegments(newTimingData)
         } else {
             // For final results, use the accumulation method
-            print("[SpeechRecognition] Using accumulation method for final results")
             self.extractAndAccumulateTimingData(from: transcription, withOffset: transcriptionOffset)
-        }
-        
-        print("[SpeechRecognition] Total timing segments: \(self.timingData.count)")
-        if let first = self.timingData.first, let last = self.timingData.last {
-            print("[SpeechRecognition] Duration range: \(first.startTime) - \(last.endTime) seconds")
         }
         
         // Validate segment coverage
@@ -730,18 +665,12 @@ class SpeechRecognitionService: ObservableObject {
                 // Validate that the offsets are within bounds
                 guard currentEnd >= 0 && currentEnd <= fullTextLength &&
                       nextStart >= 0 && nextStart <= fullTextLength else {
-                    print("[SpeechRecognition] WARNING: Invalid segment indices - currentEnd: \(currentEnd), nextStart: \(nextStart), textLength: \(fullTextLength)")
                     continue
                 }
                 
                 let gapStart = fullText.index(fullText.startIndex, offsetBy: currentEnd)
                 let gapEnd = fullText.index(fullText.startIndex, offsetBy: nextStart)
                 let gapText = String(fullText[gapStart..<gapEnd])
-                
-                print("[SpeechRecognition] WARNING: Gap found between segments")
-                print("[SpeechRecognition]   - Gap position: \(currentEnd)-\(nextStart) (length: \(gapLength))")
-                print("[SpeechRecognition]   - Gap text: '\(gapText)'")
-                print("[SpeechRecognition]   - Between: '\(currentSegment.text)' and '\(nextSegment.text)'")
             }
         }
         
@@ -750,7 +679,6 @@ class SpeechRecognitionService: ObservableObject {
             let firstLocation = firstSegment.textRange.location
             if firstLocation > 0 && firstLocation <= fullTextLength {
                 let missedText = String(fullText.prefix(firstLocation))
-                print("[SpeechRecognition] WARNING: Text before first segment: '\(missedText)'")
             }
         }
         
@@ -761,7 +689,6 @@ class SpeechRecognitionService: ObservableObject {
                 let missedCount = fullTextLength - lastEnd
                 if missedCount > 0 {
                     let missedText = String(fullText.suffix(missedCount))
-                    print("[SpeechRecognition] WARNING: Text after last segment: '\(missedText)'")
                 }
             }
         }
@@ -807,13 +734,8 @@ class SpeechRecognitionService: ObservableObject {
         // Get the full transcription text to calculate proper ranges
         let fullText = transcription.formattedString
         
-        print("[SpeechRecognition] Extracting and accumulating timing data")
-        print("[SpeechRecognition] - Full text: '\(fullText)' with offset \(offset)")
-        print("[SpeechRecognition] - Number of segments: \(transcription.segments.count)")
-        
         // Track the highest timestamp we already have to ensure continuity
         let highestExistingTime = self.timingData.last?.endTime ?? 0
-        print("[SpeechRecognition] Highest existing timestamp: \(highestExistingTime)")
         
         // Process each segment in the transcription
         for i in 0..<transcription.segments.count {
@@ -822,10 +744,6 @@ class SpeechRecognitionService: ObservableObject {
             let timestamp = segment.timestamp
             let duration = segment.duration
             let originalRange = segment.substringRange // Use the provided range
-            
-            print("[SpeechRecognition] Processing segment \(i): '\(segmentText)'")
-            print("[SpeechRecognition]   - SF timestamp: \(timestamp), duration: \(duration)")
-            print("[SpeechRecognition]   - SF segment range: \(originalRange)")
             
             // Only process segments we haven't seen before (based on timestamp)
             if timestamp > highestExistingTime - 0.1 { // small overlap tolerance
@@ -839,9 +757,6 @@ class SpeechRecognitionService: ObservableObject {
                     // Adjust the range to account for the offset in the accumulated transcription
                     let adjustedRange = NSRange(location: originalRange.location + offset, length: originalRange.length)
                     
-                    print("[SpeechRecognition] Adding new segment: '\(segmentText)' at time \(timestamp)-\(timestamp + duration)s")
-                    print("[SpeechRecognition]   - Original range: \(originalRange), adjusted range: \(adjustedRange)")
-                    
                     // Create a segment with timing information and locale
                     let transcriptionSegment = TranscriptionSegment(
                         text: segmentText,
@@ -852,19 +767,12 @@ class SpeechRecognitionService: ObservableObject {
                         )
                         
                         newSegments.append(transcriptionSegment)
-                    
-                } else {
-                    print("[SpeechRecognition] Skipping duplicate segment: '\(segmentText)' at \(timestamp)")
                 }
-            } else {
-                print("[SpeechRecognition] Skipping old segment: '\(segmentText)' at \(timestamp) (before \(highestExistingTime))")
             }
         }
         
         // Append new segments to existing timing data
         timingData.append(contentsOf: newSegments)
-        print("[SpeechRecognition] Added \(newSegments.count) timing segments, total: \(timingData.count)")
-        print("[SpeechRecognition] Full transcription so far: '\(self.transcription)'")
     }
     
     /// Extract timing data from a transcription (used for file recognition)
@@ -891,29 +799,23 @@ class SpeechRecognitionService: ObservableObject {
         
         // Store the timing data
         timingData = segments
-        print("[SpeechRecognition] Extracted \(segments.count) timing segments")
     }
 
     /// Get the timing data as a JSON string
     func getTimingDataJSON() -> String? {
         guard !timingData.isEmpty else {
-            print("[SpeechRecognition] No timing data to encode")
             return nil
         }
-        
-        print("[SpeechRecognition] Encoding \(timingData.count) timing segments")
         
         do {
             let encoder = JSONEncoder()
             encoder.outputFormatting = .prettyPrinted
             let data = try encoder.encode(timingData)
             if let json = String(data: data, encoding: .utf8) {
-                print("[SpeechRecognition] Encoded timing data: \(json.prefix(200))...")
                 return json
             }
             return nil
         } catch {
-            print("[SpeechRecognition] Error encoding timing data: \(error)")
             return nil
         }
     }

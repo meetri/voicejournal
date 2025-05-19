@@ -348,7 +348,7 @@ struct SettingsTabView: View {
                 return customTheme.name ?? "Custom"
             }
         } catch {
-            print("Error fetching theme name: \(error)")
+            // Error fetching theme name
         }
         
         return "Custom"

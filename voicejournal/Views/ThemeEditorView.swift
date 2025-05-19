@@ -187,7 +187,7 @@ struct ThemeEditorView: View {
         themeData.lastModified = Date()
         
         // Verify cell border is being saved
-        print("Saving theme with cell border: \(themeData.cellBorderHex)")
+        // Saving theme with cell border
         
         if isEditMode, let existingTheme = existingTheme {
             // Update existing theme

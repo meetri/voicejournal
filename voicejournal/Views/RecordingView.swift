@@ -154,13 +154,8 @@ struct RecordingView: View {
             }
         }
         .onAppear {
-            print("[RecordingView] View appeared")
-            print("[RecordingView] Environment speech service locale: \(speechRecognitionService.currentLocale.identifier)")
-            print("[RecordingView] Language settings locale: \(LanguageSettings.shared.selectedLocale.identifier)")
-            
             // If a specific language was provided, use it for recording
             if let language = recordingLanguage {
-                print("[RecordingView] Setting recording language to: \(language.id)")
                 speechRecognitionService.setRecognitionLocale(language.locale)
             }
             
@@ -314,8 +309,6 @@ struct RecordingView: View {
                     
                     // Language indicator
                     if !viewModel.currentTranscriptionLanguage.isEmpty {
-                        // Log the language being displayed
-                        
                         // Determine color based on language status
                         let (displayText, textColor, bgColor) = getLanguageDisplayInfo(viewModel.currentTranscriptionLanguage)
                         
@@ -326,9 +319,6 @@ struct RecordingView: View {
                             .padding(.vertical, 2)
                             .background(bgColor)
                             .cornerRadius(4)
-                            .onAppear {
-                            }
-                    } else {
                     }
                     
                     Spacer()

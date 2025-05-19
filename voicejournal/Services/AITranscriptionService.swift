@@ -30,9 +30,6 @@ class AITranscriptionService: ObservableObject {
         context: NSManagedObjectContext
     ) async throws -> EnhancedTranscription {
         let enhancementStartTime = Date()
-        print("[AI] Starting transcription enhancement")
-        print("[AI] Original text length: \(text.count) characters")
-        print("[AI] Features to apply: \(features.map { $0.displayName }.joined(separator: ", "))")
         guard let config = aiManager.activeConfiguration,
               config.isValid else {
             throw AITranscriptionError.noActiveConfiguration
@@ -55,7 +52,6 @@ class AITranscriptionService: ObservableObject {
         for (index, feature) in features.sorted(by: { $0.order < $1.order }).enumerated() {
             processingProgress = Float(index + 1) / Float(features.count)
             
-            print("[AI] Processing feature \(index + 1)/\(features.count): \(feature.displayName)")
             let featureStartTime = Date()
             
             switch feature {
@@ -73,17 +69,11 @@ class AITranscriptionService: ObservableObject {
                 detectedLanguage = try await detectLanguage(in: enhancedText)
             case .noiseReduction:
                 // This would be handled at the audio level, not text
-                print("[AI] Feature \(feature.displayName) not implemented yet")
                 break
             }
             
-            let featureTime = Date().timeIntervalSince(featureStartTime)
-            print("[AI] Feature \(feature.displayName) completed in \(String(format: "%.2f", featureTime)) seconds")
-        }
+            }
         
-        let totalTime = Date().timeIntervalSince(enhancementStartTime)
-        print("[AI] Enhancement completed in \(String(format: "%.2f", totalTime)) seconds")
-        print("[AI] Enhanced text length: \(enhancedText.count) characters")
         
         let result = EnhancedTranscription(
             originalText: text,
@@ -94,13 +84,6 @@ class AITranscriptionService: ObservableObject {
             appliedFeatures: features
         )
         
-        print("[AI] Applied features: \(result.appliedFeatures.map { $0.displayName }.joined(separator: ", "))")
-        if let lang = result.detectedLanguage {
-            print("[AI] Detected language: \(lang)")
-        }
-        if let speakerList = result.speakers {
-            print("[AI] Identified speakers: \(speakerList.joined(separator: ", "))")
-        }
         
         return result
     }
@@ -136,7 +119,6 @@ class AITranscriptionService: ObservableObject {
     
     /// Add punctuation to unpunctuated text
     private func addPunctuation(to text: String) async throws -> String {
-        print("[AI] Starting punctuation enhancement...")
         let prompt = """
         Add appropriate punctuation to the following text while maintaining the exact words and their order. Only add punctuation marks where needed:
         
@@ -148,7 +130,6 @@ class AITranscriptionService: ObservableObject {
     
     /// Fix capitalization issues
     private func fixCapitalization(in text: String) async throws -> String {
-        print("[AI] Starting capitalization enhancement...")
         let prompt = """
         Fix the capitalization in the following text. Capitalize proper nouns, sentence beginnings, and follow standard English capitalization rules:
         
@@ -160,7 +141,6 @@ class AITranscriptionService: ObservableObject {
     
     /// Add paragraph breaks to long text
     private func addParagraphs(to text: String) async throws -> String {
-        print("[AI] Starting paragraph formatting...")
         let prompt = """
         Add paragraph breaks to the following text where appropriate. Group related sentences together. Do not change any words:
         
@@ -172,7 +152,6 @@ class AITranscriptionService: ObservableObject {
     
     /// Identify different speakers in the text
     private func identifySpeakers(in text: String) async throws -> (text: String, speakers: [String]) {
-        print("[AI] Starting speaker identification...")
         let prompt = """
         Identify different speakers in the following conversation and mark them appropriately. Use format "Speaker 1:", "Speaker 2:", etc. if names are not evident:
         
@@ -189,7 +168,6 @@ class AITranscriptionService: ObservableObject {
     
     /// Detect the language of the text
     private func detectLanguage(in text: String) async throws -> String {
-        print("[AI] Starting language detection...")
         let prompt = """
         Detect the language of the following text and return only the ISO 639-1 language code (e.g., 'en' for English, 'es' for Spanish):
         
@@ -207,13 +185,8 @@ class AITranscriptionService: ObservableObject {
         guard let config = aiManager.activeConfiguration,
               let apiEndpoint = config.apiEndpoint,
               config.apiKey != nil else {
-            print("[AI] Error: No active AI configuration")
             throw AITranscriptionError.noActiveConfiguration
         }
-        
-        print("[AI] Starting request to \(config.aiVendor?.displayName ?? "Unknown") - Model: \(config.modelIdentifier ?? "default")")
-        print("[AI] System prompt: \(systemPrompt ?? "default")")
-        print("[AI] User prompt length: \(prompt.count) characters")
         
         let actualSystemPrompt = systemPrompt ?? config.systemPrompt ?? "You are a helpful assistant."
         
@@ -259,16 +232,7 @@ class AITranscriptionService: ObservableObject {
         // Create the request
         let endpoint = "\(apiEndpoint)/chat/completions"
         guard let url = URL(string: endpoint) else {
-            print("[AI] Error: Invalid endpoint URL: \(endpoint)")
             throw AITranscriptionError.invalidEndpoint
-        }
-        
-        print("[AI] Request URL: \(endpoint)")
-        
-        // Log request body for debugging
-        if let requestData = try? JSONSerialization.data(withJSONObject: requestBody, options: .prettyPrinted),
-           let requestJson = String(data: requestData, encoding: .utf8) {
-            print("[AI] Request body:\n\(requestJson)")
         }
         
         var request = URLRequest(url: url)
@@ -277,11 +241,7 @@ class AITranscriptionService: ObservableObject {
         
         // Add headers from the AI manager
         if let headers = aiManager.getRequestHeaders() {
-            print("[AI] Request headers:")
             for (key, value) in headers {
-                // Mask API key for security
-                let maskedValue = key.lowercased().contains("authorization") ? "Bearer ***" : value
-                print("[AI]   \(key): \(maskedValue)")
                 request.setValue(value, forHTTPHeaderField: key)
             }
         }
@@ -290,53 +250,29 @@ class AITranscriptionService: ObservableObject {
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
         
         // Make the API call
-        print("[AI] Sending request...")
         let requestTime = Date()
         let (data, response) = try await URLSession.shared.data(for: request)
         let responseTime = Date().timeIntervalSince(requestTime)
         
-        print("[AI] Response received in \(String(format: "%.2f", responseTime)) seconds")
-        
         guard let httpResponse = response as? HTTPURLResponse else {
-            print("[AI] Error: Invalid response type")
             throw AITranscriptionError.apiRequestFailed
         }
         
-        print("[AI] Response status: \(httpResponse.statusCode)")
-        
         guard httpResponse.statusCode == 200 else {
-            print("[AI] Error: Request failed with status \(httpResponse.statusCode)")
-            if let errorData = String(data: data, encoding: .utf8) {
-                print("[AI] Error response: \(errorData)")
-            }
             throw AITranscriptionError.apiRequestFailed
         }
         
         // Parse the response
-        print("[AI] Response size: \(data.count) bytes")
-        
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        
-        // Log the response structure for debugging
-        if let responseData = try? JSONSerialization.data(withJSONObject: json as Any, options: .prettyPrinted),
-           let responseJson = String(data: responseData, encoding: .utf8) {
-            print("[AI] Response JSON:\n\(responseJson)")
-        }
         
         guard let choices = json?["choices"] as? [[String: Any]],
               let firstChoice = choices.first,
               let message = firstChoice["message"] as? [String: Any],
               let content = message["content"] as? String else {
-            print("[AI] Error: Invalid response format")
             throw AITranscriptionError.invalidResponse
         }
         
         let result = content.trimmingCharacters(in: .whitespacesAndNewlines)
-        let totalTime = Date().timeIntervalSince(requestStartTime)
-        
-        print("[AI] Request completed in \(String(format: "%.2f", totalTime)) seconds")
-        print("[AI] Response length: \(result.count) characters")
-        print("[AI] Response preview: \(String(result.prefix(100)))...")
         
         return result
     }

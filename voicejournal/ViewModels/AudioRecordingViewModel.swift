@@ -78,11 +78,7 @@ class AudioRecordingViewModel: ObservableObject {
     @Published private(set) var hasRecordingSaved = false
     
     /// Current transcription text (from speech recognition)
-    @Published private(set) var transcriptionText: String = "" {
-        didSet {
-            print("[AudioRecording] TranscriptionText updated: '\(transcriptionText)'")
-        }
-    }
+    @Published private(set) var transcriptionText: String = ""
     
     /// Whether transcription is in progress
     @Published private(set) var isTranscribing = false
@@ -139,15 +135,12 @@ class AudioRecordingViewModel: ObservableObject {
             // Use the locale already set on the service
             let locale = service.currentLocale
             currentTranscriptionLanguage = locale.localizedLanguageName ?? locale.identifier
-            print("[AudioRecording] Using existing service with locale: \(locale.identifier)")
         } else {
             // Create a new instance with the correct locale
             let locale = LanguageSettings.shared.selectedLocale
-            print("[AudioRecording] Creating speech recognizer with locale: \(locale.identifier)")
             self.speechRecognitionService = SpeechRecognitionService(locale: locale)
             currentTranscriptionLanguage = locale.localizedLanguageName ?? locale.identifier
         }
-        print("[AudioRecording] Current transcription language: \(currentTranscriptionLanguage)")
         
         // Always set up publishers in the init
         setupPublishers()
@@ -155,19 +148,15 @@ class AudioRecordingViewModel: ObservableObject {
     
     /// Update the speech recognition service from environment
     func updateSpeechRecognitionService(_ service: SpeechRecognitionService) {
-        print("[AudioRecording] Updating speech recognition service from environment")
         self.speechRecognitionService = service
         
         // Use the locale that's already set on the service (which was set in RecordingView)
         let locale = service.currentLocale
-        print("[AudioRecording] Using service's current locale: \(locale.identifier)")
         currentTranscriptionLanguage = locale.localizedLanguageName ?? locale.identifier
-        print("[AudioRecording] Updated transcription language: \(currentTranscriptionLanguage)")
         
         // Re-setup publishers with the new service
         cancellables.removeAll()
         setupPublishers()
-        print("[AudioRecording] Re-setup publishers for new speech recognition service")
     }
     
     // MARK: - Public Methods
@@ -215,7 +204,6 @@ class AudioRecordingViewModel: ObservableObject {
             // Start recording and capture the start time
             recordingStartTime = Date()
             try await recordingService.startRecording()
-            print("[AudioRecording] Recording started at: \(recordingStartTime!)")
             
             // Set up audio buffer callback to share with spectrum analyzer
             recordingService.audioBufferCallback = { [weak self] buffer in
@@ -236,15 +224,12 @@ class AudioRecordingViewModel: ObservableObject {
         
             // Start speech recognition if permission is granted
             if checkSpeechRecognitionPermission() {
-                print("[AudioRecording] Speech recognition permission granted - starting recognition")
                 do {
                     try await startSpeechRecognition()
                 } catch {
-                    print("[AudioRecording] Speech recognition error: \(error)")
                     // Handle speech recognition errors but continue recording
                 }
             } else {
-                print("[AudioRecording] Speech recognition permission not granted - requesting")
                 // Request permission for future recordings
                 await requestSpeechRecognitionPermission()
             }
@@ -257,14 +242,9 @@ class AudioRecordingViewModel: ObservableObject {
     /// Start speech recognition
     private func startSpeechRecognition() async throws {
         do {
-            print("[AudioRecording] Starting speech recognition")
-            print("[AudioRecording] Language Settings locale: \(LanguageSettings.shared.selectedLocale.identifier)")
-            print("[AudioRecording] Speech service current locale: \(speechRecognitionService.currentLocale.identifier)")
-            
             // Check language status before starting
             speechRecognitionService.updateLanguageStatus()
             let status = speechRecognitionService.languageStatus
-            print("[AudioRecording] Language status: \(status.description)")
             
             // Update the language display based on status
             let locale = speechRecognitionService.currentLocale
@@ -277,15 +257,12 @@ class AudioRecordingViewModel: ObservableObject {
                 
                 // Try to fall back to English if the selected language is unavailable
                 if locale.identifier != "en-US" {
-                    print("[AudioRecording] Attempting fallback to English")
                     speechRecognitionService.setRecognitionLocale(Locale(identifier: "en-US"))
                     speechRecognitionService.updateLanguageStatus()
                     
                     if speechRecognitionService.languageStatus == .available {
                         currentTranscriptionLanguage = "English (Fallback)"
-                        print("[AudioRecording] Fallback to English successful")
                     } else {
-                        print("[AudioRecording] English fallback also unavailable")
                         throw SpeechRecognitionError.languageNotAvailable
                     }
                 } else {
@@ -295,8 +272,6 @@ class AudioRecordingViewModel: ObservableObject {
                 currentTranscriptionLanguage = locale.localizedLanguageName ?? locale.identifier
             }
             
-            // Log the language being used for debugging
-            print("[AudioRecording] Using language: \(currentTranscriptionLanguage)")
             
             // Start live recognition
             speechRecognitionStartTime = Date()
@@ -305,11 +280,6 @@ class AudioRecordingViewModel: ObservableObject {
             transcriptionText = ""
             transcriptionProgress = 0.0
             
-            // Log timing offset
-            if let recordingStart = recordingStartTime {
-                let offset = speechRecognitionStartTime!.timeIntervalSince(recordingStart)
-                print("[AudioRecording] Speech recognition started at: \(speechRecognitionStartTime!), offset: \(offset)s")
-            }
             
         } catch let error as SpeechRecognitionError {
             // Don't stop recording if speech recognition fails
@@ -382,37 +352,29 @@ class AudioRecordingViewModel: ObservableObject {
             if isTranscribing {
                 // Save the current transcription text before stopping
                 let savedTranscription = self.transcriptionText
-                print("[AudioRecording] Saved transcription before stop: '\(savedTranscription)'")
                 
                 // Get the complete transcription (including interim) before stopping
                 let completeTranscription = speechRecognitionService.currentTranscription
-                print("[AudioRecording] Complete transcription on stop: '\(completeTranscription)'")
                 
                 // Use whichever transcription has more content
                 let bestTranscription = completeTranscription.count > savedTranscription.count ? completeTranscription : savedTranscription
                 
                 // Get timing data BEFORE stopping recognition
                 if let timingDataJSON = speechRecognitionService.getTimingDataJSON() {
-                    print("[AudioRecording] Original timing data from live recognition (before stop): \(timingDataJSON.prefix(200))...")
-                    
                     // Calculate offset if we have both timestamps
                     if let recordingStart = recordingStartTime, let speechStart = speechRecognitionStartTime {
                         let offset = speechStart.timeIntervalSince(recordingStart)
-                        print("[AudioRecording] Timing offset between recording and speech recognition: \(offset)s")
                         
                         // Adjust timing data by the offset
                         if let adjustedData = adjustTimingData(timingDataJSON, byOffset: offset) {
                             self.timingDataFromLiveRecognition = adjustedData
-                            print("[AudioRecording] Adjusted timing data: \(adjustedData.prefix(200))...")
                         } else {
                             self.timingDataFromLiveRecognition = timingDataJSON
                         }
                     } else {
-                        print("[AudioRecording] Missing timestamps - recording: \(recordingStartTime != nil), speech: \(speechRecognitionStartTime != nil)")
                         self.timingDataFromLiveRecognition = timingDataJSON
                     }
                 } else {
-                    print("[AudioRecording] No timing data available from live recognition")
                     self.timingDataFromLiveRecognition = nil
                 }
                 
@@ -424,7 +386,6 @@ class AudioRecordingViewModel: ObservableObject {
                 
                 // Use the best transcription we captured
                 transcriptionText = bestTranscription
-                print("[AudioRecording] Final transcription text: '\(transcriptionText)'")
             }
             
             // Create a journal entry with the recording and transcription
@@ -481,8 +442,6 @@ class AudioRecordingViewModel: ObservableObject {
     /// Process audio file for better timing data after recording completes
     private func processAudioFileForBetterTimingData(_ url: URL) async {
         do {
-            print("[AudioRecording] Processing audio file for accurate timing data")
-            
             // Get absolute URL from relative path if needed
             let fileURL = FilePathUtility.toAbsolutePath(from: url.path)
             
@@ -497,8 +456,6 @@ class AudioRecordingViewModel: ObservableObject {
             
             // Get the timing data from file recognition
             if let fileTimingData = fileRecognitionService.getTimingDataJSON() {
-                print("[AudioRecording] Got accurate timing data from file processing: \(fileTimingData.prefix(200))...")
-                
                 // Update journal entry with better timing data if it exists
                 if let entry = journalEntry,
                    let transcription = entry.transcription {
@@ -509,17 +466,13 @@ class AudioRecordingViewModel: ObservableObject {
                         
                         do {
                             try managedObjectContext.save()
-                            print("[AudioRecording] Updated transcription with accurate timing data from file")
                         } catch {
-                            print("[AudioRecording] Failed to save accurate timing data: \(error)")
+                            // Failed to save accurate timing data
                         }
                     }
                 }
-            } else {
-                print("[AudioRecording] No timing data available from file processing")
             }
         } catch {
-            print("[AudioRecording] Failed to process file for timing data: \(error)")
             // Don't show error alert for timing data failures
             // This is a background improvement and shouldn't interrupt the user
         }
@@ -589,7 +542,6 @@ class AudioRecordingViewModel: ObservableObject {
     // MARK: - Private Methods
     
     private func setupPublishers() {
-        print("[AudioRecording] Setting up publishers")
         
         // Subscribe to audio level changes
         recordingService.$audioLevel
@@ -612,7 +564,6 @@ class AudioRecordingViewModel: ObservableObject {
         speechRecognitionService.$transcription
             .receive(on: RunLoop.main)
             .sink { [weak self] text in
-                print("[AudioRecording] Final transcription update: '\(text)'")
                 if !text.isEmpty {
                     self?.transcriptionText = text
                 }
@@ -623,15 +574,11 @@ class AudioRecordingViewModel: ObservableObject {
         speechRecognitionService.$interimTranscription
             .receive(on: RunLoop.main)
             .sink { [weak self] text in
-                print("[AudioRecording] Interim transcription update: '\(text)'")
-                print("[AudioRecording] isTranscribing: \(self?.isTranscribing ?? false)")
                 if let self = self {
                     // Always update transcription text when we receive interim updates
                     let currentText = self.speechRecognitionService.currentTranscription
-                    print("[AudioRecording] Combined transcription: '\(currentText)'")
                     if self.isTranscribing || !currentText.isEmpty {
                         self.transcriptionText = currentText
-                        print("[AudioRecording] Updated transcriptionText to: '\(self.transcriptionText)'")
                     }
                 }
             }
@@ -699,7 +646,6 @@ class AudioRecordingViewModel: ObservableObject {
             scaledSegments.append(scaledSegment)
         }
         
-        print("[AudioRecording] Scaled \(segments.count) segments from \(currentDuration)s to \(targetDuration)s")
         return scaledSegments
     }
     
@@ -749,14 +695,11 @@ class AudioRecordingViewModel: ObservableObject {
             
             // Add transcription if available
             if !transcriptionText.isEmpty {
-                print("[AudioRecording] Creating transcription with text: '\(transcriptionText)'")
                 let transcription = entry.createTranscription(text: transcriptionText)
-                print("[AudioRecording] Transcription created: \(transcription)")
                 
                 // Enhance transcription if enabled and AI is configured
                 if TranscriptionSettings.shared.autoEnhanceNewTranscriptions,
                    AIConfigurationManager.shared.activeConfiguration != nil {
-                    print("[AudioRecording] Auto-enhance enabled, triggering AI enhancement")
                     
                     // Initialize enhancement tracking
                     let enabledFeatures = TranscriptionSettings.shared.enabledFeatures
@@ -900,21 +843,17 @@ class AudioRecordingViewModel: ObservableObject {
                             if let scaledData = try? JSONEncoder().encode(scaledSegments),
                                let scaledJSON = String(data: scaledData, encoding: .utf8) {
                                 transcription.timingData = scaledJSON
-                                print("[AudioRecording] Stored scaled timing data to match audio duration: \(duration)s")
                             } else {
                                 transcription.timingData = timingDataJSON
-                                print("[AudioRecording] Failed to scale timing data, using original")
                             }
                         } else {
                             transcription.timingData = timingDataJSON
-                            print("[AudioRecording] Stored timing data in transcription (appears to have final results)")
                         }
                     } else {
                         transcription.timingData = timingDataJSON
-                        print("[AudioRecording] Stored timing data in transcription: \(timingDataJSON.prefix(200))...")
                     }
                 } else {
-                    print("[AudioRecording] No timing data available to store")
+                    // No timing data available to store
                 }
                 
                 // Store the locale used for transcription in the journal entry
@@ -926,10 +865,7 @@ class AudioRecordingViewModel: ObservableObject {
                 try managedObjectContext.save()
                 journalEntry = entry
                 hasRecordingSaved = true
-                print("[AudioRecording] Journal entry saved successfully")
-                print("[AudioRecording] Transcription text: '\(entry.transcription?.text ?? "none")'")
             } catch {
-                print("[AudioRecording] Failed to save journal entry: \(error)")
                 // Failed to save managed object context
                 throw error
             }
@@ -1010,7 +946,6 @@ class AudioRecordingViewModel: ObservableObject {
     /// Adjust timing data by a given offset
     private func adjustTimingData(_ timingDataJSON: String, byOffset offset: TimeInterval) -> String? {
         guard let data = timingDataJSON.data(using: .utf8) else { 
-            print("[AudioRecording] Failed to convert timing data to Data")
             return nil 
         }
         
@@ -1018,11 +953,6 @@ class AudioRecordingViewModel: ObservableObject {
             // Parse the timing data JSON
             let decoder = JSONDecoder()
             let segments = try decoder.decode([TranscriptionSegment].self, from: data)
-            
-            print("[AudioRecording] Adjusting \(segments.count) segments by offset: \(offset)s")
-            if let firstSegment = segments.first, let lastSegment = segments.last {
-                print("[AudioRecording] Original timing: \(firstSegment.startTime)s - \(lastSegment.endTime)s")
-            }
             
             // Adjust all segment timings by ADDING the offset, since segments are relative to speech recognition start
             // and we need to adjust them to be relative to recording start
@@ -1036,9 +966,6 @@ class AudioRecordingViewModel: ObservableObject {
                 )
             }
             
-            if let firstAdjusted = adjustedSegments.first, let lastAdjusted = adjustedSegments.last {
-                print("[AudioRecording] Adjusted timing: \(firstAdjusted.startTime)s - \(lastAdjusted.endTime)s")
-            }
             
             // Encode back to JSON
             let encoder = JSONEncoder()
@@ -1047,7 +974,6 @@ class AudioRecordingViewModel: ObservableObject {
             
             return String(data: adjustedData, encoding: .utf8)
         } catch {
-            print("[AudioRecording] Failed to adjust timing data: \(error)")
             return nil
         }
     }
