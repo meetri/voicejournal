@@ -778,11 +778,18 @@ class AudioRecordingViewModel: ObservableObject {
                             
                             // Update the transcription with enhanced text
                             await MainActor.run {
+                                print("💫 [AudioRecordingViewModel] Saving enhanced text (\(processedText.count) characters) to transcription")
+                                
                                 // Save enhanced text separately while keeping raw text as default
                                 transcription.enhancedText = processedText
                                 // Keep the raw text as the default display text
                                 // transcription.text remains unchanged (showing raw text)
                                 transcription.modifiedAt = Date()
+                                
+                                print("💫 [AudioRecordingViewModel] Enhanced text assigned. Current state:")
+                                print("  - Raw text: \(transcription.rawText?.count ?? 0) characters")
+                                print("  - Enhanced text: \(transcription.enhancedText?.count ?? 0) characters")
+                                print("  - Main text: \(transcription.text?.count ?? 0) characters")
                                 
                                 // Create enhancement result
                                 let totalDuration = Date().timeIntervalSince(enhancementStart)
@@ -800,8 +807,9 @@ class AudioRecordingViewModel: ObservableObject {
                                 
                                 do {
                                     try managedObjectContext.save()
+                                    print("✅ [AudioRecordingViewModel] Enhanced transcription saved successfully")
                                 } catch {
-                                    print("Failed to save enhanced transcription: \(error)")
+                                    print("❌ [AudioRecordingViewModel] Failed to save enhanced transcription: \(error)")
                                 }
                                 
                                 // Keep the status visible for the RecordingSavedView

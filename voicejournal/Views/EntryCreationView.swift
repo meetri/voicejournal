@@ -420,11 +420,24 @@ struct EntryCreationView: View {
         
         // Apply encrypted tag if one was selected
         if let tag = encryptedTag, let tagName = tag.name {
+            print("🏷️ [EntryCreationView] Applying encrypted tag: \(tagName)")
             
             if let pin = EntryCreationView.encryptedTagPINs[tagName] {
+                print("🏷️ [EntryCreationView] PIN found for tag, applying encryption")
+                
+                // Check transcription state before encryption
+                if let transcription = entry.transcription {
+                    print("📊 [EntryCreationView] Pre-encryption transcription state:")
+                    print("  - Raw text: \(transcription.rawText?.count ?? 0) characters")
+                    print("  - Enhanced text: \(transcription.enhancedText?.count ?? 0) characters")
+                    print("  - AI analysis: \(transcription.aiAnalysis?.count ?? 0) characters")
+                }
+                
                 // Apply tag with PIN to encrypt content
                 if entry.applyEncryptedTagWithPin(tag, pin: pin) {
+                    print("✅ [EntryCreationView] Encrypted tag applied successfully")
                 } else {
+                    print("❌ [EntryCreationView] Failed to apply encrypted tag")
                 }
                 
                 // Remove from local storage after use

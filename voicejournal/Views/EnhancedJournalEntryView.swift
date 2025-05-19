@@ -143,6 +143,16 @@ struct EnhancedJournalEntryView: View {
         }
         .onAppear {
             loadAudio()
+            
+            // Debug logging for transcription state
+            if let transcription = journalEntry.transcription {
+                print("📊 [EnhancedJournalEntryView] Transcription state:")
+                print("  - Raw text: \(transcription.rawText?.count ?? 0) characters")
+                print("  - Enhanced text: \(transcription.enhancedText?.count ?? 0) characters")
+                print("  - AI analysis: \(transcription.aiAnalysis?.count ?? 0) characters")
+                print("  - Encrypted enhanced: \(transcription.encryptedEnhancedText?.count ?? 0) bytes")
+                print("  - Encrypted AI: \(transcription.encryptedAIAnalysis?.count ?? 0) bytes")
+            }
         }
         .onDisappear {
             playbackViewModel.stop()

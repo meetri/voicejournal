@@ -295,47 +295,72 @@ extension JournalEntry {
         
         // Encrypt the transcription if it exists
         if let transcription = self.transcription {
+            print("🔐 [JournalEntry] Starting transcription encryption...")
+            
             // Encrypt main text
             if let text = transcription.text {
+                print("🔐 [JournalEntry] Encrypting main text (\(text.count) characters)")
                 if let encryptedData = EncryptionManager.encrypt(text, using: key) {
                     transcription.encryptedText = encryptedData
                     transcription.text = nil
+                    print("✅ [JournalEntry] Main text encrypted successfully")
                 } else {
                     encryptionSuccess = false
+                    print("❌ [JournalEntry] Failed to encrypt main text")
                 }
+            } else {
+                print("⚠️ [JournalEntry] No main text to encrypt")
             }
             
             // Encrypt raw text
             if let rawText = transcription.rawText {
+                print("🔐 [JournalEntry] Encrypting raw text (\(rawText.count) characters)")
                 if let encryptedData = EncryptionManager.encrypt(rawText, using: key) {
                     transcription.encryptedRawText = encryptedData
                     transcription.rawText = nil
+                    print("✅ [JournalEntry] Raw text encrypted successfully")
                 } else {
                     encryptionSuccess = false
+                    print("❌ [JournalEntry] Failed to encrypt raw text")
                 }
+            } else {
+                print("⚠️ [JournalEntry] No raw text to encrypt")
             }
             
             // Encrypt enhanced text
             if let enhancedText = transcription.enhancedText {
+                print("🔐 [JournalEntry] Encrypting enhanced text (\(enhancedText.count) characters)")
                 if let encryptedData = EncryptionManager.encrypt(enhancedText, using: key) {
                     transcription.encryptedEnhancedText = encryptedData
                     transcription.enhancedText = nil
+                    print("✅ [JournalEntry] Enhanced text encrypted successfully")
                 } else {
                     encryptionSuccess = false
+                    print("❌ [JournalEntry] Failed to encrypt enhanced text")
                 }
+            } else {
+                print("⚠️ [JournalEntry] No enhanced text to encrypt")
             }
             
             // Encrypt AI analysis
             if let aiAnalysis = transcription.aiAnalysis {
+                print("🔐 [JournalEntry] Encrypting AI analysis (\(aiAnalysis.count) characters)")
                 if let encryptedData = EncryptionManager.encrypt(aiAnalysis, using: key) {
                     transcription.encryptedAIAnalysis = encryptedData
                     transcription.aiAnalysis = nil
+                    print("✅ [JournalEntry] AI analysis encrypted successfully")
                 } else {
                     encryptionSuccess = false
+                    print("❌ [JournalEntry] Failed to encrypt AI analysis")
                 }
+            } else {
+                print("⚠️ [JournalEntry] No AI analysis to encrypt")
             }
             
             transcription.modifiedAt = Date()
+            print("🔐 [JournalEntry] Transcription encryption completed. Success: \(encryptionSuccess)")
+        } else {
+            print("⚠️ [JournalEntry] No transcription to encrypt")
         }
         
         // Mark as encrypted
@@ -395,45 +420,71 @@ extension JournalEntry {
         
         // Decrypt the transcription if it exists and is encrypted
         if let transcription = self.transcription {
+            print("🔓 [JournalEntry] Starting transcription decryption...")
+            
             // Decrypt main text
             if let encryptedData = transcription.encryptedText,
                transcription.text == nil {
+                print("🔓 [JournalEntry] Decrypting main text (\(encryptedData.count) bytes)")
                 if let decryptedText = EncryptionManager.decryptToString(encryptedData, using: key) {
                     transcription.text = decryptedText
+                    print("✅ [JournalEntry] Main text decrypted successfully (\(decryptedText.count) characters)")
                 } else {
                     decryptionSuccess = false
+                    print("❌ [JournalEntry] Failed to decrypt main text")
                 }
+            } else {
+                print("⚠️ [JournalEntry] No encrypted main text or already decrypted")
             }
             
             // Decrypt raw text
             if let encryptedData = transcription.encryptedRawText,
                transcription.rawText == nil {
+                print("🔓 [JournalEntry] Decrypting raw text (\(encryptedData.count) bytes)")
                 if let decryptedText = EncryptionManager.decryptToString(encryptedData, using: key) {
                     transcription.rawText = decryptedText
+                    print("✅ [JournalEntry] Raw text decrypted successfully (\(decryptedText.count) characters)")
                 } else {
                     decryptionSuccess = false
+                    print("❌ [JournalEntry] Failed to decrypt raw text")
                 }
+            } else {
+                print("⚠️ [JournalEntry] No encrypted raw text or already decrypted")
             }
             
             // Decrypt enhanced text
             if let encryptedData = transcription.encryptedEnhancedText,
                transcription.enhancedText == nil {
+                print("🔓 [JournalEntry] Decrypting enhanced text (\(encryptedData.count) bytes)")
                 if let decryptedText = EncryptionManager.decryptToString(encryptedData, using: key) {
                     transcription.enhancedText = decryptedText
+                    print("✅ [JournalEntry] Enhanced text decrypted successfully (\(decryptedText.count) characters)")
                 } else {
                     decryptionSuccess = false
+                    print("❌ [JournalEntry] Failed to decrypt enhanced text")
                 }
+            } else {
+                print("⚠️ [JournalEntry] No encrypted enhanced text or already decrypted. Enhanced text exists: \(transcription.enhancedText != nil)")
             }
             
             // Decrypt AI analysis
             if let encryptedData = transcription.encryptedAIAnalysis,
                transcription.aiAnalysis == nil {
+                print("🔓 [JournalEntry] Decrypting AI analysis (\(encryptedData.count) bytes)")
                 if let decryptedText = EncryptionManager.decryptToString(encryptedData, using: key) {
                     transcription.aiAnalysis = decryptedText
+                    print("✅ [JournalEntry] AI analysis decrypted successfully (\(decryptedText.count) characters)")
                 } else {
                     decryptionSuccess = false
+                    print("❌ [JournalEntry] Failed to decrypt AI analysis")
                 }
+            } else {
+                print("⚠️ [JournalEntry] No encrypted AI analysis or already decrypted. AI analysis exists: \(transcription.aiAnalysis != nil)")
             }
+            
+            print("🔓 [JournalEntry] Transcription decryption completed. Success: \(decryptionSuccess)")
+        } else {
+            print("⚠️ [JournalEntry] No transcription to decrypt")
         }
         
         if decryptionSuccess {
