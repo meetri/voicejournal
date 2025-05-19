@@ -24,6 +24,9 @@ class LanguageSettings: ObservableObject {
             // Save the selected locale identifier to UserDefaults
             UserDefaults.standard.set(selectedLocale.identifier, forKey: "selectedLocaleIdentifier")
             
+            // Update default recording language to match
+            defaultRecordingLanguage = SpeechLanguage(locale: selectedLocale)
+            
             // Notify any observers that the locale has changed
             NotificationCenter.default.post(name: .localeDidChange, object: selectedLocale)
         }
@@ -31,32 +34,59 @@ class LanguageSettings: ObservableObject {
     
     @Published var availableLocales: [Locale] = []
     
+    @Published var defaultRecordingLanguage: SpeechLanguage
+    
     private init() {
+        // Temporary variable to hold the locale
+        let tempLocale: Locale
+        
         // Load saved locale or use system default
         if let savedIdentifier = UserDefaults.standard.string(forKey: "selectedLocaleIdentifier") {
             print("[LanguageSettings] Loading saved locale: \(savedIdentifier)")
             
             // Create locale from saved identifier
-            selectedLocale = Locale(identifier: savedIdentifier)
+            let savedLocale = Locale(identifier: savedIdentifier)
             
             // Verify the locale is supported for speech recognition
             // More flexible comparison using language and region codes
             let isSupported = SFSpeechRecognizer.supportedLocales().contains(where: { supportedLocale in
-                return supportedLocale.languageCode == selectedLocale.languageCode &&
-                       (supportedLocale.regionCode == selectedLocale.regionCode || 
-                        selectedLocale.regionCode == nil)
+                if #available(iOS 16.0, *) {
+                    return supportedLocale.language.languageCode?.identifier == savedLocale.language.languageCode?.identifier &&
+                           (supportedLocale.region?.identifier == savedLocale.region?.identifier || 
+                            savedLocale.region?.identifier == nil)
+                } else {
+                    return supportedLocale.languageCode == savedLocale.languageCode &&
+                           (supportedLocale.regionCode == savedLocale.regionCode || 
+                            savedLocale.regionCode == nil)
+                }
             })
             
             if !isSupported {
                 print("[LanguageSettings] Saved locale not supported, falling back to current locale")
                 // Fall back to current locale if saved locale is not supported
-                selectedLocale = Locale.current
+                tempLocale = Locale.current
             } else {
                 print("[LanguageSettings] Saved locale is supported")
+                tempLocale = savedLocale
             }
         } else {
             print("[LanguageSettings] No saved locale, using system default: \(Locale.current.identifier)")
-            selectedLocale = Locale.current
+            tempLocale = Locale.current
+        }
+        
+        // Initialize both properties together
+        selectedLocale = tempLocale
+        defaultRecordingLanguage = SpeechLanguage(locale: tempLocale)
+        
+        // Load default recording language
+        if let savedRecordingLanguageId = UserDefaults.standard.string(forKey: "defaultRecordingLanguageId") {
+            if let savedLocale = SFSpeechRecognizer.supportedLocales().first(where: { $0.identifier == savedRecordingLanguageId }) {
+                defaultRecordingLanguage = SpeechLanguage(locale: savedLocale)
+            } else {
+                defaultRecordingLanguage = SpeechLanguage.defaultLanguage()
+            }
+        } else {
+            defaultRecordingLanguage = SpeechLanguage.defaultLanguage()
         }
         
         // Load available locales
@@ -83,18 +113,36 @@ class LanguageSettings: ObservableObject {
     
     func localizedName(for locale: Locale) -> String {
         // Fallback implementation for all iOS versions
-        if let languageCode = locale.languageCode {
-            if let displayName = Locale.current.localizedString(forLanguageCode: languageCode), !displayName.isEmpty {
-                // If there's a region code, add it in parentheses
-                if let regionCode = locale.regionCode, 
-                   let regionName = Locale.current.localizedString(forRegionCode: regionCode) {
-                    return "\(displayName) (\(regionName))"
+        if #available(iOS 16.0, *) {
+            if let languageCode = locale.language.languageCode?.identifier {
+                if let displayName = Locale.current.localizedString(forLanguageCode: languageCode), !displayName.isEmpty {
+                    // If there's a region code, add it in parentheses
+                    if let regionCode = locale.region?.identifier, 
+                       let regionName = Locale.current.localizedString(forRegionCode: regionCode) {
+                        return "\(displayName) (\(regionName))"
+                    }
+                    return displayName
                 }
-                return displayName
+            }
+        } else {
+            if let languageCode = locale.languageCode {
+                if let displayName = Locale.current.localizedString(forLanguageCode: languageCode), !displayName.isEmpty {
+                    // If there's a region code, add it in parentheses
+                    if let regionCode = locale.regionCode, 
+                       let regionName = Locale.current.localizedString(forRegionCode: regionCode) {
+                        return "\(displayName) (\(regionName))"
+                    }
+                    return displayName
+                }
             }
         }
         
         // Last resort fallback
         return locale.identifier
+    }
+    
+    func updateDefaultRecordingLanguage(_ language: SpeechLanguage) {
+        defaultRecordingLanguage = language
+        UserDefaults.standard.set(language.id, forKey: "defaultRecordingLanguageId")
     }
 }

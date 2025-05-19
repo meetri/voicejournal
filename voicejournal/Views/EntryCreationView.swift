@@ -36,6 +36,8 @@ struct EntryCreationView: View {
     @State private var transcriptionText = ""
     @State private var showingDiscardAlert = false
     @State private var encryptedTag: Tag? = nil
+    @State private var selectedLanguage = LanguageSettings.shared.defaultRecordingLanguage
+    @StateObject private var languageSettings = LanguageSettings.shared
     
     // MARK: - Body
     
@@ -97,6 +99,11 @@ struct EntryCreationView: View {
                         }
                         .padding(.vertical, 4)
                     }
+                }
+                
+                // Language selection section
+                Section(header: Text("Recording Language")) {
+                    CompactLanguageSelectionView(selectedLanguage: $selectedLanguage)
                 }
                 
                 // Recording section
@@ -210,6 +217,7 @@ struct EntryCreationView: View {
                     RecordingView(
                         context: viewContext,
                         existingEntry: entry,
+                        language: selectedLanguage,
                         onComplete: {
                             showingRecordingView = false
                         }

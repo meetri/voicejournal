@@ -42,14 +42,19 @@ struct RecordingView: View {
     
     // MARK: - Initialization
     
+    /// Language to use for recording
+    var recordingLanguage: SpeechLanguage?
+    
     /// Initialize the recording view
     /// - Parameters:
     ///   - context: The managed object context to use
     ///   - existingEntry: An optional existing journal entry to edit
     ///   - onComplete: An optional callback when recording is complete (for edit mode)
-    init(context: NSManagedObjectContext? = nil, existingEntry: JournalEntry? = nil, onComplete: (() -> Void)? = nil) {
+    ///   - language: The language to use for speech recognition
+    init(context: NSManagedObjectContext? = nil, existingEntry: JournalEntry? = nil, language: SpeechLanguage? = nil, onComplete: (() -> Void)? = nil) {
         self.existingEntry = existingEntry
         self.onComplete = onComplete
+        self.recordingLanguage = language
         
         let ctx = context ?? PersistenceController.shared.container.viewContext
         // Create the AudioRecordingService on the main actor
@@ -152,6 +157,12 @@ struct RecordingView: View {
             print("[RecordingView] View appeared")
             print("[RecordingView] Environment speech service locale: \(speechRecognitionService.currentLocale.identifier)")
             print("[RecordingView] Language settings locale: \(LanguageSettings.shared.selectedLocale.identifier)")
+            
+            // If a specific language was provided, use it for recording
+            if let language = recordingLanguage {
+                print("[RecordingView] Setting recording language to: \(language.id)")
+                speechRecognitionService.setRecognitionLocale(language.locale)
+            }
             
             // Update the view model with the environment speech recognition service
             viewModel.updateSpeechRecognitionService(speechRecognitionService)
