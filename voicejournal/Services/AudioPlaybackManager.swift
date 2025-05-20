@@ -152,10 +152,12 @@ class AudioPlaybackManager: NSObject, ObservableObject {
                     self?.spectrumAnalyzerService?.processAudioBuffer(buffer)
                 }
                 
-                // Start the engine
+                // Start the engine but don't start playing yet
+                // That will happen when play() is called
                 try audioEngine.start()
                 
-                print("🎵 [AudioPlaybackManager] Audio engine started for spectrum analysis")
+                print("🎵 [AudioPlaybackManager] Audio engine setup complete for spectrum analysis")
+                print("📊 [AudioPlaybackManager] Audio file format: \(file.processingFormat), length: \(file.length) frames")
             }
         } catch {
             print("❌ [AudioPlaybackManager] Failed to set up spectrum analysis: \(error)")
@@ -186,17 +188,44 @@ class AudioPlaybackManager: NSObject, ObservableObject {
             return
         }
         
+        // Get current time for synchronized playback
+        let currentTimePosition = player.currentTime
+        let wasAlreadyPlaying = isPlaying
+        
         player.play()
         isPlaying = true
         startPlaybackTimer()
         print("▶️ [AudioPlaybackManager] Playback started")
         
-        // Play the audio in the player node for spectrum analysis
+        // Handling spectrum analysis playback
         if let playerNode = playerNode, let audioFile = audioFile {
-            playerNode.stop()
-            playerNode.scheduleFile(audioFile, at: nil)
-            playerNode.play()
-            print("🎵 [AudioPlaybackManager] Started player node for spectrum analysis")
+            // Only restart playback if we weren't already playing
+            // or if current time is at the beginning
+            if !wasAlreadyPlaying {
+                playerNode.stop()
+                
+                // If resuming from a paused state (non-zero position)
+                if currentTimePosition > 0.01 {
+                    // Calculate frame position for synchronized resume
+                    let framePosition = AVAudioFramePosition(currentTimePosition * audioFile.processingFormat.sampleRate)
+                    let frameCount = AVAudioFrameCount(audioFile.length - framePosition)
+                    
+                    // Schedule file from current position
+                    playerNode.scheduleSegment(
+                        audioFile,
+                        startingFrame: framePosition,
+                        frameCount: frameCount,
+                        at: nil
+                    )
+                    print("🎵 [AudioPlaybackManager] Resumed player node from position: \(currentTimePosition)")
+                } else {
+                    // Start from beginning
+                    playerNode.scheduleFile(audioFile, at: nil)
+                    print("🎵 [AudioPlaybackManager] Started player node from beginning")
+                }
+                
+                playerNode.play()
+            }
         }
         
         // Post notification for other listeners
@@ -232,8 +261,11 @@ class AudioPlaybackManager: NSObject, ObservableObject {
         stopPlaybackTimer()
         print("⏹ [AudioPlaybackManager] Playback stopped")
         
-        // Stop the player node for spectrum analysis
-        playerNode?.stop()
+        // Stop the player node for spectrum analysis and reset it
+        if let playerNode = playerNode {
+            playerNode.stop()
+            print("🎵 [AudioPlaybackManager] Stopped player node for spectrum analysis")
+        }
         
         // Post notification for other listeners
         NotificationCenter.default.post(
@@ -244,11 +276,12 @@ class AudioPlaybackManager: NSObject, ObservableObject {
     
     /// Seek to specific time
     func seek(to time: TimeInterval) {
+        // Set time on main audio player
         audioPlayer?.currentTime = time
         currentTime = time
         
-        // If we're playing, update the player node for spectrum analysis
-        if isPlaying, let playerNode = playerNode, let audioFile = audioFile {
+        // Synchronize the player node for spectrum analysis
+        if let playerNode = playerNode, let audioFile = audioFile {
             let wasPlaying = playerNode.isPlaying
             
             // Calculate frame position
@@ -257,11 +290,16 @@ class AudioPlaybackManager: NSObject, ObservableObject {
             // Stop current playback
             playerNode.stop()
             
+            // Validate frame position to ensure it's within bounds
+            let safeFramePosition = max(0, min(framePosition, audioFile.length - 1))
+            
+            // Calculate remaining frames
+            let frameCount = AVAudioFrameCount(audioFile.length - safeFramePosition)
+            
             // Schedule file from the new position
-            let frameCount = AVAudioFrameCount(audioFile.length - framePosition)
             playerNode.scheduleSegment(
                 audioFile,
-                startingFrame: framePosition,
+                startingFrame: safeFramePosition,
                 frameCount: frameCount,
                 at: nil
             )
@@ -270,6 +308,8 @@ class AudioPlaybackManager: NSObject, ObservableObject {
             if wasPlaying {
                 playerNode.play()
             }
+            
+            print("🎵 [AudioPlaybackManager] Seeked player node to position: \(time)")
         }
     }
     

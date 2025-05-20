@@ -100,10 +100,18 @@ class AudioSpectrumManager {
     /// Process external buffer (for use with shared audio tap)
     func processExternalBuffer(_ buffer: AVAudioPCMBuffer) {
         // Only print occasionally to avoid log spam
-        if Int.random(in: 0...100) < 2 {  // ~2% chance to log
+        if Int.random(in: 0...500) < 1 {  // ~0.2% chance to log
             print("📊 [AudioSpectrumManager] Processing external buffer: \(buffer.frameLength) frames")
         }
-        process(buffer: buffer)
+        
+        // Only process the buffer if we have valid data
+        if buffer.frameLength > 0, buffer.floatChannelData != nil {
+            process(buffer: buffer)
+        } else {
+            if Int.random(in: 0...100) < 5 {  // ~5% chance to log
+                print("⚠️ [AudioSpectrumManager] Received empty or invalid buffer, skipping")
+            }
+        }
     }
     
     
