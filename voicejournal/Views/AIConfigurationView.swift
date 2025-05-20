@@ -496,31 +496,18 @@ struct EditAIConfigurationView: View {
                     Picker("Select Prompt", selection: $selectedPromptId) {
                         Text("Custom").tag(nil as UUID?)
                         ForEach(audioPrompts) { prompt in
-                            Text(prompt.name).tag(prompt.id as UUID?)
+                            Text(prompt.name ?? "Unnamed").tag(prompt.id as UUID?)
                         }
                     }
                     .onChange(of: selectedPromptId) { _, newValue in
-                        if let id = newValue, 
-                           let prompt = audioPrompts.first(where: { $0.id == id }) {
-                            audioAnalysisPrompt = prompt.content
-                        }
+                        updateSelectedPrompt(newValue)
                     }
                     
                     if selectedPromptId == nil {
                         TextEditor(text: $audioAnalysisPrompt)
                             .frame(minHeight: 150)
-                    } else if let id = selectedPromptId,
-                              let prompt = audioPrompts.first(where: { $0.id == id }) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(prompt.name)
-                                .font(.headline)
-                            
-                            Text(prompt.content)
-                                .font(.body)
-                                .foregroundColor(.secondary)
-                                .padding(.vertical, 4)
-                        }
-                        .padding(.vertical, 8)
+                    } else {
+                        selectedPromptView
                     }
                     
                     NavigationLink("Manage Prompts") {
@@ -583,6 +570,35 @@ struct EditAIConfigurationView: View {
             audioAnalysisPrompt: audioAnalysisPrompt.isEmpty ? nil : audioAnalysisPrompt
         )
         dismiss()
+    }
+    
+    private func updateSelectedPrompt(_ newValue: UUID?) {
+        if let id = newValue, 
+           let prompt = audioPrompts.first(where: { $0.id == id }) {
+            audioAnalysisPrompt = prompt.content ?? ""
+        }
+    }
+    
+    private var selectedPromptView: some View {
+        Group {
+            if let id = selectedPromptId,
+               let prompt = audioPrompts.first(where: { $0.id == id }) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(prompt.name ?? "Unnamed")
+                        .font(.headline)
+                    
+                    Text(prompt.content ?? "No content")
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                        .padding(.vertical, 4)
+                }
+                .padding(.vertical, 8)
+            } else {
+                Text("Selected prompt not found")
+                    .foregroundColor(.red)
+                    .italic()
+            }
+        }
     }
 }
 

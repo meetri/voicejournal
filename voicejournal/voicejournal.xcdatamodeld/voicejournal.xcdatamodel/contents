@@ -1,5 +1,30 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="23788" systemVersion="24E263" minimumToolsVersion="Automatic" sourceLanguage="Swift" userDefinedModelVersionIdentifier="">
+    <entity name="AIConfiguration" representedClassName="AIConfiguration" syncable="YES" codeGenerationType="class">
+        <attribute name="apiEndpoint" optional="YES" attributeType="String"/>
+        <attribute name="apiKey" optional="YES" attributeType="String"/>
+        <attribute name="audioAnalysisPrompt" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="isActive" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="lastUsedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="modelIdentifier" optional="YES" attributeType="String"/>
+        <attribute name="modifiedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="name" attributeType="String"/>
+        <attribute name="systemPrompt" optional="YES" attributeType="String"/>
+        <attribute name="totalInputTokens" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="totalOutputTokens" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="totalRequests" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="vendor" attributeType="String" defaultValueString="openai"/>
+    </entity>
+    <entity name="AIPrompt" representedClassName="AIPrompt" syncable="YES">
+        <attribute name="content" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="isDefault" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="modifiedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="name" optional="YES" attributeType="String"/>
+        <attribute name="type" optional="YES" attributeType="String"/>
+    </entity>
     <entity name="AudioRecording" representedClassName="AudioRecording" syncable="YES" codeGenerationType="class">
         <attribute name="duration" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="filePath" attributeType="String"/>
@@ -17,6 +42,17 @@
         <attribute name="timestamp" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <relationship name="audioRecording" maxCount="1" deletionRule="Nullify" destinationEntity="AudioRecording" inverseName="bookmarks" inverseEntity="AudioRecording"/>
     </entity>
+    <entity name="CustomTheme" representedClassName="CustomTheme" syncable="YES">
+        <attribute name="author" optional="YES" attributeType="String"/>
+        <attribute name="createdDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="isBuiltIn" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="isEditable" optional="YES" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
+        <attribute name="isSelected" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="lastModified" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="name" optional="YES" attributeType="String"/>
+        <attribute name="themeDataJSON" optional="YES" attributeType="Binary"/>
+    </entity>
     <entity name="JournalEntry" representedClassName="JournalEntry" syncable="YES" codeGenerationType="class">
         <attribute name="baseEncryptedAudioPath" optional="YES" attributeType="String"/>
         <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
@@ -27,7 +63,7 @@
         <relationship name="audioRecording" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="AudioRecording" inverseName="journalEntry" inverseEntity="AudioRecording"/>
         <relationship name="encryptedTag" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Tag" inverseName="encryptedEntries" inverseEntity="Tag"/>
         <relationship name="tags" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Tag" inverseName="entries" inverseEntity="Tag"/>
-        <relationship name="transcription" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="Transcription" inverseName="journalEntry" inverseEntity="Transcription"/>
+        <relationship name="transcription" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="Transcription" inverseName="journalEntry" inverseEntity="JournalEntry"/>
     </entity>
     <entity name="Tag" representedClassName="Tag" syncable="YES" codeGenerationType="class">
         <attribute name="color" optional="YES" attributeType="String"/>
@@ -42,44 +78,17 @@
         <relationship name="entries" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="JournalEntry" inverseName="tags" inverseEntity="JournalEntry"/>
     </entity>
     <entity name="Transcription" representedClassName="Transcription" syncable="YES" codeGenerationType="class">
+        <attribute name="aiAnalysis" optional="YES" attributeType="String"/>
         <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="encryptedText" optional="YES" attributeType="Binary"/>
-        <attribute name="encryptedRawText" optional="YES" attributeType="Binary"/>
-        <attribute name="encryptedEnhancedText" optional="YES" attributeType="Binary"/>
         <attribute name="encryptedAIAnalysis" optional="YES" attributeType="Binary"/>
+        <attribute name="encryptedEnhancedText" optional="YES" attributeType="Binary"/>
+        <attribute name="encryptedRawText" optional="YES" attributeType="Binary"/>
+        <attribute name="encryptedText" optional="YES" attributeType="Binary"/>
         <attribute name="enhancedText" optional="YES" attributeType="String"/>
         <attribute name="modifiedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="rawText" optional="YES" attributeType="String"/>
         <attribute name="text" optional="YES" attributeType="String"/>
         <attribute name="timingData" optional="YES" attributeType="String"/>
-        <attribute name="aiAnalysis" optional="YES" attributeType="String"/>
         <relationship name="journalEntry" maxCount="1" deletionRule="Nullify" destinationEntity="JournalEntry" inverseName="transcription" inverseEntity="JournalEntry"/>
-    </entity>
-    <entity name="CustomTheme" representedClassName="CustomTheme" syncable="YES">
-        <attribute name="author" optional="YES" attributeType="String"/>
-        <attribute name="createdDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
-        <attribute name="isBuiltIn" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
-        <attribute name="isEditable" optional="YES" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
-        <attribute name="isSelected" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
-        <attribute name="lastModified" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="name" optional="YES" attributeType="String"/>
-        <attribute name="themeDataJSON" optional="YES" attributeType="Binary"/>
-    </entity>
-    <entity name="AIConfiguration" representedClassName="AIConfiguration" syncable="YES" codeGenerationType="class">
-        <attribute name="apiEndpoint" optional="YES" attributeType="String"/>
-        <attribute name="apiKey" optional="YES" attributeType="String"/>
-        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="isActive" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
-        <attribute name="modelIdentifier" optional="YES" attributeType="String"/>
-        <attribute name="modifiedAt" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="name" attributeType="String"/>
-        <attribute name="systemPrompt" optional="YES" attributeType="String"/>
-        <attribute name="vendor" attributeType="String" defaultValueString="openai"/>
-        <attribute name="totalInputTokens" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
-        <attribute name="totalOutputTokens" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
-        <attribute name="totalRequests" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
-        <attribute name="lastUsedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="audioAnalysisPrompt" optional="YES" attributeType="String"/>
     </entity>
 </model>

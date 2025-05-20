@@ -8,18 +8,8 @@
 import Foundation
 import CoreData
 
-/// Model for storing AI prompt templates
-class AIPrompt: NSManagedObject, Identifiable {
-    
-    // MARK: - Properties
-    
-    @NSManaged var id: UUID
-    @NSManaged var name: String
-    @NSManaged var content: String
-    @NSManaged var type: String
-    @NSManaged var isDefault: Bool
-    @NSManaged var createdAt: Date
-    @NSManaged var modifiedAt: Date
+/// Extension methods for AIPrompt entity
+extension AIPrompt {
     
     // MARK: - Initialization
     
@@ -79,22 +69,50 @@ class AIPrompt: NSManagedObject, Identifiable {
         for type: AIPromptType,
         in context: NSManagedObjectContext
     ) -> AIPrompt? {
+        print("🔍 [AIPrompt.fetchDefault] Fetching default prompt for type: \(type.rawValue)")
+        
         let request: NSFetchRequest<AIPrompt> = AIPrompt.fetchRequest()
         request.predicate = NSPredicate(format: "type == %@ AND isDefault == YES", type.rawValue)
         request.fetchLimit = 1
         
+        // Log existing prompts for debugging
+        do {
+            let allPromptsRequest: NSFetchRequest<AIPrompt> = AIPrompt.fetchRequest()
+            allPromptsRequest.predicate = NSPredicate(format: "type == %@", type.rawValue)
+            let allResults = try context.fetch(allPromptsRequest)
+            
+            print("📊 [AIPrompt.fetchDefault] Found \(allResults.count) prompts of type \(type.rawValue):")
+            for (index, prompt) in allResults.enumerated() {
+                print("  \(index+1). '\(prompt.name ?? "Unnamed")' - isDefault: \(prompt.isDefault), id: \(prompt.id?.uuidString ?? "nil")")
+            }
+        } catch {
+            print("❌ [AIPrompt.fetchDefault] Error fetching all prompts: \(error)")
+        }
+        
+        // Now try to fetch the default prompt
         do {
             let results = try context.fetch(request)
-            return results.first
+            if let defaultPrompt = results.first {
+                print("✅ [AIPrompt.fetchDefault] Found default prompt: '\(defaultPrompt.name ?? "Unnamed")' with id: \(defaultPrompt.id?.uuidString ?? "nil")")
+                return defaultPrompt
+            } else {
+                print("⚠️ [AIPrompt.fetchDefault] No default prompt found for type: \(type.rawValue)")
+                return nil
+            }
         } catch {
-            print("Error fetching default AI prompt: \(error)")
+            print("❌ [AIPrompt.fetchDefault] Error fetching default AI prompt: \(error)")
             return nil
         }
     }
     
     /// Set this prompt as the default for its type
     func setAsDefault(in context: NSManagedObjectContext) {
-        guard let type = self.type else { return }
+        guard let type = self.type else {
+            print("❌ [AIPrompt.setAsDefault] Failed to set default: prompt has no type")
+            return
+        }
+        
+        print("🔄 [AIPrompt.setAsDefault] Setting prompt '\(self.name ?? "Unnamed")' as default for type: \(type)")
         
         // Unset any existing defaults for this type
         let request: NSFetchRequest<AIPrompt> = AIPrompt.fetchRequest()
@@ -102,19 +120,35 @@ class AIPrompt: NSManagedObject, Identifiable {
         
         do {
             let results = try context.fetch(request)
+            print("📊 [AIPrompt.setAsDefault] Found \(results.count) existing default prompts to clear")
+            
             for prompt in results {
+                print("  - Unsetting default status for '\(prompt.name ?? "Unnamed")' (id: \(prompt.id?.uuidString ?? "nil"))")
                 prompt.isDefault = false
             }
         } catch {
-            print("Error clearing default prompts: \(error)")
+            print("❌ [AIPrompt.setAsDefault] Error clearing default prompts: \(error)")
         }
         
         // Set this prompt as default
         self.isDefault = true
         self.modifiedAt = Date()
+        print("✅ [AIPrompt.setAsDefault] Set isDefault = true for prompt '\(self.name ?? "Unnamed")' (id: \(self.id?.uuidString ?? "nil"))")
         
         // Save changes
-        try? context.save()
+        do {
+            try context.save()
+            print("✅ [AIPrompt.setAsDefault] Successfully saved changes to context")
+            
+            // Verify the change was applied correctly
+            if self.isDefault {
+                print("✅ [AIPrompt.setAsDefault] Verified prompt isDefault = true after save")
+            } else {
+                print("⚠️ [AIPrompt.setAsDefault] Warning: prompt.isDefault = false after save!")
+            }
+        } catch {
+            print("❌ [AIPrompt.setAsDefault] Error saving context: \(error)")
+        }
     }
 }
 
@@ -144,9 +178,4 @@ enum AIPromptType: String, CaseIterable {
 }
 
 // MARK: - Core Data Generation
-
-extension AIPrompt {
-    @nonobjc public class func fetchRequest() -> NSFetchRequest<AIPrompt> {
-        return NSFetchRequest<AIPrompt>(entityName: "AIPrompt")
-    }
-}
+// fetchRequest() is defined in AIPrompt+CoreDataProperties.swift

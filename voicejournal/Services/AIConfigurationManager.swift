@@ -76,14 +76,16 @@ class AIConfigurationManager: ObservableObject {
         apiEndpoint: String? = nil,
         apiKey: String? = nil,
         modelIdentifier: String? = nil,
-        systemPrompt: String? = nil
+        systemPrompt: String? = nil,
+        audioAnalysisPrompt: String? = nil
     ) {
         configuration.update(
             name: name,
             apiEndpoint: apiEndpoint,
             apiKey: apiKey,
             modelIdentifier: modelIdentifier,
-            systemPrompt: systemPrompt
+            systemPrompt: systemPrompt,
+            audioAnalysisPrompt: audioAnalysisPrompt
         )
         
         save()

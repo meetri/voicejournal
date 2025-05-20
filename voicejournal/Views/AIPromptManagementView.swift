@@ -113,7 +113,7 @@ struct AIPromptManagementView: View {
                 deletePrompt(prompt)
             }
         } message: { prompt in
-            Text("Are you sure you want to delete '\(prompt.name)'?")
+            Text("Are you sure you want to delete '\(prompt.name ?? "Unnamed")'?")
         }
     }
     
@@ -214,11 +214,11 @@ struct PromptRow: View {
         } label: {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(prompt.name)
+                    Text(prompt.name ?? "Unnamed")
                         .font(.body)
                         .foregroundColor(.primary)
                     
-                    Text(prompt.content.prefix(50) + (prompt.content.count > 50 ? "..." : ""))
+                    Text((prompt.content ?? "").prefix(50) + ((prompt.content?.count ?? 0) > 50 ? "..." : ""))
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .lineLimit(1)
@@ -269,7 +269,7 @@ struct PromptDetailView: View {
                     HStack {
                         Text("Name")
                         Spacer()
-                        Text(prompt.name)
+                        Text(prompt.name ?? "Unnamed")
                             .foregroundColor(.secondary)
                     }
                     
@@ -304,7 +304,7 @@ struct PromptDetailView: View {
                 
                 // Prompt Content
                 Section {
-                    Text(prompt.content)
+                    Text(prompt.content ?? "No content")
                         .font(.body)
                         .foregroundColor(.primary)
                         .padding(.vertical, 8)
@@ -344,7 +344,7 @@ struct PromptDetailView: View {
                 }
             }
             .listStyle(InsetGroupedListStyle())
-            .navigationTitle(prompt.name)
+            .navigationTitle(prompt.name ?? "Prompt Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -361,7 +361,7 @@ struct PromptDetailView: View {
                 dismiss()
             }
         } message: {
-            Text("Are you sure you want to delete '\(prompt.name)'?")
+            Text("Are you sure you want to delete '\(prompt.name ?? "Unnamed")'?")
         }
     }
 }
@@ -462,8 +462,8 @@ struct EditAIPromptView: View {
     
     init(prompt: AIPrompt) {
         self.prompt = prompt
-        _name = State(initialValue: prompt.name)
-        _content = State(initialValue: prompt.content)
+        _name = State(initialValue: prompt.name ?? "")
+        _content = State(initialValue: prompt.content ?? "")
         _isDefault = State(initialValue: prompt.isDefault)
     }
     
@@ -513,13 +513,29 @@ struct EditAIPromptView: View {
         prompt.content = content
         prompt.modifiedAt = Date()
         
-        if isDefault && !prompt.isDefault {
-            prompt.setAsDefault(in: viewContext)
-            
-            // If setting as default audio analysis prompt, update the active configuration
-            if prompt.promptType == .audioAnalysis,
-               let activeConfig = AIConfigurationManager.shared.activeConfiguration {
-                activeConfig.audioAnalysisPrompt = content
+        // Handle toggling default status
+        if isDefault != prompt.isDefault {
+            if isDefault {
+                // Setting as default
+                prompt.setAsDefault(in: viewContext)
+                
+                // If setting as default audio analysis prompt, update the active configuration
+                if prompt.promptType == .audioAnalysis,
+                   let activeConfig = AIConfigurationManager.shared.activeConfiguration {
+                    activeConfig.audioAnalysisPrompt = content
+                }
+            } else {
+                // Removing default status
+                prompt.isDefault = false
+                
+                // Create a new default prompt if this was the default
+                let promptType = prompt.promptType ?? .audioAnalysis
+                let otherPrompts = AIPrompt.fetch(type: promptType, in: viewContext)
+                    .filter { $0.id != prompt.id }
+                
+                if let newDefault = otherPrompts.first {
+                    newDefault.setAsDefault(in: viewContext)
+                }
             }
         }
         

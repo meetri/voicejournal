@@ -7,6 +7,7 @@
 
 import CoreData
 import Foundation
+import SwiftUI
 
 class PersistenceController {
     static let shared = PersistenceController()
@@ -76,10 +77,14 @@ class PersistenceController {
                 // Migration successful
             }
             
+            // Create default AI prompts if needed
+            AIPromptDefaultManager.shared.createDefaultPromptsIfNeeded(in: container.viewContext)
+            
             // Migrate existing entries to base encryption if needed
             await migrateToBaseEncryption()
         }
     }
+    
     
     /// Migrate existing journal entries to use base encryption
     @MainActor
