@@ -115,8 +115,14 @@ class AudioPlaybackViewModel: ObservableObject {
         self.playbackService = playbackService
         self.spectrumAnalyzerService = SpectrumAnalyzerService()
         
+        // Set up the spectrum analyzer delegate
+        self.spectrumAnalyzerService.delegate = self
+        
         // Set up publishers
         setupPublishers()
+        
+        // Set up audio spectrum manager for AudioPlaybackManager
+        setupSpectrumAnalyzer()
     }
     
     // MARK: - Public Methods
@@ -454,6 +460,31 @@ class AudioPlaybackViewModel: ObservableObject {
             .store(in: &cancellables)
     }
     
+    private func setupSpectrumAnalyzer() {
+        // When audio file is loaded, set up spectrum analyzer for the file
+        NotificationCenter.default.publisher(for: .AudioPlaybackManagerDidLoadAudio)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] notification in
+                guard let self = self,
+                      let url = notification.object as? URL else { return }
+                
+                // Start spectrum analysis for playback
+                self.spectrumAnalyzerService.startPlaybackAnalysis(fileURL: url)
+                try? self.spectrumAnalyzerService.start()
+                print("🎵 [AudioPlaybackViewModel] Started spectrum analyzer for: \(url.lastPathComponent)")
+            }
+            .store(in: &cancellables)
+        
+        // When playback stops, stop the spectrum analyzer
+        NotificationCenter.default.publisher(for: .AudioPlaybackManagerDidStop)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.spectrumAnalyzerService.stop()
+                print("🎵 [AudioPlaybackViewModel] Stopped spectrum analyzer")
+            }
+            .store(in: &cancellables)
+    }
+    
     private func setupPublishers() {
         // Subscribe to playback state changes
         playbackService.$state
@@ -550,11 +581,18 @@ class AudioPlaybackViewModel: ObservableObject {
 
 // MARK: - Extensions
 
-extension AudioPlaybackViewModel: AudioSpectrumDelegate {
+extension AudioPlaybackViewModel: AudioSpectrumDelegate, SpectrumAnalyzerDelegate {
     /// Implements AudioSpectrumDelegate to receive frequency data
     nonisolated func didUpdateSpectrum(_ bars: [Float]) {
         Task { @MainActor in
             self.frequencyData = bars
+        }
+    }
+    
+    /// Implements SpectrumAnalyzerDelegate to receive frequency data
+    nonisolated func didUpdateFrequencyData(_ frequencyData: [Float]) {
+        Task { @MainActor in
+            self.frequencyData = frequencyData
         }
     }
 }

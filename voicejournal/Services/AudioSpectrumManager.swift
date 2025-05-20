@@ -23,9 +23,15 @@ class AudioSpectrumManager {
     weak var delegate: AudioSpectrumDelegate?
     private var playerNode: AVAudioPlayerNode?
     
+    // Concurrency
+    private let processingQueue = DispatchQueue(label: "com.voicejournal.fft-processing", qos: .userInitiated)
+    
     // Smoothing for visualization
     private var previousBars: [Float] = []
     private let smoothingFactor: Float = 0.5 // Higher = more smoothing
+    
+    // Thread safety for previousBars
+    private let lock = NSLock()
     
     // MARK: - Initialization
     
@@ -53,15 +59,20 @@ class AudioSpectrumManager {
     func startPlaybackAnalysis(fileURL: URL) {
         stopAnalysis()
         
+        print("🎛️ [AudioSpectrumManager] Starting playback analysis for: \(fileURL.lastPathComponent)")
+        
         // Use a player node in our engine to get the audio data
         let player = AVAudioPlayerNode()
         engine.attach(player)
         self.playerNode = player
         
         guard let file = try? AVAudioFile(forReading: fileURL) else {
-            // Failed to open audio file
+            print("❌ [AudioSpectrumManager] Failed to open audio file: \(fileURL.lastPathComponent)")
             return
         }
+        
+        print("✅ [AudioSpectrumManager] Successfully opened audio file: \(fileURL.lastPathComponent)")
+        print("📊 [AudioSpectrumManager] Audio format: \(file.processingFormat), duration: \(Float(file.length) / Float(file.processingFormat.sampleRate)) seconds")
         
         let format = file.processingFormat
         
@@ -81,16 +92,19 @@ class AudioSpectrumManager {
             player.volume = 0.0  // Mute this player to avoid echo
             player.play()
             
-            // Audio engine started for playback analysis
+            print("🎵 [AudioSpectrumManager] Audio engine started for playback analysis")
         } catch {
-            // print("Failed to start audio engine: \(error)")
+            print("❌ [AudioSpectrumManager] Failed to start audio engine: \(error)")
         }
     }
     
     func stopAnalysis() {
+        print("🛑 [AudioSpectrumManager] Stopping audio spectrum analysis")
+        
         // Remove any installed taps
         if engine.inputNode.numberOfInputs > 0 {
             engine.inputNode.removeTap(onBus: 0)
+            print("🎤 [AudioSpectrumManager] Removed tap from input node")
         }
         
         if let player = playerNode {
@@ -98,11 +112,23 @@ class AudioSpectrumManager {
             player.stop()
             engine.detach(player)
             playerNode = nil
+            print("🔇 [AudioSpectrumManager] Stopped and detached player node")
         }
         
         engine.mainMixerNode.removeTap(onBus: 0)
-        engine.stop()
-        // Audio engine stopped
+        
+        // Only stop the engine if it's running
+        if engine.isRunning {
+            engine.stop()
+            print("⏹️ [AudioSpectrumManager] Audio engine stopped")
+        }
+        
+        // Reset previous bars to avoid stale data
+        lock.lock()
+        previousBars = [Float](repeating: 0, count: barCount)
+        lock.unlock()
+        
+        print("🧹 [AudioSpectrumManager] Audio analysis completely stopped and reset")
     }
     
     // MARK: - Public Methods
@@ -115,92 +141,125 @@ class AudioSpectrumManager {
     // MARK: - Private Methods
     
     private func process(buffer: AVAudioPCMBuffer) {
-        guard let fftSetup = fftSetup,
-              let channelData = buffer.floatChannelData?[0],
+        // Copy buffer data to avoid potential race conditions
+        guard let channelData = buffer.floatChannelData?[0],
               buffer.frameLength > 0 else { 
+            print("⚠️ [AudioSpectrumManager] Received empty or invalid audio buffer")
             return 
         }
         
-        let frameCount = Int(buffer.frameLength)
-        
-        // Apply Hann window
-        let window = vDSP.window(ofType: Float.self,
-                                usingSequence: .hanningDenormalized,
-                                count: frameCount,
-                                isHalfWindow: false)
-        
-        var windowed = [Float](repeating: 0, count: frameCount)
-        let channelDataArray = Array(UnsafeBufferPointer(start: channelData, count: frameCount))
-        vDSP.multiply(channelDataArray, window, result: &windowed)
-        
-        // Pad with zeros if needed
-        if frameCount < fftSize {
-            windowed.append(contentsOf: [Float](repeating: 0, count: fftSize - frameCount))
+        // Only print this occasionally to avoid log spam
+        if Int.random(in: 0...100) < 2 {  // ~2% chance to log
+            print("📊 [AudioSpectrumManager] Processing audio buffer: \(buffer.frameLength) frames")
         }
         
-        // Perform FFT
-        var real = [Float](repeating: 0, count: fftSize/2)
-        var imag = [Float](repeating: 0, count: fftSize/2)
+        let frameCount = Int(buffer.frameLength)
+        let channelDataArray = Array(UnsafeBufferPointer(start: channelData, count: frameCount))
         
-        real.withUnsafeMutableBufferPointer { realPtr in
-            imag.withUnsafeMutableBufferPointer { imagPtr in
-                var split = DSPSplitComplex(realp: realPtr.baseAddress!, imagp: imagPtr.baseAddress!)
-                
-                windowed.withUnsafeBufferPointer {
-                    $0.baseAddress!.withMemoryRebound(to: DSPComplex.self, capacity: fftSize/2) {
-                        vDSP_ctoz($0, 2, &split, 1, vDSP_Length(fftSize / 2))
-                    }
-                }
-                
-                vDSP_fft_zrip(fftSetup, &split, 1, log2n, FFTDirection(FFT_FORWARD))
-                
-                var magnitudes = [Float](repeating: 0.0, count: fftSize/2)
-                vDSP_zvabs(&split, 1, &magnitudes, 1, vDSP_Length(fftSize/2))
-                
-                // Scale magnitudes to compensate for FFT size
-                var scaleFactor: Float = 2.0 / Float(fftSize)
-                vDSP_vsmul(magnitudes, 1, &scaleFactor, &magnitudes, 1, vDSP_Length(magnitudes.count))
-                
-                // Apply logarithmic scaling for better perception
-                // log10(x + 1) to avoid log(0) and maintain dynamic range
-                var logMagnitudes = [Float](repeating: 0.0, count: magnitudes.count)
-                for i in 0..<magnitudes.count {
-                    // Add a small epsilon to avoid log(0), but keep it small to preserve silence
-                    let epsilon: Float = 1e-10
-                    logMagnitudes[i] = log10(magnitudes[i] + epsilon)
-                }
-                
-                // Apply a noise floor threshold to eliminate background noise
-                let noiseFloor: Float = -60.0 // dB threshold
-                let minMagnitude: Float = pow(10, noiseFloor / 20.0)
-                
-                // Convert to linear scale (0-1 range) with proper silence detection
-                var scaledMagnitudes = [Float](repeating: 0.0, count: logMagnitudes.count)
-                let dynamicRange: Float = 50.0 // dB dynamic range (reduced for better scaling)
-                let minDB: Float = -dynamicRange
-                let maxDB: Float = -5.0 // Adjusted to boost overall levels
-                
-                for i in 0..<logMagnitudes.count {
-                    // Convert log magnitude to dB (20 * log10(magnitude))
-                    let db = 20.0 * logMagnitudes[i]
+        // Create a thread-local copy of FFTSetup to avoid Sendable warnings
+        guard let fftSetupLocal = fftSetup else { 
+            print("❌ [AudioSpectrumManager] FFT setup not available")
+            return 
+        }
+        
+        let fftSizeLocal = fftSize
+        let log2nLocal = log2n
+        
+        // Move intensive FFT processing to background queue
+        processingQueue.async { [weak self] in
+            guard let self = self else { return }
+            
+            // Apply Hann window
+            let window = vDSP.window(ofType: Float.self,
+                                    usingSequence: .hanningDenormalized,
+                                    count: frameCount,
+                                    isHalfWindow: false)
+            
+            var windowed = [Float](repeating: 0, count: frameCount)
+            vDSP.multiply(channelDataArray, window, result: &windowed)
+            
+            // Pad with zeros if needed
+            if frameCount < fftSizeLocal {
+                windowed.append(contentsOf: [Float](repeating: 0, count: fftSizeLocal - frameCount))
+            }
+            
+            // Perform FFT
+            var real = [Float](repeating: 0, count: fftSizeLocal/2)
+            var imag = [Float](repeating: 0, count: fftSizeLocal/2)
+            
+            real.withUnsafeMutableBufferPointer { realPtr in
+                imag.withUnsafeMutableBufferPointer { imagPtr in
+                    var split = DSPSplitComplex(realp: realPtr.baseAddress!, imagp: imagPtr.baseAddress!)
                     
-                    // Apply noise floor
-                    if magnitudes[i] < minMagnitude {
-                        scaledMagnitudes[i] = 0.0
-                    } else {
-                        // Map dB to 0-1 range with clamping
-                        let normalized = (db - minDB) / (maxDB - minDB)
-                        scaledMagnitudes[i] = max(0.0, min(1.0, normalized))
+                    windowed.withUnsafeBufferPointer {
+                        $0.baseAddress!.withMemoryRebound(to: DSPComplex.self, capacity: fftSizeLocal/2) {
+                            vDSP_ctoz($0, 2, &split, 1, vDSP_Length(fftSizeLocal / 2))
+                        }
                     }
-                }
-                
-                let bars = self.reduceToBars(magnitudes: scaledMagnitudes)
-                
-                if bars.contains(where: { $0 > 0 }) {
-                }
-                
-                DispatchQueue.main.async {
-                    self.delegate?.didUpdateSpectrum(bars)
+                    
+                    // Use local copy of FFTSetup to avoid Sendable issues
+                    vDSP_fft_zrip(fftSetupLocal, &split, 1, log2nLocal, FFTDirection(FFT_FORWARD))
+                    
+                    var magnitudes = [Float](repeating: 0.0, count: fftSizeLocal/2)
+                    vDSP_zvabs(&split, 1, &magnitudes, 1, vDSP_Length(fftSizeLocal/2))
+                    
+                    // Scale magnitudes to compensate for FFT size
+                    var scaleFactor: Float = 2.0 / Float(fftSizeLocal)
+                    vDSP_vsmul(magnitudes, 1, &scaleFactor, &magnitudes, 1, vDSP_Length(magnitudes.count))
+                    
+                    // Apply logarithmic scaling for better perception
+                    // log10(x + 1) to avoid log(0) and maintain dynamic range
+                    var logMagnitudes = [Float](repeating: 0.0, count: magnitudes.count)
+                    for i in 0..<magnitudes.count {
+                        // Add a small epsilon to avoid log(0), but keep it small to preserve silence
+                        let epsilon: Float = 1e-10
+                        logMagnitudes[i] = log10(magnitudes[i] + epsilon)
+                    }
+                    
+                    // Apply a noise floor threshold to eliminate background noise
+                    let noiseFloor: Float = -60.0 // dB threshold
+                    let minMagnitude: Float = pow(10, noiseFloor / 20.0)
+                    
+                    // Convert to linear scale (0-1 range) with proper silence detection
+                    var scaledMagnitudes = [Float](repeating: 0.0, count: logMagnitudes.count)
+                    let dynamicRange: Float = 50.0 // dB dynamic range (reduced for better scaling)
+                    let minDB: Float = -dynamicRange
+                    let maxDB: Float = -5.0 // Adjusted to boost overall levels
+                    
+                    for i in 0..<logMagnitudes.count {
+                        // Convert log magnitude to dB (20 * log10(magnitude))
+                        let db = 20.0 * logMagnitudes[i]
+                        
+                        // Apply noise floor
+                        if magnitudes[i] < minMagnitude {
+                            scaledMagnitudes[i] = 0.0
+                        } else {
+                            // Map dB to 0-1 range with clamping
+                            let normalized = (db - minDB) / (maxDB - minDB)
+                            scaledMagnitudes[i] = max(0.0, min(1.0, normalized))
+                        }
+                    }
+                    
+                    // Process bars in a thread-safe manner
+                    let bars = self.reduceToBars(magnitudes: scaledMagnitudes)
+                    
+                    // Debug log to check if we're getting data
+                    if bars.contains(where: { $0 > 0 }) {
+                        // Only occasionally log to avoid spam
+                        if Int.random(in: 0...100) < 1 {  // ~1% chance to log
+                            print("📈 [AudioSpectrumManager] Got non-zero spectrum data: \(bars.prefix(5))...")
+                        }
+                    } else {
+                        // Log more frequently when there's no data, as this is an error condition
+                        if Int.random(in: 0...100) < 10 {  // ~10% chance to log
+                            print("⚠️ [AudioSpectrumManager] Received all-zero spectrum data")
+                        }
+                    }
+                    
+                    // Dispatch UI updates to main thread
+                    DispatchQueue.main.async {
+                        self.delegate?.didUpdateSpectrum(bars)
+                    }
                 }
             }
         }
@@ -231,7 +290,19 @@ class AudioSpectrumManager {
             }
         }
         
-        // Apply smoothing using exponential moving average
+        // Apply smoothing using exponential moving average with proper locking
+        // to ensure thread-safety when accessing shared state (previousBars)
+        lock.lock()
+        defer { lock.unlock() }
+        
+        // Initialize previousBars if empty (thread-safe check)
+        if previousBars.isEmpty || previousBars.count != barCount {
+            previousBars = [Float](repeating: 0, count: barCount)
+        }
+        
+        // Create a local copy of the result to return
+        var resultBars = [Float](repeating: 0, count: barCount)
+        
         for i in 0..<barCount {
             let currentValue = bars[i]
             let previousValue = previousBars[i]
@@ -239,16 +310,17 @@ class AudioSpectrumManager {
             // Smooth the values, but allow quick rises and slow falls
             if currentValue > previousValue {
                 // Allow quick rises
-                bars[i] = currentValue * 0.9 + previousValue * 0.1
+                resultBars[i] = currentValue * 0.9 + previousValue * 0.1
             } else {
                 // Slow falls
-                bars[i] = currentValue * 0.3 + previousValue * 0.7
+                resultBars[i] = currentValue * 0.3 + previousValue * 0.7
             }
             
-            previousBars[i] = bars[i]
+            // Update shared state under lock
+            previousBars[i] = resultBars[i]
         }
         
-        return bars
+        return resultBars
     }
     
     deinit {

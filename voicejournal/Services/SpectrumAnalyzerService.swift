@@ -100,7 +100,10 @@ class SpectrumAnalyzerService: AudioSpectrumDelegate {
         
         analysisType = .playback(fileURL)
         if isActive {
+            print("🔈 [SpectrumAnalyzerService] Starting playback analysis for: \(fileURL.lastPathComponent)")
             audioSpectrumManager.startPlaybackAnalysis(fileURL: fileURL)
+        } else {
+            print("🔇 [SpectrumAnalyzerService] Not active, deferring playback analysis")
         }
     }
     
@@ -120,6 +123,15 @@ class SpectrumAnalyzerService: AudioSpectrumDelegate {
         
         // Debug log to check if we're getting data
         if processedData.contains(where: { $0 > 0 }) {
+            // Only occasionally log to avoid spam
+            if Int.random(in: 0...100) < 1 {  // ~1% chance to log
+                print("📈 [SpectrumAnalyzerService] Got non-zero frequency data: \(processedData.prefix(5))...")
+            }
+        } else {
+            // Log more frequently when there's no data, as this is an error condition
+            if Int.random(in: 0...100) < 10 {  // ~10% chance to log
+                print("⚠️ [SpectrumAnalyzerService] Received all-zero frequency data from AudioSpectrumManager")
+            }
         }
         
         // Notify delegate and publisher
