@@ -142,8 +142,11 @@ class AudioPlaybackManager: NSObject, ObservableObject {
             self.playerNode = player
             
             if let file = audioFile {
-                // Connect player to main mixer
+                // Connect player to main mixer (required for AVAudioEngine to work)
                 audioEngine.connect(player, to: audioEngine.mainMixerNode, format: file.processingFormat)
+                
+                // Set player volume to 0 to prevent audio output
+                player.volume = 0.0
                 
                 // Install tap on the player node to capture audio data
                 let bufferSize = AVAudioFrameCount(1024) // Use appropriate buffer size for FFT
@@ -166,15 +169,17 @@ class AudioPlaybackManager: NSObject, ObservableObject {
     
     /// Clean up spectrum analysis resources
     private func cleanupSpectrumAnalysis() {
+        // Stop the engine first to prevent any race conditions
+        if audioEngine.isRunning {
+            audioEngine.stop()
+        }
+        
+        // Clean up player node
         if let player = playerNode {
             player.removeTap(onBus: 0)
             player.stop()
             audioEngine.detach(player)
             playerNode = nil
-        }
-        
-        if audioEngine.isRunning {
-            audioEngine.stop()
         }
         
         audioFile = nil
