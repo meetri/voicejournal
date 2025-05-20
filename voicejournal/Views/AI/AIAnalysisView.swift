@@ -134,6 +134,14 @@ struct AIAnalysisView: View {
     private func startAnalysis() {
         isAnalyzing = true
         
+        // Log pre-analysis state for debugging
+        print("🧠 [AIAnalysisView.startAnalysis] Starting analysis with current state:")
+        print("  - Has transcription: \(journalEntry.transcription != nil)")
+        if let transcription = journalEntry.transcription {
+            print("  - Current AI analysis: \(transcription.aiAnalysis?.count ?? 0) characters")
+            print("  - Encrypted AI analysis: \(transcription.encryptedAIAnalysis?.count ?? 0) bytes")
+        }
+        
         Task {
             do {
                 let transcription = journalEntry.transcription
@@ -145,6 +153,9 @@ struct AIAnalysisView: View {
                 await MainActor.run {
                     self.analysisResult = result
                     self.isAnalyzing = false
+                    
+                    // Log post-analysis content before saving
+                    print("✅ [AIAnalysisView.startAnalysis] Analysis completed with length: \(result.count) characters")
                     
                     // Automatically save the analysis
                     var transcription = journalEntry.transcription
@@ -186,12 +197,21 @@ struct AIAnalysisView: View {
                         
                         do {
                             try viewContext.save()
-                            print("Successfully saved AI analysis to transcription")
+                            print("✅ [AIAnalysisView] Successfully saved AI analysis to transcription")
+                            
+                            // Create a local copy of the journal entry object ID before refreshing
+                            let entryObjectID = journalEntry.objectID
                             
                             // Force refresh the journal entry and related objects
                             viewContext.refresh(journalEntry, mergeChanges: true)
                             if let transcription = journalEntry.transcription {
                                 viewContext.refresh(transcription, mergeChanges: true)
+                                
+                                // Log the state after refresh
+                                print("📊 [AIAnalysisView] Transcription after refresh:")
+                                print("  - AI analysis present: \(transcription.aiAnalysis != nil)")
+                                print("  - Encrypted AI analysis present: \(transcription.encryptedAIAnalysis != nil)")
+                                print("  - AI analysis length: \(transcription.aiAnalysis?.count ?? 0) characters")
                             }
                             if let audioRecording = journalEntry.audioRecording {
                                 viewContext.refresh(audioRecording, mergeChanges: true)
@@ -199,11 +219,28 @@ struct AIAnalysisView: View {
                             
                             // Notify any observers about the change
                             NotificationCenter.default.post(
-                                name: Notification.Name("AIAnalysisCompleted"),
-                                object: journalEntry
+                                name: Notification.Name.aiEnhancementCompleted,
+                                object: journalEntry,
+                                userInfo: ["objectID": entryObjectID]
                             )
                             
-                            print("✅ [AIAnalysisView] Core Data refresh completed")
+                            print("✅ [AIAnalysisView] Notification posted via aiEnhancementCompleted")
+                            
+                            // Log final analysis state for debugging
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                if let transcription = journalEntry.transcription {
+                                    print("📊 [AIAnalysisView] Final analysis state check:")
+                                    print("  - AI analysis present: \(transcription.aiAnalysis != nil)")
+                                    print("  - Encrypted AI analysis present: \(transcription.encryptedAIAnalysis != nil)")
+                                    print("  - AI analysis length: \(transcription.aiAnalysis?.count ?? 0) characters")
+                                }
+                            }
+                            
+                            // Automatically dismiss the sheet after 1 second
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                isPresented = false
+                                print("✅ [AIAnalysisView] Auto-dismissed after analysis completion")
+                            }
                         } catch {
                             print("Failed to auto-save AI analysis: \(error)")
                         }
@@ -255,11 +292,21 @@ struct AIAnalysisView: View {
             
             do {
                 try viewContext.save()
+                print("✅ [AIAnalysisView] Successfully saved AI analysis using manual save")
+                
+                // Create a local copy of the journal entry object ID before refreshing
+                let entryObjectID = journalEntry.objectID
                 
                 // Force refresh the journal entry and related objects
                 viewContext.refresh(journalEntry, mergeChanges: true)
                 if let transcription = journalEntry.transcription {
                     viewContext.refresh(transcription, mergeChanges: true)
+                    
+                    // Log the state after refresh
+                    print("📊 [AIAnalysisView] Transcription after manual save and refresh:")
+                    print("  - AI analysis present: \(transcription.aiAnalysis != nil)")
+                    print("  - Encrypted AI analysis present: \(transcription.encryptedAIAnalysis != nil)")
+                    print("  - AI analysis length: \(transcription.aiAnalysis?.count ?? 0) characters")
                 }
                 if let audioRecording = journalEntry.audioRecording {
                     viewContext.refresh(audioRecording, mergeChanges: true)
@@ -267,11 +314,26 @@ struct AIAnalysisView: View {
                 
                 // Notify any observers about the change
                 NotificationCenter.default.post(
-                    name: Notification.Name("AIAnalysisCompleted"),
-                    object: journalEntry
+                    name: Notification.Name.aiEnhancementCompleted,
+                    object: journalEntry,
+                    userInfo: ["objectID": entryObjectID]
                 )
                 
-                print("✅ [AIAnalysisView] Manual save and Core Data refresh completed")
+                print("✅ [AIAnalysisView] Manual save: Notification posted via aiEnhancementCompleted")
+                
+                // Dismiss the sheet after 0.5 seconds 
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    // Log final state before dismissing
+                    if let transcription = journalEntry.transcription {
+                        print("📊 [AIAnalysisView] Final analysis state before dismissal (manual save):")
+                        print("  - AI analysis present: \(transcription.aiAnalysis != nil)")
+                        print("  - Encrypted AI analysis present: \(transcription.encryptedAIAnalysis != nil)")
+                        print("  - AI analysis length: \(transcription.aiAnalysis?.count ?? 0) characters")
+                    }
+                    
+                    isPresented = false
+                    print("✅ [AIAnalysisView] Auto-dismissed after manual save")
+                }
             } catch {
                 print("Failed to save AI analysis: \(error)")
             }

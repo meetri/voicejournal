@@ -357,30 +357,46 @@ class AITranscriptionService: ObservableObject {
         let fileSize = fileAttributes[.size] as? Int64 ?? 0
         let fileSizeInMB = Double(fileSize) / (1024 * 1024)
         
-        // Prepare the analysis prompt
-        let defaultPrompt = """
-        Please analyze this audio recording and provide:
+        // Get the audio analysis prompt - first try to get a custom one from the config
+        var promptTemplate = config.audioAnalysisPrompt
+        
+        // If no custom prompt in config, check for default prompt in database
+        if promptTemplate == nil {
+            let context = PersistenceController.shared.container.viewContext
+            if let defaultPrompt = AIPrompt.fetchDefault(for: .audioAnalysis, in: context) {
+                promptTemplate = defaultPrompt.content
+            }
+        }
+        
+        // If still no prompt, use hardcoded default
+        if promptTemplate == nil {
+            promptTemplate = """
+            Please analyze this audio recording and provide:
 
-        1. A detailed summary of the audio content
-        2. Key topics and themes discussed
-        3. Important insights or conclusions
-        4. Any notable patterns or recurring elements
-        5. Suggested action items or follow-ups (if applicable)
-        6. Create relevant mermaid diagrams if the content involves:
-           - Processes or workflows
-           - Relationships or hierarchies
-           - Timeline or sequences
-           - Decision trees
+            1. A detailed summary of the audio content
+            2. Key topics and themes discussed
+            3. Important insights or conclusions
+            4. Any notable patterns or recurring elements
+            5. Suggested action items or follow-ups (if applicable)
+            6. Create relevant mermaid diagrams if the content involves:
+               - Processes or workflows
+               - Relationships or hierarchies
+               - Timeline or sequences
+               - Decision trees
 
-        Format the response in markdown with clear sections and headers.
-        If creating mermaid diagrams, use proper mermaid syntax blocks.
-
+            Format the response in markdown with clear sections and headers.
+            If creating mermaid diagrams, use proper mermaid syntax blocks.
+            """
+        }
+        
+        // Add audio details to the prompt
+        let prompt = """
+        \(promptTemplate!)
+        
         Audio Details:
         - Duration: \(Int(durationInSeconds)) seconds (\(Int(durationInSeconds/60)) minutes)
         - File Size: \(String(format: "%.2f", fileSizeInMB)) MB
         """
-        
-        let prompt = config.audioAnalysisPrompt ?? defaultPrompt
         
         // If we have a transcription, include it in the analysis
         var contentToAnalyze = prompt

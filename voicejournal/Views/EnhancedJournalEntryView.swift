@@ -160,37 +160,112 @@ struct EnhancedJournalEntryView: View {
                 print("  - Entry is base decrypted: \(journalEntry.isBaseDecrypted)")
                 
                 // Try to decrypt if needed
-                if journalEntry.hasEncryptedContent && transcription.encryptedEnhancedText != nil && transcription.enhancedText == nil {
-                    print("  - Attempting to decrypt enhanced text...")
+                if journalEntry.hasEncryptedContent {
+                    print("  - Attempting to decrypt content...")
                     if journalEntry.decryptWithGlobalAccess() {
                         print("  - Decryption succeeded")
                     } else {
                         print("  - Decryption failed")
                     }
                 }
+                
+                // Check if we should show AI analysis on initial load
+                let hasAnalysis = (transcription.aiAnalysis != nil) || 
+                                  (transcription.encryptedAIAnalysis != nil && journalEntry.isDecrypted)
+                
+                if hasAnalysis {
+                    print("📊 [EnhancedJournalEntryView.onAppear] AI analysis is available, setting to show analysis")
+                    // Auto-select AI analysis if it's available
+                    showAIAnalysis = true
+                    showEnhancedTranscription = false
+                } else if transcription.enhancedText != nil {
+                    print("📊 [EnhancedJournalEntryView.onAppear] Enhanced text is available, setting to show enhanced")
+                    // Auto-select enhanced text if it's available
+                    showEnhancedTranscription = true
+                    showAIAnalysis = false
+                }
             }
         }
         .onDisappear {
             playbackViewModel.stop()
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AIAnalysisCompleted"))) { notification in
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name.aiEnhancementCompleted)) { notification in
             // Check if the notification is for our journal entry
             if let notificationEntry = notification.object as? JournalEntry,
                notificationEntry.objectID == journalEntry.objectID {
-                print("🔄 [EnhancedJournalEntryView] Received AI analysis completion notification")
+                print("🔄 [EnhancedJournalEntryView] Received AI analysis completion notification (aiEnhancementCompleted)")
                 
-                // Refresh Core Data object
-                viewContext.refresh(journalEntry, mergeChanges: true)
-                
-                // Force UI refresh
-                refreshID = UUID()
-                
-                // Update our state if AI analysis is now available
-                if let transcription = journalEntry.transcription,
-                   transcription.aiAnalysis != nil {
-                    showAIAnalysis = true
-                    showEnhancedTranscription = false
-                    print("✅ [EnhancedJournalEntryView] AI analysis is now available, switching to analysis view")
+                // Refresh Core Data object with a slight delay to ensure proper loading
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    print("🔄 [EnhancedJournalEntryView] Starting delayed UI refresh after AI analysis")
+                    
+                    // Save current state for diagnostic purposes
+                    let initialShowAIAnalysis = showAIAnalysis
+                    let initialShowEnhancedTranscription = showEnhancedTranscription
+                    
+                    // Dump current transcription state before refresh
+                    if let transcription = journalEntry.transcription {
+                        print("📊 [EnhancedJournalEntryView] Transcription state BEFORE refresh:")
+                        print("  - Raw text: \(transcription.rawText?.count ?? 0) characters")
+                        print("  - Enhanced text: \(transcription.enhancedText?.count ?? 0) characters")
+                        print("  - AI analysis: \(transcription.aiAnalysis?.count ?? 0) characters")
+                        print("  - Encrypted enhanced: \(transcription.encryptedEnhancedText?.count ?? 0) bytes")
+                        print("  - Encrypted AI: \(transcription.encryptedAIAnalysis?.count ?? 0) bytes")
+                    }
+                    
+                    // Ensure running on the main thread
+                    print("🔄 [EnhancedJournalEntryView] Refreshing CoreData objects")
+                    viewContext.refresh(journalEntry, mergeChanges: true)
+                    
+                    // Refresh the transcription object directly to ensure we have latest data
+                    if let transcription = journalEntry.transcription {
+                        viewContext.refresh(transcription, mergeChanges: true)
+                        print("📊 [EnhancedJournalEntryView] Transcription state AFTER refresh:")
+                        print("  - Raw text: \(transcription.rawText?.count ?? 0) characters")
+                        print("  - Enhanced text: \(transcription.enhancedText?.count ?? 0) characters")
+                        print("  - AI analysis: \(transcription.aiAnalysis?.count ?? 0) characters")
+                        print("  - Encrypted enhanced: \(transcription.encryptedEnhancedText?.count ?? 0) bytes")
+                        print("  - Encrypted AI: \(transcription.encryptedAIAnalysis?.count ?? 0) bytes")
+                    }
+                    
+                    // Check for analysis in both encrypted and unencrypted forms
+                    let hasAnalysis = (journalEntry.transcription?.aiAnalysis != nil) || 
+                                      (journalEntry.transcription?.encryptedAIAnalysis != nil)
+                    
+                    print("🔍 [EnhancedJournalEntryView] Analysis available check: \(hasAnalysis)")
+                    print("  - Unencrypted: \(journalEntry.transcription?.aiAnalysis != nil)")
+                    print("  - Encrypted: \(journalEntry.transcription?.encryptedAIAnalysis != nil)")
+                    print("  - Entry has encrypted content: \(journalEntry.hasEncryptedContent)")
+                    print("  - Entry is decrypted: \(journalEntry.isDecrypted)")
+                    
+                    if hasAnalysis {
+                        // Try to decrypt if needed
+                        if journalEntry.hasEncryptedContent && journalEntry.transcription?.aiAnalysis == nil {
+                            print("  - Attempting to decrypt analysis before showing...")
+                            let decryptResult = journalEntry.decryptWithGlobalAccess()
+                            print("  - Decryption result: \(decryptResult)")
+                            
+                            // Verify decryption worked
+                            if decryptResult && journalEntry.transcription?.aiAnalysis != nil {
+                                print("  - Decryption succeeded, analysis is now available")
+                            } else {
+                                print("  - Decryption failed or didn't produce expected results")
+                            }
+                        }
+                        
+                        // Update UI state
+                        showAIAnalysis = true
+                        showEnhancedTranscription = false
+                        print("✅ [EnhancedJournalEntryView] AI analysis is now available, switching to analysis view")
+                        print("  - UI state changed: showAIAnalysis \(initialShowAIAnalysis) → \(showAIAnalysis), showEnhancedTranscription \(initialShowEnhancedTranscription) → \(showEnhancedTranscription)")
+                    } else {
+                        print("⚠️ [EnhancedJournalEntryView] Analysis is NOT available after refresh")
+                    }
+                    
+                    // Force UI refresh with new UUID
+                    let oldRefreshID = refreshID
+                    refreshID = UUID()
+                    print("🔄 [EnhancedJournalEntryView] Forcing UI refresh: \(oldRefreshID) → \(refreshID)")
                 }
             }
         }
@@ -337,19 +412,53 @@ struct EnhancedJournalEntryView: View {
             }
             
             // Display content based on type
-            if showAIAnalysis, let analysis = journalEntry.transcription?.aiAnalysis {
-                // Show AI analysis in a scrollable markdown view
-                ScrollView {
-                    Text(analysis)
-                        .font(.body)
-                        .padding()
-                        .textSelection(.enabled)
+            if showAIAnalysis {
+                if let analysis = journalEntry.transcription?.aiAnalysis {
+                    // Show AI analysis in a scrollable markdown view
+                    ScrollView {
+                        Text(analysis)
+                            .font(.body)
+                            .padding()
+                            .textSelection(.enabled)
+                    }
+                    .frame(maxHeight: 400)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(themeManager.theme.surface)
+                    )
+                } else if journalEntry.transcription?.encryptedAIAnalysis != nil {
+                    // Show encrypted indicator with decrypt button
+                    VStack(spacing: 16) {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 32))
+                            .foregroundColor(.secondary)
+                        
+                        Text("AI analysis is encrypted")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                        
+                        Button(action: {
+                            // Attempt to decrypt
+                            if journalEntry.decryptWithGlobalAccess() {
+                                // Force UI refresh
+                                refreshID = UUID()
+                            }
+                        }) {
+                            Text("Decrypt")
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(Color.blue.opacity(0.7))
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                        }
+                    }
+                    .padding()
+                    .frame(maxHeight: 400)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(themeManager.theme.surface)
+                    )
                 }
-                .frame(maxHeight: 400)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(themeManager.theme.surface)
-                )
             } else if showEnhancedTranscription, let enhanced = journalEntry.transcription?.enhancedText {
                 // Show enhanced transcription
                 if playbackViewModel.isPlaybackInProgress {
@@ -770,7 +879,6 @@ struct EnhancedJournalEntryView: View {
         
         return nil
     }
-    
 }
 
 // MARK: - Preview

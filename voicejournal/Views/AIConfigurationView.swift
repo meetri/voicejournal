@@ -77,6 +77,18 @@ struct AIConfigurationView: View {
                     }
                 }
                 
+                // AI Prompts Section
+                Section {
+                    NavigationLink {
+                        AIPromptManagementView()
+                            .environment(\.managedObjectContext, viewContext)
+                    } label: {
+                        Label("Manage AI Prompts", systemImage: "text.bubble")
+                    }
+                } header: {
+                    Text("AI PROMPTS")
+                }
+                
                 // Add New Configuration Section
                 Section {
                     Button {
@@ -432,6 +444,10 @@ struct EditAIConfigurationView: View {
     @State private var apiKey: String
     @State private var modelIdentifier: String
     @State private var systemPrompt: String
+    @State private var audioAnalysisPrompt: String
+    @State private var selectedPromptId: UUID?
+    @State private var audioPrompts: [AIPrompt] = []
+    @State private var showingEditPrompt = false
     
     init(configuration: AIConfiguration) {
         self.configuration = configuration
@@ -440,6 +456,7 @@ struct EditAIConfigurationView: View {
         _apiKey = State(initialValue: configuration.apiKey ?? "")
         _modelIdentifier = State(initialValue: configuration.modelIdentifier ?? "")
         _systemPrompt = State(initialValue: configuration.systemPrompt ?? "")
+        _audioAnalysisPrompt = State(initialValue: configuration.audioAnalysisPrompt ?? "")
     }
     
     var body: some View {
@@ -474,6 +491,46 @@ struct EditAIConfigurationView: View {
                     TextEditor(text: $systemPrompt)
                         .frame(minHeight: 100)
                 }
+                
+                Section(header: Text("Audio Analysis Prompt")) {
+                    Picker("Select Prompt", selection: $selectedPromptId) {
+                        Text("Custom").tag(nil as UUID?)
+                        ForEach(audioPrompts) { prompt in
+                            Text(prompt.name).tag(prompt.id as UUID?)
+                        }
+                    }
+                    .onChange(of: selectedPromptId) { _, newValue in
+                        if let id = newValue, 
+                           let prompt = audioPrompts.first(where: { $0.id == id }) {
+                            audioAnalysisPrompt = prompt.content
+                        }
+                    }
+                    
+                    if selectedPromptId == nil {
+                        TextEditor(text: $audioAnalysisPrompt)
+                            .frame(minHeight: 150)
+                    } else if let id = selectedPromptId,
+                              let prompt = audioPrompts.first(where: { $0.id == id }) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(prompt.name)
+                                .font(.headline)
+                            
+                            Text(prompt.content)
+                                .font(.body)
+                                .foregroundColor(.secondary)
+                                .padding(.vertical, 4)
+                        }
+                        .padding(.vertical, 8)
+                    }
+                    
+                    NavigationLink("Manage Prompts") {
+                        AIPromptManagementView()
+                            .environment(\.managedObjectContext, viewContext)
+                            .onDisappear {
+                                loadAudioPrompts()
+                            }
+                    }
+                }
             }
             .navigationTitle("Edit Configuration")
             .navigationBarTitleDisplayMode(.inline)
@@ -491,6 +548,27 @@ struct EditAIConfigurationView: View {
                     .disabled(name.isEmpty || apiEndpoint.isEmpty || apiKey.isEmpty)
                 }
             }
+            .onAppear {
+                loadAudioPrompts()
+                
+                // Find selected prompt if any
+                if let existingPrompt = audioPrompts.first(where: { $0.content == audioAnalysisPrompt }) {
+                    selectedPromptId = existingPrompt.id
+                } else {
+                    selectedPromptId = nil
+                }
+            }
+        }
+    }
+    
+    private func loadAudioPrompts() {
+        audioPrompts = AIPrompt.fetch(type: .audioAnalysis, in: viewContext)
+        
+        // Check if our current prompt matches any existing prompt
+        if let existingPrompt = audioPrompts.first(where: { $0.content == audioAnalysisPrompt }) {
+            selectedPromptId = existingPrompt.id
+        } else {
+            selectedPromptId = nil
         }
     }
     
@@ -501,7 +579,8 @@ struct EditAIConfigurationView: View {
             apiEndpoint: apiEndpoint,
             apiKey: apiKey,
             modelIdentifier: modelIdentifier.isEmpty ? nil : modelIdentifier,
-            systemPrompt: systemPrompt.isEmpty ? nil : systemPrompt
+            systemPrompt: systemPrompt.isEmpty ? nil : systemPrompt,
+            audioAnalysisPrompt: audioAnalysisPrompt.isEmpty ? nil : audioAnalysisPrompt
         )
         dismiss()
     }

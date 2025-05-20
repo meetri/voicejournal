@@ -80,7 +80,8 @@ extension AIConfiguration {
         apiEndpoint: String? = nil,
         apiKey: String? = nil,
         modelIdentifier: String? = nil,
-        systemPrompt: String? = nil
+        systemPrompt: String? = nil,
+        audioAnalysisPrompt: String? = nil
     ) {
         if let name = name {
             self.name = name
@@ -96,6 +97,9 @@ extension AIConfiguration {
         }
         if let systemPrompt = systemPrompt {
             self.systemPrompt = systemPrompt
+        }
+        if let audioAnalysisPrompt = audioAnalysisPrompt {
+            self.audioAnalysisPrompt = audioAnalysisPrompt
         }
         self.modifiedAt = Date()
     }
