@@ -56,17 +56,29 @@ extension Transcription {
             print("  - Enhanced text: \(self.enhancedText?.count ?? 0) chars, encrypted: \(self.encryptedEnhancedText?.count ?? 0) bytes")
         }
         
-        // Check for unencrypted AI analysis
+        // Check for unencrypted AI analysis - use async encryption with semaphore to wait
         if let aiAnalysis = self.aiAnalysis,
-           self.encryptedAIAnalysis == nil {
-            print("🔐 [Transcription] Encrypting AI analysis on save")
-            if let encryptedData = EncryptionManager.encrypt(aiAnalysis, using: key) {
-                self.encryptedAIAnalysis = encryptedData
-                self.aiAnalysis = nil
-                print("✅ [Transcription] AI analysis encrypted successfully")
-            } else {
-                print("❌ [Transcription] Failed to encrypt AI analysis")
+           self.encryptedAIAnalysis == nil,
+           !aiAnalysis.isEmpty {
+            print("🔐 [Transcription] Encrypting AI analysis on save (\(aiAnalysis.count) characters)")
+            
+            // For large AI analysis content, use async encryption
+            let semaphore = DispatchSemaphore(value: 0)
+            
+            EncryptionManager.encryptAsync(aiAnalysis, using: key) { encryptedData in
+                defer { semaphore.signal() }
+                
+                if let encryptedData = encryptedData {
+                    self.encryptedAIAnalysis = encryptedData
+                    self.aiAnalysis = nil
+                    print("✅ [Transcription] AI analysis encrypted successfully (\(encryptedData.count) bytes)")
+                } else {
+                    print("❌ [Transcription] Failed to encrypt AI analysis")
+                }
             }
+            
+            // Wait with timeout (3 seconds should be enough for any reasonable analysis)
+            _ = semaphore.wait(timeout: .now() + 3.0)
         }
         
         // Check for unencrypted main text
@@ -132,34 +144,55 @@ extension Transcription {
     /// Encrypt all unencrypted content with the provided key
     private func encryptContentWithKey(_ key: SymmetricKey) {
         // Encrypt enhanced text if unencrypted
-        if let enhancedText = self.enhancedText {
-            if let encryptedData = EncryptionManager.encrypt(enhancedText, using: key) {
-                self.encryptedEnhancedText = encryptedData
-                self.enhancedText = nil
+        if let enhancedText = self.enhancedText, !enhancedText.isEmpty {
+            // For potentially large enhanced text, use async encryption
+            let semaphore = DispatchSemaphore(value: 0)
+            
+            EncryptionManager.encryptAsync(enhancedText, using: key) { encryptedData in
+                defer { semaphore.signal() }
+                
+                if let encryptedData = encryptedData {
+                    self.encryptedEnhancedText = encryptedData
+                    self.enhancedText = nil
+                    print("✅ [Transcription] Enhanced text encrypted: \(encryptedData.count) bytes")
+                }
             }
+            
+            _ = semaphore.wait(timeout: .now() + 3.0)
         }
         
-        // Encrypt AI analysis if unencrypted
-        if let aiAnalysis = self.aiAnalysis {
-            if let encryptedData = EncryptionManager.encrypt(aiAnalysis, using: key) {
-                self.encryptedAIAnalysis = encryptedData
-                self.aiAnalysis = nil
+        // Encrypt AI analysis if unencrypted (usually the largest content)
+        if let aiAnalysis = self.aiAnalysis, !aiAnalysis.isEmpty {
+            let semaphore = DispatchSemaphore(value: 0)
+            
+            EncryptionManager.encryptAsync(aiAnalysis, using: key) { encryptedData in
+                defer { semaphore.signal() }
+                
+                if let encryptedData = encryptedData {
+                    self.encryptedAIAnalysis = encryptedData
+                    self.aiAnalysis = nil
+                    print("✅ [Transcription] AI analysis encrypted: \(encryptedData.count) bytes")
+                }
             }
+            
+            _ = semaphore.wait(timeout: .now() + 3.0)
         }
         
         // Encrypt main text if unencrypted
-        if let text = self.text {
+        if let text = self.text, !text.isEmpty {
             if let encryptedData = EncryptionManager.encrypt(text, using: key) {
                 self.encryptedText = encryptedData
                 self.text = nil
+                print("✅ [Transcription] Main text encrypted: \(encryptedData.count) bytes")
             }
         }
         
         // Encrypt raw text if unencrypted
-        if let rawText = self.rawText {
+        if let rawText = self.rawText, !rawText.isEmpty {
             if let encryptedData = EncryptionManager.encrypt(rawText, using: key) {
                 self.encryptedRawText = encryptedData
                 self.rawText = nil
+                print("✅ [Transcription] Raw text encrypted: \(encryptedData.count) bytes")
             }
         }
     }

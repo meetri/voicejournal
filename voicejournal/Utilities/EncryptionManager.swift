@@ -18,6 +18,15 @@ class EncryptionManager {
     private static let rootKeyAccount = "rootEncryptionKey"
     private static let tagKeychainPrefix = "tagEncryptionKey_"
     
+    // MARK: - Concurrency
+    
+    /// Background queue for cryptographic operations
+    private static let cryptoQueue = DispatchQueue(
+        label: "com.voicejournal.crypto-operations",
+        qos: .userInitiated,
+        attributes: .concurrent
+    )
+    
     // MARK: - Default Encryption Key Methods
     
     /// Generate a random encryption key
@@ -234,7 +243,9 @@ class EncryptionManager {
     
     // MARK: - Encryption / Decryption Methods
     
-    /// Encrypt data with the app's default key
+    // MARK: - Synchronous Methods (legacy)
+    
+    /// Encrypt data with the app's default key (synchronous)
     static func encrypt(_ data: Data) -> Data? {
         guard let key = getEncryptionKey() else {
             return nil
@@ -243,7 +254,7 @@ class EncryptionManager {
         return encrypt(data, using: key)
     }
     
-    /// Encrypt data with a specific key
+    /// Encrypt data with a specific key (synchronous)
     static func encrypt(_ data: Data, using key: SymmetricKey) -> Data? {
         do {
             let sealedBox = try AES.GCM.seal(data, using: key)
@@ -254,7 +265,7 @@ class EncryptionManager {
         }
     }
     
-    /// Decrypt data with the app's default key
+    /// Decrypt data with the app's default key (synchronous)
     static func decrypt(_ encryptedData: Data) -> Data? {
         guard let key = getEncryptionKey() else {
             return nil
@@ -263,7 +274,7 @@ class EncryptionManager {
         return decrypt(encryptedData, using: key)
     }
     
-    /// Decrypt data with a specific key
+    /// Decrypt data with a specific key (synchronous)
     static func decrypt(_ encryptedData: Data, using key: SymmetricKey) -> Data? {
         do {
             let sealedBox = try AES.GCM.SealedBox(combined: encryptedData)
@@ -274,7 +285,7 @@ class EncryptionManager {
         }
     }
     
-    /// Encrypt a string using the app's default key
+    /// Encrypt a string using the app's default key (synchronous)
     static func encrypt(_ string: String) -> Data? {
         guard let data = string.data(using: .utf8) else {
             return nil
@@ -283,7 +294,7 @@ class EncryptionManager {
         return encrypt(data)
     }
     
-    /// Encrypt a string using a specific key
+    /// Encrypt a string using a specific key (synchronous)
     static func encrypt(_ string: String, using key: SymmetricKey) -> Data? {
         guard let data = string.data(using: .utf8) else {
             return nil
@@ -292,7 +303,7 @@ class EncryptionManager {
         return encrypt(data, using: key)
     }
     
-    /// Decrypt data to a string using the app's default key
+    /// Decrypt data to a string using the app's default key (synchronous)
     static func decryptToString(_ encryptedData: Data) -> String? {
         guard let decryptedData = decrypt(encryptedData) else {
             return nil
@@ -301,9 +312,187 @@ class EncryptionManager {
         return String(data: decryptedData, encoding: .utf8)
     }
     
-    /// Decrypt data to a string using a specific key
+    /// Decrypt data to a string using a specific key (synchronous)
     static func decryptToString(_ encryptedData: Data, using key: SymmetricKey) -> String? {
         guard let decryptedData = decrypt(encryptedData, using: key) else {
+            return nil
+        }
+        
+        return String(data: decryptedData, encoding: .utf8)
+    }
+    
+    // MARK: - Asynchronous Methods with Completion Handlers
+    
+    /// Encrypt data with the app's default key (asynchronous)
+    static func encryptAsync(_ data: Data, completion: @escaping (Data?) -> Void) {
+        cryptoQueue.async {
+            let encryptedData = encrypt(data)
+            DispatchQueue.main.async {
+                completion(encryptedData)
+            }
+        }
+    }
+    
+    /// Encrypt data with a specific key (asynchronous)
+    static func encryptAsync(_ data: Data, using key: SymmetricKey, completion: @escaping (Data?) -> Void) {
+        cryptoQueue.async {
+            let encryptedData = encrypt(data, using: key)
+            DispatchQueue.main.async {
+                completion(encryptedData)
+            }
+        }
+    }
+    
+    /// Decrypt data with the app's default key (asynchronous)
+    static func decryptAsync(_ encryptedData: Data, completion: @escaping (Data?) -> Void) {
+        cryptoQueue.async {
+            let decryptedData = decrypt(encryptedData)
+            DispatchQueue.main.async {
+                completion(decryptedData)
+            }
+        }
+    }
+    
+    /// Decrypt data with a specific key (asynchronous)
+    static func decryptAsync(_ encryptedData: Data, using key: SymmetricKey, completion: @escaping (Data?) -> Void) {
+        cryptoQueue.async {
+            do {
+                let startTime = Date()
+                let decryptedData = decrypt(encryptedData, using: key)
+                let duration = Date().timeIntervalSince(startTime)
+                
+                if let decryptedData = decryptedData {
+                    print("✅ [EncryptionManager.decryptAsync] Successfully decrypted \(encryptedData.count) bytes in \(String(format: "%.2f", duration))s - result: \(decryptedData.count) bytes")
+                } else {
+                    print("❌ [EncryptionManager.decryptAsync] Failed to decrypt \(encryptedData.count) bytes after \(String(format: "%.2f", duration))s")
+                }
+                
+                DispatchQueue.main.async {
+                    completion(decryptedData)
+                }
+            } catch {
+                print("❌ [EncryptionManager.decryptAsync] Error during decryption: \(error)")
+                DispatchQueue.main.async {
+                    completion(nil)
+                }
+            }
+        }
+    }
+    
+    /// Encrypt a string using the app's default key (asynchronous)
+    static func encryptAsync(_ string: String, completion: @escaping (Data?) -> Void) {
+        guard let data = string.data(using: .utf8) else {
+            completion(nil)
+            return
+        }
+        
+        encryptAsync(data, completion: completion)
+    }
+    
+    /// Encrypt a string using a specific key (asynchronous)
+    static func encryptAsync(_ string: String, using key: SymmetricKey, completion: @escaping (Data?) -> Void) {
+        guard let data = string.data(using: .utf8) else {
+            completion(nil)
+            return
+        }
+        
+        encryptAsync(data, using: key, completion: completion)
+    }
+    
+    /// Decrypt data to a string using the app's default key (asynchronous)
+    static func decryptToStringAsync(_ encryptedData: Data, completion: @escaping (String?) -> Void) {
+        decryptAsync(encryptedData) { decryptedData in
+            guard let data = decryptedData else {
+                completion(nil)
+                return
+            }
+            
+            let string = String(data: data, encoding: .utf8)
+            completion(string)
+        }
+    }
+    
+    /// Decrypt data to a string using a specific key (asynchronous)
+    static func decryptToStringAsync(_ encryptedData: Data, using key: SymmetricKey, completion: @escaping (String?) -> Void) {
+        decryptAsync(encryptedData, using: key) { decryptedData in
+            guard let data = decryptedData else {
+                completion(nil)
+                return
+            }
+            
+            let string = String(data: data, encoding: .utf8)
+            completion(string)
+        }
+    }
+    
+    // MARK: - Swift Concurrency (async/await)
+    
+    /// Encrypt data with the app's default key (async/await)
+    static func encryptAsync(_ data: Data) async -> Data? {
+        await withCheckedContinuation { continuation in
+            encryptAsync(data) { result in
+                continuation.resume(returning: result)
+            }
+        }
+    }
+    
+    /// Encrypt data with a specific key (async/await)
+    static func encryptAsync(_ data: Data, using key: SymmetricKey) async -> Data? {
+        await withCheckedContinuation { continuation in
+            encryptAsync(data, using: key) { result in
+                continuation.resume(returning: result)
+            }
+        }
+    }
+    
+    /// Decrypt data with the app's default key (async/await)
+    static func decryptAsync(_ encryptedData: Data) async -> Data? {
+        await withCheckedContinuation { continuation in
+            decryptAsync(encryptedData) { result in
+                continuation.resume(returning: result)
+            }
+        }
+    }
+    
+    /// Decrypt data with a specific key (async/await)
+    static func decryptAsync(_ encryptedData: Data, using key: SymmetricKey) async -> Data? {
+        await withCheckedContinuation { continuation in
+            decryptAsync(encryptedData, using: key) { result in
+                continuation.resume(returning: result)
+            }
+        }
+    }
+    
+    /// Encrypt a string using the app's default key (async/await)
+    static func encryptAsync(_ string: String) async -> Data? {
+        guard let data = string.data(using: .utf8) else {
+            return nil
+        }
+        
+        return await encryptAsync(data)
+    }
+    
+    /// Encrypt a string using a specific key (async/await)
+    static func encryptAsync(_ string: String, using key: SymmetricKey) async -> Data? {
+        guard let data = string.data(using: .utf8) else {
+            return nil
+        }
+        
+        return await encryptAsync(data, using: key)
+    }
+    
+    /// Decrypt data to a string using the app's default key (async/await)
+    static func decryptToStringAsync(_ encryptedData: Data) async -> String? {
+        guard let decryptedData = await decryptAsync(encryptedData) else {
+            return nil
+        }
+        
+        return String(data: decryptedData, encoding: .utf8)
+    }
+    
+    /// Decrypt data to a string using a specific key (async/await)
+    static func decryptToStringAsync(_ encryptedData: Data, using key: SymmetricKey) async -> String? {
+        guard let decryptedData = await decryptAsync(encryptedData, using: key) else {
             return nil
         }
         

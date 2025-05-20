@@ -418,6 +418,26 @@ struct AddAIConfigurationView: View {
     }
     
     private func saveConfiguration() {
+        // Validate required fields with detailed feedback
+        guard !name.isEmpty else {
+            print("Error: Configuration name cannot be empty")
+            return
+        }
+        
+        guard !apiEndpoint.isEmpty else {
+            print("Error: API endpoint cannot be empty")
+            return
+        }
+        
+        guard !apiKey.isEmpty else {
+            print("Error: API key cannot be empty")
+            return
+        }
+        
+        if selectedVendor.requiresModelSelection && modelIdentifier.isEmpty {
+            print("Warning: Model identifier is recommended for \(selectedVendor.displayName)")
+        }
+        
         _ = AIConfigurationManager.shared.createConfiguration(
             name: name,
             vendor: selectedVendor,
@@ -560,6 +580,26 @@ struct EditAIConfigurationView: View {
     }
     
     private func updateConfiguration() {
+        // Validate required fields with detailed feedback
+        guard !name.isEmpty else {
+            print("Error: Configuration name cannot be empty")
+            return
+        }
+        
+        guard !apiEndpoint.isEmpty else {
+            print("Error: API endpoint cannot be empty")
+            return
+        }
+        
+        guard !apiKey.isEmpty else {
+            print("Error: API key cannot be empty")
+            return
+        }
+        
+        if configuration.aiVendor?.requiresModelSelection == true && modelIdentifier.isEmpty {
+            print("Warning: Model identifier is recommended for \(configuration.aiVendor?.displayName ?? "this provider")")
+        }
+        
         AIConfigurationManager.shared.updateConfiguration(
             configuration,
             name: name,
@@ -575,7 +615,13 @@ struct EditAIConfigurationView: View {
     private func updateSelectedPrompt(_ newValue: UUID?) {
         if let id = newValue, 
            let prompt = audioPrompts.first(where: { $0.id == id }) {
-            audioAnalysisPrompt = prompt.content ?? ""
+            guard let content = prompt.content, !content.isEmpty else {
+                print("Warning: Selected prompt '\(prompt.name ?? "Unknown")' has no content")
+                return
+            }
+            audioAnalysisPrompt = content
+        } else if newValue != nil {
+            print("Error: Unable to find prompt with ID: \(newValue!)")
         }
     }
     

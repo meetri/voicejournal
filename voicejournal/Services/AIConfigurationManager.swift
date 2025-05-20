@@ -147,8 +147,14 @@ class AIConfigurationManager: ObservableObject {
     // MARK: - API Request Configuration
     
     func getRequestHeaders() -> [String: String]? {
-        guard let config = activeConfiguration,
-              let apiKey = config.apiKey else { return nil }
+        guard let config = activeConfiguration else {
+            print("Error: No active AI configuration found for request headers")
+            return nil
+        }
+        guard let apiKey = config.apiKey, !apiKey.isEmpty else {
+            print("Error: Missing API key in active configuration \(config.name ?? "unknown")")
+            return nil
+        }
         
         switch config.aiVendor {
         case .openai:
@@ -166,15 +172,42 @@ class AIConfigurationManager: ObservableObject {
     }
     
     func getBaseURL() -> String? {
-        return activeConfiguration?.apiEndpoint
+        guard let config = activeConfiguration else {
+            print("Error: No active AI configuration found for base URL")
+            return nil
+        }
+        guard let endpoint = config.apiEndpoint, !endpoint.isEmpty else {
+            print("Error: Missing API endpoint in active configuration \(config.name ?? "unknown")")
+            return nil
+        }
+        return endpoint
     }
     
     func getModelIdentifier() -> String? {
-        return activeConfiguration?.modelIdentifier
+        guard let config = activeConfiguration else {
+            print("Error: No active AI configuration found for model identifier")
+            return nil
+        }
+        guard let modelId = config.modelIdentifier, !modelId.isEmpty else {
+            if config.aiVendor?.requiresModelSelection == true {
+                print("Warning: Missing model identifier in active configuration \(config.name ?? "unknown")")
+            }
+            return nil
+        }
+        return modelId
     }
     
     func getSystemPrompt() -> String? {
-        return activeConfiguration?.systemPrompt
+        guard let config = activeConfiguration else {
+            print("Error: No active AI configuration found for system prompt")
+            return nil
+        }
+        // System prompt is optional, so we only check if it exists but don't require it
+        let prompt = config.systemPrompt
+        if prompt == nil {
+            print("Info: No system prompt defined in active configuration \(config.name ?? "unknown")")
+        }
+        return prompt
     }
     
     // MARK: - Private Methods

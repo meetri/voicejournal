@@ -47,8 +47,15 @@ extension AIConfiguration {
     }
     
     var aiVendor: AIVendor? {
-        guard let vendor = self.vendor else { return nil }
-        return AIVendor(rawValue: vendor)
+        guard let vendor = self.vendor else {
+            print("Error: No vendor type specified for configuration \(self.name ?? "unknown")")
+            return nil
+        }
+        guard let vendorType = AIVendor(rawValue: vendor) else {
+            print("Error: Invalid vendor type '\(vendor)' for configuration \(self.name ?? "unknown")")
+            return nil
+        }
+        return vendorType
     }
     
     // MARK: - Helper methods
@@ -108,13 +115,32 @@ extension AIConfiguration {
     
     var isValid: Bool {
         // Name is required
-        guard let name = self.name, !name.isEmpty else { return false }
+        guard let name = self.name, !name.isEmpty else {
+            print("Validation failed: Configuration name is missing")
+            return false
+        }
         
         // API endpoint is required
-        guard let endpoint = self.apiEndpoint, !endpoint.isEmpty else { return false }
+        guard let endpoint = self.apiEndpoint, !endpoint.isEmpty else {
+            print("Validation failed: API endpoint is missing for configuration '\(self.name ?? "unknown")'")
+            return false
+        }
         
         // API key is required
-        guard let key = self.apiKey, !key.isEmpty else { return false }
+        guard let key = self.apiKey, !key.isEmpty else {
+            print("Validation failed: API key is missing for configuration '\(self.name ?? "unknown")'")
+            return false
+        }
+        
+        // Check if model is provided when required
+        if let vendorType = self.aiVendor, vendorType.requiresModelSelection {
+            if let model = self.modelIdentifier, !model.isEmpty {
+                // Model is properly provided
+            } else {
+                print("Warning: Model identifier is recommended for configuration '\(self.name ?? "unknown")'")
+                // We don't return false here as this is just a warning
+            }
+        }
         
         return true
     }
