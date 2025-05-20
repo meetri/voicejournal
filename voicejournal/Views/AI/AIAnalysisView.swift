@@ -141,26 +141,34 @@ struct AIAnalysisView: View {
             print("  - Current AI analysis: \(transcription.aiAnalysis?.count ?? 0) characters")
             print("  - Encrypted AI analysis: \(transcription.encryptedAIAnalysis?.count ?? 0) bytes")
         }
+        print("  - Audio URL path: \(audioURL.path)")
+        print("  - Audio URL exists: \(FileManager.default.fileExists(atPath: audioURL.path))")
         
         Task {
             do {
+                print("🧠 [AIAnalysisView.startAnalysis] Creating analysis task")
                 let transcription = journalEntry.transcription
+                
+                // Make API call to analyze audio
                 let result = try await aiService.analyzeAudioFile(
                     audioURL: audioURL,
                     transcription: transcription
                 )
                 
+                // Update UI on main thread
                 await MainActor.run {
+                    print("🧠 [AIAnalysisView.startAnalysis] Analysis completed successfully, updating UI")
                     self.analysisResult = result
                     self.isAnalyzing = false
-                    
-                    // Log post-analysis content before saving
-                    print("✅ [AIAnalysisView.startAnalysis] Analysis completed with length: \(result.count) characters")
-                    
-                    // Automatically save the analysis
+                }
+                
+                // Log post-analysis content before saving
+                print("✅ [AIAnalysisView.startAnalysis] Analysis completed with length: \(result.count) characters")
+                
+                // Automatically save the analysis (on the main thread)
+                await MainActor.run {
+                    // Get the transcription or create it if it doesn't exist
                     var transcription = journalEntry.transcription
-                    
-                    // Create transcription if it doesn't exist
                     if transcription == nil {
                         transcription = journalEntry.createTranscription(text: "")
                     }
@@ -247,8 +255,30 @@ struct AIAnalysisView: View {
                     }
                 }
             } catch {
+                // Enhanced error reporting
+                print("❌ [AIAnalysisView.startAnalysis] Analysis error: \(error)")
+                
+                // Get more specific error information
+                let errorDetails: String
+                if let aiError = error as? AITranscriptionError {
+                    errorDetails = "AI Analysis Error: \(aiError.localizedDescription)"
+                    print("  - AI Error type: \(String(describing: aiError))")
+                } else {
+                    errorDetails = "Error: \(error.localizedDescription)"
+                    
+                    // If it's a network or system error, print more details
+                    if let nsError = error as NSError? {
+                        print("  - Error domain: \(nsError.domain)")
+                        print("  - Error code: \(nsError.code)")
+                        if let underlyingError = nsError.userInfo[NSUnderlyingErrorKey] as? NSError {
+                            print("  - Underlying error: \(underlyingError)")
+                        }
+                    }
+                }
+                
+                // Update UI on main thread
                 await MainActor.run {
-                    self.errorMessage = error.localizedDescription
+                    self.errorMessage = errorDetails
                     self.showError = true
                     self.isAnalyzing = false
                 }
