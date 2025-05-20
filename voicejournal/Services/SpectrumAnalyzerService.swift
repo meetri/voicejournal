@@ -69,11 +69,13 @@ class SpectrumAnalyzerService: AudioSpectrumDelegate {
                 audioSpectrumManager.startMicrophoneAnalysis()
             case .playback(let url):
                 audioSpectrumManager.startPlaybackAnalysis(fileURL: url)
+                // Buffers will come from AudioPlaybackManager via processAudioBuffer
             }
             
             isActive = true
         }
     }
+    
     
     /// Process audio buffer directly (for use with shared audio engine)
     func processAudioBuffer(_ buffer: AVAudioPCMBuffer) {
@@ -129,14 +131,22 @@ class SpectrumAnalyzerService: AudioSpectrumDelegate {
             }
         } else {
             // Log more frequently when there's no data, as this is an error condition
-            if Int.random(in: 0...100) < 10 {  // ~10% chance to log
+            if Int.random(in: 0...100) < 5 {  // ~5% chance to log
                 print("⚠️ [SpectrumAnalyzerService] Received all-zero frequency data from AudioSpectrumManager")
             }
         }
         
         // Notify delegate and publisher
         DispatchQueue.main.async { [weak self] in
-            self?.delegate?.didUpdateFrequencyData(processedData)
+            if let delegate = self?.delegate {
+                delegate.didUpdateFrequencyData(processedData)
+                // Log occasionally to verify delegate is called
+                if Int.random(in: 0...1000) < 2 { // 0.2% chance to log
+                    print("🎹 [SpectrumAnalyzerService] Notified delegate with frequency data")
+                }
+            } else {
+                print("⚠️ [SpectrumAnalyzerService] No delegate to receive spectrum data")
+            }
             self?.frequencyDataSubject.send(processedData)
         }
     }

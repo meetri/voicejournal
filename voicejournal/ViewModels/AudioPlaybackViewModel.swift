@@ -118,11 +118,16 @@ class AudioPlaybackViewModel: ObservableObject {
         // Set up the spectrum analyzer delegate
         self.spectrumAnalyzerService.delegate = self
         
+        // Register the spectrum analyzer with the audio playback manager
+        playbackManager.setSpectrumAnalyzerService(spectrumAnalyzerService)
+        
         // Set up publishers
         setupPublishers()
         
         // Set up audio spectrum manager for AudioPlaybackManager
         setupSpectrumAnalyzer()
+        
+        print("🎧 [AudioPlaybackViewModel] Initialized with SpectrumAnalyzerService delegate setup")
     }
     
     // MARK: - Public Methods
@@ -474,6 +479,34 @@ class AudioPlaybackViewModel: ObservableObject {
                 print("🎵 [AudioPlaybackViewModel] Started spectrum analyzer for: \(url.lastPathComponent)")
             }
             .store(in: &cancellables)
+            
+        // Also listen for WillPlay notifications with URL, for redundancy 
+        NotificationCenter.default.publisher(for: .AudioPlaybackManagerWillPlay)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] notification in
+                guard let self = self,
+                      let url = notification.object as? URL else { return }
+                
+                // Start spectrum analysis for playback
+                self.spectrumAnalyzerService.startPlaybackAnalysis(fileURL: url)
+                try? self.spectrumAnalyzerService.start()
+                print("🎵 [AudioPlaybackViewModel] Started spectrum analyzer from WillPlay: \(url.lastPathComponent)")
+            }
+            .store(in: &cancellables)
+            
+        // Listen for play notifications with URL
+        NotificationCenter.default.publisher(for: .AudioPlaybackManagerDidPlay)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] notification in
+                guard let self = self,
+                      let url = notification.object as? URL else { return }
+                
+                // Start spectrum analysis for playback
+                self.spectrumAnalyzerService.startPlaybackAnalysis(fileURL: url)
+                try? self.spectrumAnalyzerService.start()
+                print("🎵 [AudioPlaybackViewModel] Started spectrum analyzer from DidPlay: \(url.lastPathComponent)")
+            }
+            .store(in: &cancellables)
         
         // When playback stops, stop the spectrum analyzer
         NotificationCenter.default.publisher(for: .AudioPlaybackManagerDidStop)
@@ -586,6 +619,11 @@ extension AudioPlaybackViewModel: AudioSpectrumDelegate, SpectrumAnalyzerDelegat
     nonisolated func didUpdateSpectrum(_ bars: [Float]) {
         Task { @MainActor in
             self.frequencyData = bars
+            
+            // Log occasionally to verify data flow
+            if Int.random(in: 0...1000) < 1 { // 0.1% chance
+                print("📊 [AudioPlaybackViewModel] Updated spectrum data from direct delegate call")
+            }
         }
     }
     
@@ -593,6 +631,11 @@ extension AudioPlaybackViewModel: AudioSpectrumDelegate, SpectrumAnalyzerDelegat
     nonisolated func didUpdateFrequencyData(_ frequencyData: [Float]) {
         Task { @MainActor in
             self.frequencyData = frequencyData
+            
+            // Log occasionally to verify data flow
+            if Int.random(in: 0...1000) < 1 { // 0.1% chance
+                print("📊 [AudioPlaybackViewModel] Updated spectrum data from analyzer service")
+            }
         }
     }
 }

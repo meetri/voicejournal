@@ -23,6 +23,14 @@ class AudioPlaybackManager: NSObject, ObservableObject {
     /// Audio player instance
     private var audioPlayer: AVAudioPlayer?
     
+    /// Audio engine for spectrum analysis
+    private let audioEngine = AVAudioEngine()
+    private var playerNode: AVAudioPlayerNode?
+    private var audioFile: AVAudioFile?
+    
+    /// Spectrum analyzer service reference
+    private weak var spectrumAnalyzerService: SpectrumAnalyzerService?
+    
     /// Cache of decrypted audio paths mapped by entry object ID
     private var decryptedPathCache: [NSManagedObjectID: String] = [:]
     
@@ -74,6 +82,12 @@ class AudioPlaybackManager: NSObject, ObservableObject {
     
     // MARK: - Playback Methods
     
+    /// Set the spectrum analyzer service
+    func setSpectrumAnalyzerService(_ service: SpectrumAnalyzerService) {
+        spectrumAnalyzerService = service
+        print("🔊 [AudioPlaybackManager] SpectrumAnalyzerService registered")
+    }
+    
     /// Load and prepare audio for a journal entry
     func loadAudio(for entry: JournalEntry) {
         print("🎵 [AudioPlaybackManager] Loading audio for entry: \(entry.objectID)")
@@ -102,10 +116,67 @@ class AudioPlaybackManager: NSObject, ObservableObject {
         if let audioURL = getAudioURL(for: entry, recording: audioRecording) {
             print("✅ [AudioPlaybackManager] Audio URL obtained: \(audioURL.path)")
             loadAudioFile(at: audioURL, for: entry.objectID)
+            
+            // Set up engine and player node for spectrum analysis
+            setupSpectrumAnalysis(fileURL: audioURL)
         } else {
             print("❌ [AudioPlaybackManager] Failed to get audio URL")
             playbackError = AudioManagerError.failedToGetAudioURL
         }
+    }
+    
+    /// Set up engine and player node for spectrum analysis
+    private func setupSpectrumAnalysis(fileURL: URL) {
+        print("📊 [AudioPlaybackManager] Setting up spectrum analysis for: \(fileURL.lastPathComponent)")
+        
+        // Clean up any existing engine setup
+        cleanupSpectrumAnalysis()
+        
+        do {
+            // Create audio file for spectrum analysis
+            audioFile = try AVAudioFile(forReading: fileURL)
+            
+            // Create player node
+            let player = AVAudioPlayerNode()
+            audioEngine.attach(player)
+            self.playerNode = player
+            
+            if let file = audioFile {
+                // Connect player to main mixer
+                audioEngine.connect(player, to: audioEngine.mainMixerNode, format: file.processingFormat)
+                
+                // Install tap on the player node to capture audio data
+                let bufferSize = AVAudioFrameCount(1024) // Use appropriate buffer size for FFT
+                player.installTap(onBus: 0, bufferSize: bufferSize, format: file.processingFormat) { [weak self] buffer, _ in
+                    // Forward the buffer to spectrum analyzer service
+                    self?.spectrumAnalyzerService?.processAudioBuffer(buffer)
+                }
+                
+                // Start the engine
+                try audioEngine.start()
+                
+                print("🎵 [AudioPlaybackManager] Audio engine started for spectrum analysis")
+            }
+        } catch {
+            print("❌ [AudioPlaybackManager] Failed to set up spectrum analysis: \(error)")
+        }
+    }
+    
+    /// Clean up spectrum analysis resources
+    private func cleanupSpectrumAnalysis() {
+        if let player = playerNode {
+            player.removeTap(onBus: 0)
+            player.stop()
+            audioEngine.detach(player)
+            playerNode = nil
+        }
+        
+        if audioEngine.isRunning {
+            audioEngine.stop()
+        }
+        
+        audioFile = nil
+        print("🧹 [AudioPlaybackManager] Cleaned up spectrum analysis resources")
     }
     
     /// Play the loaded audio
@@ -120,10 +191,18 @@ class AudioPlaybackManager: NSObject, ObservableObject {
         startPlaybackTimer()
         print("▶️ [AudioPlaybackManager] Playback started")
         
-        // Post notification for spectrum analyzer and other listeners
+        // Play the audio in the player node for spectrum analysis
+        if let playerNode = playerNode, let audioFile = audioFile {
+            playerNode.stop()
+            playerNode.scheduleFile(audioFile, at: nil)
+            playerNode.play()
+            print("🎵 [AudioPlaybackManager] Started player node for spectrum analysis")
+        }
+        
+        // Post notification for other listeners
         NotificationCenter.default.post(
             name: .AudioPlaybackManagerDidPlay,
-            object: nil
+            object: audioPlayer?.url
         )
     }
     
@@ -134,7 +213,10 @@ class AudioPlaybackManager: NSObject, ObservableObject {
         stopPlaybackTimer()
         print("⏸ [AudioPlaybackManager] Playback paused")
         
-        // Post notification for spectrum analyzer and other listeners
+        // Pause the player node for spectrum analysis
+        playerNode?.pause()
+        
+        // Post notification for other listeners
         NotificationCenter.default.post(
             name: .AudioPlaybackManagerDidPause,
             object: nil
@@ -150,7 +232,10 @@ class AudioPlaybackManager: NSObject, ObservableObject {
         stopPlaybackTimer()
         print("⏹ [AudioPlaybackManager] Playback stopped")
         
-        // Post notification for spectrum analyzer and other listeners
+        // Stop the player node for spectrum analysis
+        playerNode?.stop()
+        
+        // Post notification for other listeners
         NotificationCenter.default.post(
             name: .AudioPlaybackManagerDidStop,
             object: nil
@@ -161,6 +246,31 @@ class AudioPlaybackManager: NSObject, ObservableObject {
     func seek(to time: TimeInterval) {
         audioPlayer?.currentTime = time
         currentTime = time
+        
+        // If we're playing, update the player node for spectrum analysis
+        if isPlaying, let playerNode = playerNode, let audioFile = audioFile {
+            let wasPlaying = playerNode.isPlaying
+            
+            // Calculate frame position
+            let framePosition = AVAudioFramePosition(time * audioFile.processingFormat.sampleRate)
+            
+            // Stop current playback
+            playerNode.stop()
+            
+            // Schedule file from the new position
+            let frameCount = AVAudioFrameCount(audioFile.length - framePosition)
+            playerNode.scheduleSegment(
+                audioFile,
+                startingFrame: framePosition,
+                frameCount: frameCount,
+                at: nil
+            )
+            
+            // Resume if it was playing
+            if wasPlaying {
+                playerNode.play()
+            }
+        }
     }
     
     // MARK: - Private Methods
@@ -383,6 +493,12 @@ class AudioPlaybackManager: NSObject, ObservableObject {
                 object: url
             )
             
+            // Also post notification on play to ensure spectrum analyzer receives the audio file URL
+            NotificationCenter.default.post(
+                name: .AudioPlaybackManagerWillPlay,
+                object: url
+            )
+            
         } catch {
             print("❌ [AudioPlaybackManager] Failed to load audio: \(error)")
             playbackError = error
@@ -566,6 +682,7 @@ extension AudioPlaybackManager: AVAudioPlayerDelegate {
 
 extension Notification.Name {
     static let AudioPlaybackManagerDidLoadAudio = Notification.Name("AudioPlaybackManagerDidLoadAudio")
+    static let AudioPlaybackManagerWillPlay = Notification.Name("AudioPlaybackManagerWillPlay")
     static let AudioPlaybackManagerDidPlay = Notification.Name("AudioPlaybackManagerDidPlay")
     static let AudioPlaybackManagerDidPause = Notification.Name("AudioPlaybackManagerDidPause")
     static let AudioPlaybackManagerDidStop = Notification.Name("AudioPlaybackManagerDidStop")
