@@ -20,13 +20,20 @@ class AudioPlaybackManager: NSObject, ObservableObject {
     
     // MARK: - Properties
     
-    /// Audio player instance
-    private var audioPlayer: AVAudioPlayer?
-    
-    /// Audio engine for spectrum analysis
+    /// Audio engine for playback and spectrum analysis
     private let audioEngine = AVAudioEngine()
     private var playerNode: AVAudioPlayerNode?
     private var audioFile: AVAudioFile?
+    
+    /// Audio player instance (legacy - to be removed)
+    private var audioPlayer: AVAudioPlayer?
+    
+    /// Node completion handler for detecting end of file playback
+    private var completionHandler: AVAudioPlayerNodeCompletionHandler?
+    
+    /// Frame position tracking for seeking
+    private var lastKnownSampleTime: AVAudioFramePosition = 0
+    private var sampleRate: Double = 44100.0 // Default, will be updated from audio file
     
     /// Spectrum analyzer service reference
     private weak var spectrumAnalyzerService: SpectrumAnalyzerService?
@@ -117,138 +124,133 @@ class AudioPlaybackManager: NSObject, ObservableObject {
             print("✅ [AudioPlaybackManager] Audio URL obtained: \(audioURL.path)")
             loadAudioFile(at: audioURL, for: entry.objectID)
             
-            // Set up engine and player node for spectrum analysis
-            setupSpectrumAnalysis(fileURL: audioURL)
+            // Audio engine is already set up in loadAudioFile
         } else {
             print("❌ [AudioPlaybackManager] Failed to get audio URL")
             playbackError = AudioManagerError.failedToGetAudioURL
         }
     }
     
-    /// Set up engine and player node for spectrum analysis
-    private func setupSpectrumAnalysis(fileURL: URL) {
-        print("📊 [AudioPlaybackManager] Setting up spectrum analysis for: \(fileURL.lastPathComponent)")
-        
-        // Clean up any existing engine setup
-        cleanupSpectrumAnalysis()
-        
-        do {
-            // Create audio file for spectrum analysis
-            audioFile = try AVAudioFile(forReading: fileURL)
-            
-            // Create player node
-            let player = AVAudioPlayerNode()
-            audioEngine.attach(player)
-            self.playerNode = player
-            
-            if let file = audioFile {
-                // Connect player to main mixer (required for AVAudioEngine to work)
-                audioEngine.connect(player, to: audioEngine.mainMixerNode, format: file.processingFormat)
-                
-                // Set player volume to 0 to prevent audio output
-                player.volume = 0.0
-                
-                // Install tap on the player node to capture audio data
-                let bufferSize = AVAudioFrameCount(1024) // Use appropriate buffer size for FFT
-                player.installTap(onBus: 0, bufferSize: bufferSize, format: file.processingFormat) { [weak self] buffer, _ in
-                    // Forward the buffer to spectrum analyzer service
-                    self?.spectrumAnalyzerService?.processAudioBuffer(buffer)
-                }
-                
-                // Start the engine but don't start playing yet
-                // That will happen when play() is called
-                try audioEngine.start()
-                
-                print("🎵 [AudioPlaybackManager] Audio engine setup complete for spectrum analysis")
-                print("📊 [AudioPlaybackManager] Audio file format: \(file.processingFormat), length: \(file.length) frames")
-            }
-        } catch {
-            print("❌ [AudioPlaybackManager] Failed to set up spectrum analysis: \(error)")
-        }
-    }
-    
-    /// Clean up spectrum analysis resources
-    private func cleanupSpectrumAnalysis() {
-        // Stop the engine first to prevent any race conditions
-        if audioEngine.isRunning {
-            audioEngine.stop()
-        }
-        
-        // Clean up player node
-        if let player = playerNode {
-            player.removeTap(onBus: 0)
-            player.stop()
-            audioEngine.detach(player)
-            playerNode = nil
-        }
-        
-        audioFile = nil
-        print("🧹 [AudioPlaybackManager] Cleaned up spectrum analysis resources")
-    }
+    // Old spectrum-specific setup methods have been consolidated into setupAudioEngine
     
     /// Play the loaded audio
     func play() {
-        guard let player = audioPlayer else {
-            print("❌ [AudioPlaybackManager] No audio player available")
-            return
-        }
-        
-        // Get current time for synchronized playback
-        let currentTimePosition = player.currentTime
-        let wasAlreadyPlaying = isPlaying
-        
-        player.play()
-        isPlaying = true
-        startPlaybackTimer()
-        print("▶️ [AudioPlaybackManager] Playback started")
-        
-        // Handling spectrum analysis playback
+        // Check if we can play audio using engine
         if let playerNode = playerNode, let audioFile = audioFile {
-            // Only restart playback if we weren't already playing
-            // or if current time is at the beginning
-            if !wasAlreadyPlaying {
+            if !isPlaying {
+                // Remember if we're resuming from a paused position
+                let isResuming = currentTime > 0.01
+                
+                // Stop any existing scheduled audio
                 playerNode.stop()
                 
-                // If resuming from a paused state (non-zero position)
-                if currentTimePosition > 0.01 {
-                    // Calculate frame position for synchronized resume
-                    let framePosition = AVAudioFramePosition(currentTimePosition * audioFile.processingFormat.sampleRate)
-                    let frameCount = AVAudioFrameCount(audioFile.length - framePosition)
-                    
-                    // Schedule file from current position
-                    playerNode.scheduleSegment(
-                        audioFile,
-                        startingFrame: framePosition,
-                        frameCount: frameCount,
-                        at: nil
-                    )
-                    print("🎵 [AudioPlaybackManager] Resumed player node from position: \(currentTimePosition)")
-                } else {
-                    // Start from beginning
-                    playerNode.scheduleFile(audioFile, at: nil)
-                    print("🎵 [AudioPlaybackManager] Started player node from beginning")
+                // Calculate frame position for correct playback point
+                let framePosition = isResuming ? 
+                    AVAudioFramePosition(currentTime * sampleRate) : 
+                    AVAudioFramePosition(0)
+                
+                // Ensure position is within file bounds
+                let safePosition = max(0, min(framePosition, audioFile.length - 1))
+                
+                // Calculate remaining frames
+                let frameCount = AVAudioFrameCount(audioFile.length - safePosition)
+                
+                // Configure completion handler to detect end of file
+                completionHandler = { [weak self] (callbackType) in
+                    if callbackType == .dataPlayedBack {
+                        DispatchQueue.main.async {
+                            self?.handlePlaybackCompleted()
+                        }
+                    }
                 }
                 
+                // Schedule audio segment from current position
+                if isResuming {
+                    playerNode.scheduleSegment(
+                        audioFile,
+                        startingFrame: safePosition,
+                        frameCount: frameCount,
+                        at: nil,
+                        completionCallbackType: .dataPlayedBack,
+                        completionHandler: completionHandler
+                    )
+                    
+                    print("🎵 [AudioPlaybackManager] Resumed playback from: \(currentTime)s")
+                } else {
+                    // Start from beginning
+                    playerNode.scheduleFile(
+                        audioFile,
+                        at: nil,
+                        completionCallbackType: .dataPlayedBack,
+                        completionHandler: completionHandler
+                    )
+                    
+                    print("🎵 [AudioPlaybackManager] Started playback from beginning")
+                }
+                
+                // Start player node and update state
                 playerNode.play()
+                lastKnownSampleTime = safePosition
+                isPlaying = true
+                startPlaybackTimer()
+                
+                // Post notification
+                NotificationCenter.default.post(
+                    name: .AudioPlaybackManagerDidPlay, 
+                    object: audioFile.url
+                )
             }
         }
+        // Fallback to legacy player if needed
+        else if let player = audioPlayer {
+            player.play()
+            isPlaying = true
+            startPlaybackTimer()
+            print("▶️ [AudioPlaybackManager] Playback started with legacy player")
+            
+            // Post notification
+            NotificationCenter.default.post(
+                name: .AudioPlaybackManagerDidPlay,
+                object: player.url
+            )
+        }
+        else {
+            print("❌ [AudioPlaybackManager] No audio player available")
+        }
+    }
+    
+    /// Handle playback completion
+    private func handlePlaybackCompleted() {
+        // Update playback state
+        isPlaying = false
+        currentTime = 0
+        stopPlaybackTimer()
+        print("🏁 [AudioPlaybackManager] Playback finished")
         
-        // Post notification for other listeners
+        // Post notification
         NotificationCenter.default.post(
-            name: .AudioPlaybackManagerDidPlay,
-            object: audioPlayer?.url
+            name: .AudioPlaybackManagerDidFinishPlaying,
+            object: nil
         )
     }
     
     /// Pause playback
     func pause() {
+        // Store current time before pausing
+        updatePlaybackTime()
+        
+        // Handle pause with audio engine
+        if let playerNode = playerNode {
+            playerNode.pause()
+            print("⏸ [AudioPlaybackManager] Engine playback paused at: \(currentTime)")
+        }
+        
+        // Fallback to legacy player
         audioPlayer?.pause()
+        
+        // Update state
         isPlaying = false
         stopPlaybackTimer()
-        print("⏸ [AudioPlaybackManager] Playback paused")
-        
-        // Pause the player node for spectrum analysis
-        playerNode?.pause()
         
         // Post notification for other listeners
         NotificationCenter.default.post(
@@ -259,18 +261,21 @@ class AudioPlaybackManager: NSObject, ObservableObject {
     
     /// Stop playback
     func stop() {
-        audioPlayer?.stop()
-        audioPlayer?.currentTime = 0
-        isPlaying = false
-        currentTime = 0
-        stopPlaybackTimer()
-        print("⏹ [AudioPlaybackManager] Playback stopped")
-        
-        // Stop the player node for spectrum analysis and reset it
+        // Handle stop with audio engine
         if let playerNode = playerNode {
             playerNode.stop()
-            print("🎵 [AudioPlaybackManager] Stopped player node for spectrum analysis")
+            print("⏹ [AudioPlaybackManager] Engine playback stopped")
         }
+        
+        // Fallback to legacy player
+        audioPlayer?.stop()
+        audioPlayer?.currentTime = 0
+        
+        // Update state
+        isPlaying = false
+        currentTime = 0
+        lastKnownSampleTime = 0
+        stopPlaybackTimer()
         
         // Post notification for other listeners
         NotificationCenter.default.post(
@@ -281,16 +286,16 @@ class AudioPlaybackManager: NSObject, ObservableObject {
     
     /// Seek to specific time
     func seek(to time: TimeInterval) {
-        // Set time on main audio player
-        audioPlayer?.currentTime = time
-        currentTime = time
+        // Make sure time is within valid range
+        let validTime = max(0, min(time, duration))
+        currentTime = validTime
         
-        // Synchronize the player node for spectrum analysis
+        // Handle seek with audio engine (only if currently playing)
         if let playerNode = playerNode, let audioFile = audioFile {
             let wasPlaying = playerNode.isPlaying
             
             // Calculate frame position
-            let framePosition = AVAudioFramePosition(time * audioFile.processingFormat.sampleRate)
+            let framePosition = AVAudioFramePosition(validTime * sampleRate)
             
             // Stop current playback
             playerNode.stop()
@@ -298,24 +303,43 @@ class AudioPlaybackManager: NSObject, ObservableObject {
             // Validate frame position to ensure it's within bounds
             let safeFramePosition = max(0, min(framePosition, audioFile.length - 1))
             
-            // Calculate remaining frames
-            let frameCount = AVAudioFrameCount(audioFile.length - safeFramePosition)
+            // Save position for tracking
+            lastKnownSampleTime = safeFramePosition
             
-            // Schedule file from the new position
-            playerNode.scheduleSegment(
-                audioFile,
-                startingFrame: safeFramePosition,
-                frameCount: frameCount,
-                at: nil
-            )
-            
-            // Resume if it was playing
+            // Only reschedule if we're currently playing
             if wasPlaying {
+                // Calculate remaining frames
+                let frameCount = AVAudioFrameCount(audioFile.length - safeFramePosition)
+                
+                // Configure completion handler
+                completionHandler = { [weak self] (callbackType) in
+                    if callbackType == .dataPlayedBack {
+                        DispatchQueue.main.async {
+                            self?.handlePlaybackCompleted()
+                        }
+                    }
+                }
+                
+                // Schedule file from the new position
+                playerNode.scheduleSegment(
+                    audioFile,
+                    startingFrame: safeFramePosition,
+                    frameCount: frameCount,
+                    at: nil,
+                    completionCallbackType: .dataPlayedBack,
+                    completionHandler: completionHandler
+                )
+                
+                // Resume playback
                 playerNode.play()
+                print("🎵 [AudioPlaybackManager] Seeked and resumed engine playback at: \(validTime)")
+            } else {
+                print("🎵 [AudioPlaybackManager] Seeked engine position to: \(validTime) (paused)")
             }
-            
-            print("🎵 [AudioPlaybackManager] Seeked player node to position: \(time)")
         }
+        
+        // Fallback to legacy player
+        audioPlayer?.currentTime = validTime
     }
     
     // MARK: - Private Methods
@@ -517,20 +541,29 @@ class AudioPlaybackManager: NSObject, ObservableObject {
     }
     
     private func loadAudioFile(at url: URL, for entryID: NSManagedObjectID) {
+        // Stop any existing playback
+        stop()
+        
+        // Create audio player as fallback (legacy - will be removed in future updates)
         do {
-            // Stop any existing playback
-            stop()
-            
-            // Create new audio player
             audioPlayer = try AVAudioPlayer(contentsOf: url)
             audioPlayer?.delegate = self
             audioPlayer?.prepareToPlay()
+        } catch let playerError {
+            print("⚠️ [AudioPlaybackManager] Warning: Legacy AVAudioPlayer not available: \(playerError.localizedDescription). Using AVAudioEngine only.")
+            audioPlayer = nil
+        }
+        
+        do {
+            // Set up audio engine with the file (primary playback method)
+            try setupAudioEngine(with: url)
             
-            // Update properties
-            duration = audioPlayer?.duration ?? 0
+            // Store entry ID
             currentlyPlayingEntryID = entryID
             
-            print("✅ [AudioPlaybackManager] Audio loaded successfully. Duration: \(duration)")
+            // Format time for display
+            let durationStr = String(format: "%.2f", duration)
+            print("✅ [AudioPlaybackManager] Audio loaded successfully. Duration: \(durationStr)s")
             
             // Post notification with URL for spectrum analyzer
             NotificationCenter.default.post(
@@ -554,6 +587,70 @@ class AudioPlaybackManager: NSObject, ObservableObject {
                 object: error
             )
         }
+    }
+    
+    /// Setup audio engine with the specified audio file
+    private func setupAudioEngine(with url: URL) throws {
+        // First clean up any existing engine setup
+        cleanupAudioEngine()
+        
+        do {
+            // Create audio file
+            let file = try AVAudioFile(forReading: url)
+            audioFile = file
+            
+            // Create player node
+            let player = AVAudioPlayerNode()
+            audioEngine.attach(player)
+            self.playerNode = player
+            
+            // Connect player to main mixer (for actual output)
+            audioEngine.connect(player, to: audioEngine.mainMixerNode, format: file.processingFormat)
+            
+            // Install tap on the player node to capture audio data for spectrum analysis
+            let bufferSize = AVAudioFrameCount(1024)
+            player.installTap(onBus: 0, bufferSize: bufferSize, format: file.processingFormat) { [weak self] buffer, _ in
+                self?.spectrumAnalyzerService?.processAudioBuffer(buffer)
+            }
+            
+            // Store sample rate for accurate position tracking
+            sampleRate = file.processingFormat.sampleRate
+            
+            // Calculate duration directly from the audio file
+            duration = Double(file.length) / sampleRate
+            
+            // Start the engine (but don't start playing yet)
+            try audioEngine.start()
+            
+            print("🎵 [AudioPlaybackManager] Audio engine started with file: \(url.lastPathComponent)")
+            print("🔊 [AudioPlaybackManager] Audio format: \(file.processingFormat)")
+            
+        } catch {
+            print("❌ [AudioPlaybackManager] Failed to setup audio engine: \(error)")
+            throw error
+        }
+    }
+    
+    /// Clean up audio engine resources
+    private func cleanupAudioEngine() {
+        // Stop the engine first
+        if audioEngine.isRunning {
+            audioEngine.stop()
+        }
+        
+        // Reset completion handler
+        completionHandler = nil
+        
+        // Clean up player node
+        if let player = playerNode {
+            player.removeTap(onBus: 0)
+            player.stop()
+            audioEngine.detach(player)
+            playerNode = nil
+        }
+        
+        audioFile = nil
+        print("🧹 [AudioPlaybackManager] Cleaned up audio engine resources")
     }
     
     // MARK: - Cleanup
@@ -661,7 +758,26 @@ class AudioPlaybackManager: NSObject, ObservableObject {
     }
     
     private func updatePlaybackTime() {
-        currentTime = audioPlayer?.currentTime ?? 0
+        if let playerNode = playerNode, playerNode.isPlaying {
+            // For AVAudioEngine, we need to estimate current time based on:
+            // 1. Last known position
+            // 2. How long the node has been playing
+            if let nodeTime = playerNode.lastRenderTime,
+               let playerTime = playerNode.playerTime(forNodeTime: nodeTime) {
+                // Calculate current position in frames
+                let currentFrame = lastKnownSampleTime + AVAudioFramePosition(playerTime.sampleTime)
+                
+                // Convert to seconds
+                currentTime = Double(currentFrame) / sampleRate
+                
+                // Ensure time doesn't exceed duration
+                currentTime = min(currentTime, duration)
+            }
+        } 
+        // Fallback to legacy AVAudioPlayer for position tracking
+        else if let player = audioPlayer {
+            currentTime = player.currentTime
+        }
     }
 }
 
