@@ -233,18 +233,9 @@ class AudioSpectrumManager {
                         }
                     }
                     
-                    // Create artificial data for testing if all values are zero
-                    var finalBars = bars
-                    if !finalBars.contains(where: { $0 > 0 }) {
-                        // Inject some test data to ensure animation works
-                        for i in 0..<finalBars.count {
-                            finalBars[i] = Float.random(in: 0...0.3)
-                        }
-                    }
-                    
                     // Dispatch UI updates to main thread
                     DispatchQueue.main.async {
-                        self.delegate?.didUpdateSpectrum(finalBars)
+                        self.delegate?.didUpdateSpectrum(bars)
                     }
                 }
             }
